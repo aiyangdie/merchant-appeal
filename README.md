@@ -1,353 +1,366 @@
-# 🛡️ 微信商户号申诉专业助手（Merchant Appeal Assistant）
+# 🛡️ 微信商户号申诉专业助手
 
-> **AI驱动的商户号申诉解决方案** — 基于 DeepSeek 大模型，智能收集信息、精准生成申诉材料，帮助商户高效解决微信支付风控问题。
+### Merchant Appeal Assistant — AI-Powered Smart Appeal Solution
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
-[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-purple.svg)](https://deepseek.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> 基于 **DeepSeek 大模型**的智能商户号申诉系统。像真人顾问一样对话，自动收集信息、智能生成申诉材料，帮助商户高效解决微信支付风控问题。
+
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-7C3AED?style=for-the-badge)](https://deepseek.com/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://mysql.com/)
+[![License](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
+
+---
+
+## 🎯 项目定位
+
+**这不是一个 Demo，是一个可直接商用的申诉工具。**
+
+微信支付商户号被风控（冻结、封禁、限额、拦截）后，商户往往不知道怎么申诉、材料怎么写、重点在哪里。本系统通过 AI 对话收集信息，自动生成符合微信官方要求的申诉材料，大幅降低申诉门槛，提升通过率。
+
+### 解决的核心痛点
+
+| 痛点 | 本系统方案 |
+|------|-----------|
+| 商户不知道需要准备哪些材料 | AI 对话自动引导，像朋友聊天一样收集所有必要信息 |
+| 申诉材料不专业、漏洞百出 | 基于行业知识库 + 成功案例，AI 生成严谨合规的申诉文案 |
+| 不了解自己被处罚的原因和应对策略 | 内置 30+ 行业风控知识，自动分析处罚原因和最优策略 |
+| 找专业顾问费用高昂 | Token 计费模式，成本低至几毛钱一次 |
+| 模板化申诉千篇一律 | AI 根据每个商户的具体情况定制个性化申诉方案 |
 
 ---
 
 ## ✨ 核心特性
 
-| 特性 | 说明 |
-|------|------|
-| 🤖 **AI智能对话** | 基于DeepSeek大模型，像真人顾问一样自然对话，理解碎片化、口语化表达 |
-| 🔍 **智能信息提取** | 所有字段提取100%由DeepSeek API完成，精准无幻觉，支持随时修正 |
-| 📋 **专业申诉材料** | 自动生成可直接提交微信官方的申诉文案，严谨合规 |
-| 🏭 **行业自适应** | 覆盖30+行业知识库，10+敏感行业检测，自动匹配最优申诉策略 |
-| 📊 **案例智能匹配** | 内置成功案例知识库，AI参考相似案例生成更有针对性的材料 |
-| ⚡ **流式响应** | SSE流式传输，首字节延迟<1秒，实时显示Token用量和成本 |
-| 🔒 **反幻觉四重防线** | 对话prompt+报告prompt+提取prompt+服务端校验，杜绝AI编造 |
-| 💰 **Token计费系统** | DeepSeek统一计费，充值后使用，自动扣费，支持自定义API Key |
-| 🛠️ **管理后台** | 用户管理、会话监控、系统配置、充值审核、案例库维护 |
+### 🤖 AI 智能对话引擎
+- **DeepSeek 大模型驱动**：不是简单的问答机器人，是真正理解语义的 AI 顾问
+- **自然语言理解**：用户说"钱取不出来"→自动识别为"资金冻结"，说"被封了"→"商户号封禁"
+- **碎片化表达处理**：用户说话断断续续、前后矛盾、夹杂情绪，AI 都能准确理出有用信息
+- **信息随时修正**：说错了随时改，AI 主动确认"之前是 XX，现在改成 YY 对吧？"
+
+### 🔍 DeepSeek 统一智能提取
+- **100% AI 提取**：所有字段提取由 DeepSeek API 完成，零正则、零硬编码
+- **反幻觉四重防线**：对话 Prompt → 提取 Prompt → 报告 Prompt → 服务端校验
+- **跨字段智能识别**：用户在回答 A 问题时顺带说了 B 的信息，AI 全部捕获
+- **纠错检测**：自动识别"不是 XX 是 YY""之前说错了"等纠正意图
+
+### 🏭 行业自适应系统
+- **30+ 行业知识库**：电商、游戏、教育、医疗、金融等，每个行业有专属的申诉策略
+- **10+ 敏感行业检测**：自动识别高风险行业（博彩、虚拟货币等），针对性处理
+- **动态字段扩展**：根据行业自动增加特定信息收集项（如游戏行业需要版号）
+
+### 📋 专业申诉材料生成
+- **结构化报告**：包含问题分析、原因剖析、整改方案、申诉理由四大板块
+- **案例智能匹配**：内置成功案例库，AI 参考相似案例生成更有针对性的材料
+- **合规审核**：输出内容 100% 基于用户提供的真实信息，严禁编造
+
+### ⚡ 极致性能体验
+- **SSE 流式传输**：AI 回复实时流出，首字节延迟 < 1 秒
+- **并行处理**：对话生成和字段提取并行执行，用户无感知
+- **实时指标**：每条消息显示延迟、Token 用量、费用
+
+### 💰 完整计费系统
+- **DeepSeek Token 统一计费**：充值后使用，每次调用自动扣费
+- **双模式支持**：官方模式（平台扣费）/ 自定义模式（用户自己的 API Key）
+- **费用透明**：实时显示每条消息的 Token 消耗和费用
+
+### 🛠️ 全功能管理后台
+- **用户管理**：查看、删除用户，调整余额
+- **会话监控**：实时查看所有对话，支持管理员人工回复
+- **系统配置**：DeepSeek API Key、模型选择、费用倍率
+- **充值审核**：用户充值订单审核确认
+- **案例库管理**：维护成功申诉案例，提升 AI 生成质量
+
+---
 
 ## 🏗️ 系统架构
 
 ```
-┌─────────────┐    SSE Stream    ┌──────────────┐    API    ┌──────────┐
-│  React SPA  │ ◄──────────────► │  Express API │ ◄───────► │  MySQL   │
-│  TailwindCSS│                  │  规则引擎     │           │  数据持久化│
-└─────────────┘                  └──────┬───────┘           └──────────┘
-                                        │
-                                        ▼ DeepSeek API
-                                 ┌──────────────┐
-                                 │ 对话生成      │
-                                 │ 字段提取      │
-                                 │ 完成度评估    │
-                                 │ 报告生成      │
-                                 │ 行业扩展      │
-                                 └──────────────┘
+用户浏览器                         服务端                           外部服务
+┌──────────────┐              ┌─────────────────┐            ┌──────────────┐
+│  React 18    │  SSE Stream  │  Express API    │            │  DeepSeek    │
+│  TailwindCSS │◄────────────►│                 │◄──────────►│  大模型 API   │
+│  React Router│              │  ┌───────────┐  │            └──────────────┘
+└──────────────┘              │  │ 规则引擎   │  │
+                              │  │ (localAI)  │  │            ┌──────────────┐
+                              │  └───────────┘  │            │  MySQL 8.0   │
+                              │  ┌───────────┐  │◄──────────►│  数据持久化   │
+                              │  │ 知识库     │  │            └──────────────┘
+                              │  │ 30+行业    │  │
+                              │  └───────────┘  │
+                              └─────────────────┘
 ```
 
-## 📦 项目简介
+### DeepSeek API 调用点（5 处）
 
-本项目是一个**商用级微信商户号申诉咨询/材料生成**应用，包含：
+| 调用场景 | 功能 | 并行/串行 |
+|----------|------|-----------|
+| **对话生成** | 流式生成 AI 回复 | 立即流式输出 |
+| **字段提取** | 从用户消息中提取结构化数据 | 与对话并行 |
+| **完成度评估** | 判断信息是否充分、是否可生成报告 | 后台异步 |
+| **报告生成** | 生成完整申诉材料 | 流式输出 |
+| **行业扩展** | 根据行业动态生成额外信息收集项 | 触发式 |
 
-- **前台用户端**：会话式AI对话收集信息、智能申诉材料生成、充值与用量查看
-- **后台管理端**：用户管理、会话监控、系统配置、充值审核、成功案例知识库
-- **后端服务**：Express + MySQL + DeepSeek API，规则引擎兜底，流式SSE响应
+---
 
-运行形态：
+## 🚀 快速开始
 
-- 本地开发：Vite 前端（5173）代理到 Node 后端（3001）
-- 生产部署：前端 `dist/` 由 Nginx 托管，反代 `/api/` 到 Node 后端
- 
- ---
- 
- ## 2. 技术栈
- 
- - **前端**：React 18、React Router、Vite 6、TailwindCSS
- - **后端**：Node.js (ESM)、Express、helmet、cors、express-rate-limit、jsonwebtoken
- - **数据库**：MySQL（mysql2/promise）
- - **AI**：DeepSeek Chat Completions（可使用系统 Key 或用户自定义 Key）
- - **其它**：
-   - `uuid`：会话ID
-   - `bcryptjs`：管理员密码
-   - `html2canvas`：前端页面截图/导出（用于材料/凭证展示等场景）
- 
- ---
- 
- ## 3. 目录结构
- 
- ```
- merchant-appeal/
- ├── public/
- ├── src/
- │   ├── components/
- │   ├── pages/
- │   │   ├── ChatPage.jsx        # 用户端主页面
- │   │   ├── AdminLogin.jsx      # 后台登录
- │   │   └── AdminPage.jsx       # 后台管理控制台
- │   ├── App.jsx                 # 前端路由：/、/admin、/admin/dashboard
- │   ├── main.jsx
- │   └── index.css
- ├── server/
- │   ├── index.js                # 后端入口（Express）
- │   ├── db.js                   # DB 初始化/表结构/数据访问层（含加密迁移）
- │   ├── ai.js                   # DeepSeek 调用与后备规则引擎（部分流程）
- │   ├── localAI.js              # 本地规则引擎：信息收集/行业知识/敏感行业识别
- │   ├── knowledgeBase.js        # 内置知识库：违规类型/风险/材料清单/案例匹配
- │   ├── tokenizer.js            # token 统计与计费
- │   └── crypto.js               # 敏感信息加解密（配合 ENCRYPT_KEY）
- ├── dist/                       # 前端构建产物（生产环境）
- ├── .env.example
- ├── DEPLOY.md                   # 宝塔面板部署指南
- ├── vite.config.js
- └── package.json
- ```
- 
- ---
- 
- ## 4. 本地开发
- 
- ### 4.1 环境要求
- 
- - Node.js：建议 18+
- - MySQL：5.7+ 或 8.0+
- 
- ### 4.2 安装依赖
- 
- ```bash
- npm install
- ```
- 
- ### 4.3 配置环境变量
- 
- 复制 `.env.example` 为 `.env`，按你的环境填写：
- 
- - 数据库：`DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME`
- - 安全：`ENCRYPT_KEY`（AES-256 32字节十六进制=64位 hex）、`JWT_SECRET`
- - 服务：`PORT`（默认 3001）、`CORS_ORIGINS`
- - 限速：`RATE_LIMIT_MAX`、`CHAT_RATE_LIMIT_MAX`
- 
- **注意**：后端启动时如果 `JWT_SECRET` 未配置，会提示警告并使用不安全默认值（仅建议本地临时调试）。
- 
- ### 4.4 启动开发服务
- 
- ```bash
- npm run dev
- ```
- 
- - 前端：`http://localhost:5173`
- - 后端：`http://localhost:3001`
- 
- Vite 已在 `vite.config.js` 中配置代理：`/api` -> `http://localhost:3001`。
- 
- ---
- 
- ## 5. 构建与生产启动
- 
- ```bash
- npm run build
- npm run start
- ```
- 
- - `build`：生成 `dist/`
- - `start`：仅启动后端（生产环境通常由 Nginx 托管 `dist/` 并反代 API）
- 
- ---
- 
- ## 6. 环境变量说明（.env）
- 
- 与 `.env.example` / `DEPLOY.md` 保持一致，核心项如下：
- 
- - **数据库**
-   - `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME`
-   - `DB_CONNECTION_LIMIT`
- - **安全**
-   - `ENCRYPT_KEY`：用于加密存储敏感配置（如 DeepSeek Key、支付配置、用户手机号/IP 等）
-   - `JWT_SECRET`：用于签发管理员/用户 JWT
-   - `JWT_EXPIRES_IN`：默认 `24h`
- - **服务**
-   - `PORT`：后端端口（默认 3001）
-   - `NODE_ENV`：`production`/`development`
-   - `CORS_ORIGINS`：允许跨域来源（生产建议配置域名，支持逗号分隔）
- - **限速**
-   - `RATE_LIMIT_MAX`：全局限速
-   - `CHAT_RATE_LIMIT_MAX`：聊天接口限速
- 
- ---
- 
- ## 7. 核心流程与数据流（概览）
- 
- ### 7.1 用户侧
- 
- - 用户在 `/`（`ChatPage`）完成注册/登录。
- - 发起聊天：`POST /api/chat`
-   - 强制要求已登录并具备付费能力（官方余额>0 或自定义 API Key）。
-   - 创建或续用 `sessionId`。
-   - 后端将消息写入 `messages`。
-   - 调用 DeepSeek（系统 Key 或用户自定义 Key），并依据 token 计费扣余额（官方模式）。
- - 信息收集：会话 `sessions.collected_data` 与 `sessions.step` 存储收集进度。
- - 深度分析：`GET /api/sessions/:id/deep-analysis`（包含会员/月额度逻辑与缓存/落库）。
- - 申诉文案：`POST /api/sessions/:id/generate-appeal-text` 生成并保存 `appeal_texts`。
- 
- ### 7.2 管理员侧
- 
- - 登录：`POST /api/admin/login` 获取管理员 JWT。
- - 进入 `/admin/dashboard` 管理用户/会话/配置/充值订单/案例库。
- 
- ---
- 
- ## 8. 后端 API 概览（server/index.js）
- 
- 仅列出主要端点，具体入参/返回请以代码为准。
- 
- ### 8.1 用户相关
- 
- - `POST /api/user/register`
- - `POST /api/user/login`
- - `GET /api/user/:id`（需用户 JWT，仅本人）
- - `GET /api/user/:id/sessions`（需用户 JWT，仅本人）
- - `PUT /api/user/:id/api-mode`（需用户 JWT，仅本人；`official`/`custom`）
- - `GET /api/user/:id/usage`（需用户 JWT，仅本人；token 用量/统计/充值记录）
- 
- ### 8.2 聊天与会话
- 
- - `POST /api/chat`（聊天；需要 `userId`；并校验付费能力）
- - `POST /api/chat/stream`（SSE 流式聊天）
- - `GET /api/sessions/lookup`（搜索会话；可选用户 JWT）
- - `GET /api/sessions/:id/messages`（会话消息；可选用户 JWT，若会话绑定用户则校验归属）
- - `GET /api/sessions/:id/info`（会话收集信息与字段元数据）
- - `PUT /api/sessions/:id/field`（更新某个收集字段）
- - `GET /api/sessions/:id/analysis`（本地分析摘要，不消耗 DeepSeek）
- - `GET /api/sessions/:id/deep-analysis`（DeepSeek 深度分析，含会员/月额度逻辑）
- - `GET /api/sessions/:id/deep-analysis-result`（获取已保存的深度分析结果）
- 
- ### 8.3 申诉文案
- 
- - `POST /api/sessions/:id/generate-appeal-text`（生成并保存，支持 `force` 重新生成）
- - `GET /api/sessions/:id/appeal-text`（获取已生成文案）
- 
- ### 8.4 充值
- 
- - `GET /api/recharge/config`（公开：金额选项、二维码、说明）
- - `POST /api/recharge`（用户提交充值订单；需用户 JWT）
- - `GET /api/recharge/orders`（用户查看自己的充值记录；需用户 JWT）
- 
- ### 8.5 管理员
- 
- - `POST /api/admin/login`
- - `PUT /api/admin/password`（需管理员 JWT）
- - `GET /api/admin/users`（需管理员 JWT）
- - `DELETE /api/admin/users/:id`（需管理员 JWT）
- - `POST /api/admin/users/:id/balance`（需管理员 JWT；调整余额）
- - `GET /api/admin/stats`（需管理员 JWT）
- - `GET /api/admin/sessions`（需管理员 JWT）
- - `GET /api/admin/sessions/:id/messages`（需管理员 JWT）
- - `DELETE /api/admin/sessions/:id`（需管理员 JWT）
- - `POST /api/admin/sessions/:id/reply`（需管理员 JWT；管理员人工回复）
- 
- ### 8.6 充值订单管理（管理员）
- 
- - `GET /api/admin/recharge-orders`
- - `PUT /api/admin/recharge-orders/:id/confirm`
- - `PUT /api/admin/recharge-orders/:id/reject`
- 
- ### 8.7 案例知识库（管理员）
- 
- - `GET /api/admin/cases`
- - `GET /api/admin/cases/:id`
- - `POST /api/admin/cases/from-session`
- - `POST /api/admin/cases`
- - `PUT /api/admin/cases/:id`
- - `DELETE /api/admin/cases/:id`
- 
- ---
- 
- ## 9. 数据库说明（server/db.js）
- 
- 后端启动时会自动 `initDatabase()`：
- 
- - 创建数据库（如不存在）
- - 创建/迁移表结构
- - 初始化系统配置项与支付配置项
- - 初始化默认管理员（首次运行）
- 
- ### 9.1 主要表
- 
- - `sessions`
-   - `id`：会话 ID（uuid）
-   - `user_id`：归属用户（可为空，历史兼容）
-   - `collected_data`：JSON（信息收集结果）
-   - `step`：信息收集进度
-   - `deep_analysis_result`：缓存深度分析结果
- - `messages`
-   - `session_id`、`role`（user/assistant/admin）、`content`
- - `users`
-   - `phone`/`nickname`/`last_ip` 等字段采用加密存储
-   - `phone_hash`：用于唯一索引与查询（避免明文手机号索引）
-   - `balance`：官方模式扣费余额
-   - `api_mode`：`official` / `custom`
-   - `custom_api_key`：加密存储
- - `system_config`
-   - 站点与 AI 配置（`deepseek_api_key` 为敏感字段，存储时加密）
- - `payment_config`
-   - 微信/支付宝支付配置（敏感字段加密）
- - `recharge_orders`
-   - 用户提交充值订单，管理员确认后入账
- - `token_usage`
-   - token 与费用明细
- - `appeal_texts`
-   - 申诉文案缓存
- - `success_cases`
-   - 成功案例知识库
- - `user_actions`
-   - 用户行为追踪（IP 加密存储）
- 
- ### 9.2 默认管理员
- 
- 首次初始化会创建：
- 
- - 用户名：`admin`
- - 密码：`admin123`
- 
- **上线后必须第一时间在后台修改默认密码。**
- 
- ---
- 
- ## 10. 计费与配额（关键规则）
- 
- - 聊天 `POST /api/chat`
-   - **官方模式**：按 token 计费扣余额（倍率可在系统配置中调节 `cost_multiplier`）。
-   - **自定义模式**：使用用户自定义 DeepSeek API Key，不扣平台余额。
- - 深度分析 `GET /api/sessions/:id/deep-analysis`
-   - 存在“会员/月度次数（100次）”相关逻辑（以代码实现为准）。
- 
- ---
- 
- ## 11. 部署
- 
- 生产部署建议按 `DEPLOY.md`（宝塔面板）执行。核心要点：
- 
- - 前端：`npm run build` 生成 `dist/`，由 Nginx 托管
- - 后端：PM2 守护运行 `server/index.js`
- - Nginx：反代 `/api/` 到 Node（3001）并处理 SPA `try_files`
- - `.env`：必须正确配置 DB 与安全密钥
- 
- ---
- 
- ## 12. 常见问题（排错）
- 
- - **页面空白**
-   - 检查 `dist/` 是否存在
-   - Nginx root 是否指向 `dist/`
- - **接口 502**
-   - 检查 Node 是否运行（PM2）
-   - 检查端口、`.env` 是否正确
- - **数据库初始化失败**
-   - 检查 MySQL 账号权限与 `DB_*` 配置
- - **AI 不回复 / 只提示未配置**
-   - 后台 `system_config.deepseek_api_key` 是否已设置
-   - 余额/自定义 Key 是否满足使用条件
- 
- ---
- 
- ## 13. 安全注意事项
- 
- - 不要把 `.env` 提交到仓库。
- - 生产环境务必配置强随机 `ENCRYPT_KEY` 与 `JWT_SECRET`。
- - 默认管理员密码必须修改。
- - `CORS_ORIGINS` 生产环境建议配置为站点域名（不要长期 `*`）。
+### 环境要求
+
+- **Node.js** 18+
+- **MySQL** 5.7+ 或 8.0+
+- **DeepSeek API Key**（从 https://platform.deepseek.com 获取）
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/aiyangdie/merchant-appeal.git
+cd merchant-appeal
+```
+
+### 2. 安装依赖
+
+```bash
+npm install
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`，填写以下必填项：
+
+```env
+# 数据库
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=merchant_appeal
+
+# 安全密钥
+ENCRYPT_KEY=你的64位十六进制字符串
+JWT_SECRET=你的随机字符串
+
+# 服务端口
+PORT=3001
+```
+
+### 4. 构建并启动
+
+```bash
+npm run build    # 构建前端
+npm run start    # 启动服务器
+```
+
+### 5. 访问系统
+
+- **用户端**：http://localhost:3001
+- **管理后台**：http://localhost:3001/admin（默认账号 `admin` / `admin123`）
+
+### 6. 配置 DeepSeek
+
+登录管理后台 → 系统配置 → 填入 `deepseek_api_key` → 保存
+
+---
+
+## 📁 项目结构
+
+```
+merchant-appeal/
+├── public/                          # 静态资源
+├── src/                             # 前端源码
+│   ├── components/
+│   │   ├── ChatMessage.jsx          # 聊天消息组件（含延迟/Token显示）
+│   │   ├── InfoPanel.jsx            # 信息收集面板
+│   │   ├── AIAnalysisPanel.jsx      # AI 分析面板
+│   │   ├── ReportCard.jsx           # 申诉报告卡片
+│   │   ├── AppealTextPanel.jsx      # 申诉文案面板
+│   │   ├── UserCenter.jsx           # 用户中心（充值/用量）
+│   │   └── ErrorBoundary.jsx        # 错误边界
+│   ├── pages/
+│   │   ├── ChatPage.jsx             # 主对话页面（信息收集+AI对话）
+│   │   ├── AdminPage.jsx            # 管理后台控制台
+│   │   └── AdminLogin.jsx           # 管理员登录页
+│   ├── App.jsx                      # 路由配置
+│   ├── main.jsx                     # 入口
+│   └── index.css                    # 全局样式（TailwindCSS）
+├── server/                          # 后端源码
+│   ├── index.js                     # Express 主入口（API路由+SSE流式聊天）
+│   ├── ai.js                        # DeepSeek API 调用（提取/评估/扩展）
+│   ├── localAI.js                   # 本地规则引擎（对话流程+知识库+报告）
+│   ├── knowledgeBase.js             # 行业知识库+违规类型+材料清单
+│   ├── db.js                        # MySQL 数据访问层（自动建表+迁移）
+│   ├── tokenizer.js                 # Token 统计与计费
+│   └── crypto.js                    # AES-256 加解密
+├── .env.example                     # 环境变量模板
+├── DEPLOY.md                        # 生产部署指南（宝塔面板）
+├── package.json
+└── vite.config.js
+```
+
+---
+
+## 🔧 技术栈
+
+| 层级 | 技术 | 用途 |
+|------|------|------|
+| **前端框架** | React 18 + React Router 6 | SPA 单页应用 |
+| **UI 样式** | TailwindCSS 3.4 | 原子化 CSS |
+| **构建工具** | Vite 6 | 极速构建 |
+| **后端框架** | Express 4 | REST API + SSE |
+| **数据库** | MySQL 8.0 (mysql2) | 数据持久化 |
+| **AI 引擎** | DeepSeek Chat API | 对话/提取/报告 |
+| **安全** | helmet + cors + rate-limit + JWT + AES-256 | 全方位安全防护 |
+| **Token 计算** | js-tiktoken | 精确 Token 计数 |
+
+---
+
+## 💻 API 接口概览
+
+### 用户端
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/user/register` | 用户注册 |
+| POST | `/api/user/login` | 用户登录 |
+| POST | `/api/chat/stream` | SSE 流式 AI 对话 |
+| GET | `/api/sessions/:id/info` | 获取会话收集信息 |
+| PUT | `/api/sessions/:id/field` | 修改某个字段 |
+| GET | `/api/sessions/:id/deep-analysis` | DeepSeek 深度分析 |
+| POST | `/api/sessions/:id/generate-appeal-text` | 生成申诉文案 |
+
+### 管理端
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/admin/login` | 管理员登录 |
+| GET | `/api/admin/users` | 用户列表 |
+| GET | `/api/admin/sessions` | 会话列表 |
+| GET | `/api/admin/stats` | 系统统计 |
+| PUT | `/api/admin/recharge-orders/:id/confirm` | 确认充值 |
+| POST/PUT/DELETE | `/api/admin/cases/*` | 案例库 CRUD |
+
+> 完整 API 文档详见源码 `server/index.js`
+
+---
+
+## 🗄️ 数据库设计
+
+系统启动时自动创建表结构，无需手动建表。
+
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| `users` | 用户表 | phone(加密)、balance、api_mode |
+| `sessions` | 会话表 | collected_data(JSON)、step |
+| `messages` | 消息表 | role(user/assistant/admin)、content |
+| `token_usage` | Token用量 | input/output_tokens、cost |
+| `recharge_orders` | 充值订单 | amount、status |
+| `success_cases` | 成功案例库 | industry、problem_type、strategy |
+| `system_config` | 系统配置 | deepseek_api_key(加密) |
+| `appeal_texts` | 申诉文案 | content(缓存) |
+
+---
+
+## 🚢 生产部署
+
+详见 [DEPLOY.md](DEPLOY.md)，核心步骤：
+
+1. **服务器**：Linux + Node.js 18+ + MySQL 8.0 + Nginx
+2. **构建**：`npm run build` 生成 `dist/`
+3. **Nginx**：托管 `dist/` + 反代 `/api/` → Node:3001
+4. **进程管理**：PM2 守护 `server/index.js`
+5. **安全**：配置 HTTPS、强密钥、修改默认密码
+
+---
+
+## 🔒 安全机制
+
+- **数据加密**：用户手机号、API Key 等敏感信息使用 AES-256 加密存储
+- **JWT 认证**：用户和管理员分离的 JWT 认证体系
+- **请求限速**：全局限速 + 聊天接口独立限速，防止滥用
+- **安全头**：helmet 自动设置安全响应头
+- **CORS 控制**：生产环境限制允许的跨域来源
+- **反幻觉**：四层防线确保 AI 不编造任何信息
+
+---
+
+## 📊 计费规则
+
+| 模式 | 说明 | 扣费 |
+|------|------|------|
+| **官方模式** | 使用平台 DeepSeek API Key | 按 Token 扣余额（倍率可调） |
+| **自定义模式** | 用户自己的 API Key | 不扣平台余额 |
+
+每条消息实时显示：输入 Token、输出 Token、费用。管理员可在后台调整费用倍率。
+
+---
+
+## ❓ 常见问题
+
+<details>
+<summary><b>页面空白</b></summary>
+检查 dist/ 是否存在，Nginx root 是否指向 dist/
+</details>
+
+<details>
+<summary><b>接口 502</b></summary>
+检查 Node 进程是否运行（PM2），端口和 .env 配置是否正确
+</details>
+
+<details>
+<summary><b>AI 不回复</b></summary>
+管理后台检查 deepseek_api_key 是否已配置，用户余额是否充足
+</details>
+
+<details>
+<summary><b>数据库初始化失败</b></summary>
+检查 MySQL 账号权限和 DB_* 环境变量配置
+</details>
+
+---
+
+## 🗺️ 路线图
+
+- [x] AI 智能对话引擎
+- [x] DeepSeek 统一字段提取（反幻觉）
+- [x] 行业自适应系统
+- [x] 申诉材料自动生成
+- [x] 成功案例知识库
+- [x] Token 计费系统
+- [x] 管理后台
+- [x] SSE 流式响应
+- [ ] 多轮申诉跟踪（首次申诉→复审→二次申诉）
+- [ ] 申诉成功率统计与反馈闭环
+- [ ] 微信小程序端
+- [ ] 更多支付渠道对接
+- [ ] 多 AI 模型支持（GPT-4o / Claude）
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 PR！
+
+1. Fork 本仓库
+2. 创建功能分支：`git checkout -b feature/amazing-feature`
+3. 提交更改：`git commit -m '添加某某功能'`
+4. 推送分支：`git push origin feature/amazing-feature`
+5. 发起 Pull Request
+
+---
+
+## 📄 License
+
+本项目采用 [MIT License](LICENSE) 开源协议。
+
+---
+
+## ⭐ Star History
+
+如果这个项目对你有帮助，请给个 Star 支持一下！
+
+**Made with ❤️ by [aiyang](https://github.com/aiyangdie)**
