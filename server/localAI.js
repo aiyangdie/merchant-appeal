@@ -758,7 +758,12 @@ function normalizeFieldValue(key, rawValue, existingData = {}) {
       return v
     }
     case 'appeal_history': {
+      if (/^1$/.test(v)) return '首次申诉'
+      if (/^2$/.test(v)) return '申诉过，被驳回'
+      if (/^3$/.test(v)) return '申诉过，等待中/无结果'
       if (/没有|无|没|第一次|首次|从来没/.test(v) && v.length < 10) return '首次申诉'
+      if (/驳回|拒绝|失败|不通过|被拒|没通过/.test(v)) return `申诉过，被驳回（${v}）`
+      if (/等待|处理中|没结果|没回复/.test(v)) return `申诉过，等待中（${v}）`
       return v
     }
     default:
@@ -920,6 +925,9 @@ export function processLocal(userMessage, step, data) {
             const fieldDef = INFO_FIELDS[fieldIdx]
             const response = `✅ 已更新${fieldDef.label}：${oldValue} → ${newValue}\n\n我们继续~ 当前问题：\n\n${currentField.question}`
             return { response, nextStep: step, collectedData: d, infoUpdate: { key: fieldKey, label: fieldDef.label, value: newValue, group: fieldDef.group, icon: fieldDef.icon }, needDeepSeek: false, allCollected: false }
+          } else {
+            // 值相同但消息明确匹配其他字段 → 交给DeepSeek确认，不要存入当前字段
+            return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
           }
         }
       }
@@ -1159,11 +1167,12 @@ export function processLocal(userMessage, step, data) {
   }
   // （处罚类型追问的回答已在 section 3.88 提前处理，此处不再重复）
 
-  // 6.2 申诉历史追问：只要有过申诉经历就追问详情
-  if (currentField.key === 'appeal_history' && !d._appeal_followup_asked && /有|申诉过|提交过|试过|驳回|拒绝|失败|不通过|被拒/.test(finalValue) && !/没|无|否|首次|第一次|N\/A/.test(finalValue)) {
+  // 6.2 申诉历史追问：只要有过申诉经历就追问详情（支持数字选项：2=驳回，3=等待中）
+  if (currentField.key === 'appeal_history' && !d._appeal_followup_asked && (/^[23]$/.test(finalValue) || /有|申诉过|提交过|试过|驳回|拒绝|失败|不通过|被拒/.test(finalValue)) && !/没|无|否|首次|第一次|N\/A/.test(finalValue)) {
     d._appeal_followup_asked = true
-    d[currentField.key] = finalValue
-    const infoUpdate = { key: currentField.key, label: currentField.label, value: finalValue, group: currentField.group, icon: currentField.icon }
+    const normalizedAppeal = normalizeFieldValue('appeal_history', finalValue, d)
+    d[currentField.key] = normalizedAppeal
+    const infoUpdate = { key: currentField.key, label: currentField.label, value: normalizedAppeal, group: currentField.group, icon: currentField.icon }
     let followup = `了解了，之前有申诉过。这个信息很关键！\n\n请帮我补充一下：\n\n① 一共申诉过几次？\n② 最近一次的结果是什么？（通过/驳回/等待中）\n③ 如果被驳回过，还记得驳回原因吗？\n\n（简单说说就行，这些信息会直接影响新的申诉策略~）`
     return { response: followup, nextStep: step, collectedData: d, infoUpdate, needDeepSeek: false, allCollected: false }
   }
