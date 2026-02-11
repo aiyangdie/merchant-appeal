@@ -1,0 +1,37 @@
+{
+  "name": "merchant-appeal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "node --watch server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.4",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "html2canvas": "^1.4.1",
+    "js-tiktoken": "^1.0.21",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.16.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "vite": "^6.0.0"
+  }
+}
