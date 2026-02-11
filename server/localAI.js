@@ -613,8 +613,12 @@ function isQuestion(text) {
   if (t.endsWith('?') || t.endsWith('？')) return true
   // 中文疑问语气词结尾（吗/呢/嘛/么/吧 — 排除"没有吗"这类否定句式被误判）
   if (/[吗呢嘛么]$/.test(t) && !/^(没|不|无)/.test(t)) return true
+  // 疑问语气词+你/啊/呀/哦 结尾（如"可以上网吗你""现在几点了呢啊"）
+  if (/[吗呢嘛么][你啊呀哦呢吧嘛]*$/.test(t) && t.length < 30 && !/^(没|不|无)/.test(t)) return true
   // 以疑问词开头且不像是在回答问题（排除"什么都没有"这类）
   if (/^(请问|我想问|问一下|能不能告诉我|可以帮我|怎么|如何|哪里|为什么|凭什么|到底)/.test(t)) return true
+  // "XX吗"在句中（如"可以上网吗你""能申诉吗这个"）
+  if (t.length < 25 && /[吗呢嘛么].{0,3}$/.test(t) && !/做|卖|经营|业务|行业|商户|店|公司/.test(t)) return true
   return false
 }
 
@@ -629,9 +633,15 @@ function isDirectedAtAI(text) {
     return true
   }
   // 骂AI / 对AI不满
-  if (/^(笨|傻|蠢|废物|垃圾|白痴|智障|有病|脑残|什么玩意|什么东西|搞什么|干什么|说什么)/.test(t)) return true
+  if (/^(笨|傻|蠢|废物|垃圾|白痴|智障|有病|脑残|什么玩意|什么东西|搞什么|干什么|说什么|你是傻|傻逼|滚|闭嘴)/.test(t)) return true
   // 命令AI / 对AI的指令（不是回答问题）
   if (/^(认真|仔细|好好|用心|动脑|再想|重新)(思考|想想|想一想|听|看|分析|回答|理解)/.test(t)) return true
+  // "不是XX"类纠正/争辩（如"不是乱讲""不是这样""不是我说的""不是这个意思"）
+  if (/^不是(乱|胡|瞎|这样|这个|那个|我|你|说的|在说|这么|那么|吧|啊|呀)/.test(t) && t.length < 20) return true
+  // 以"你"结尾的短消息+问句词（"可以上网吗你""能查到吗你""知道吗你"）
+  if (t.length < 25 && /你$/.test(t) && /[吗呢嘛么]/.test(t)) return true
+  // 短消息反问AI（"你说呢""你觉得呢""你猜""你看呢"）
+  if (/^你(说|觉得|看|猜|想|认为)[呢吧啊嘛]?$/.test(t)) return true
   // 问AI身份 / 能力（开头匹配）
   if (/^(你是|这是|那个)(什么|啥|哪个|谁|AI|人工智能|机器人|模型|GPT|DeepSeek|程序|系统)/i.test(t)) return true
   // 消息任意位置包含问AI身份（覆盖"你好 你是那个模型"、"请问你是AI吗"等复合消息）
@@ -918,6 +928,10 @@ export function processLocal(userMessage, step, data) {
 
   // 3. [已移除本地regex跨字段提取] 所有字段提取统一由DeepSeek API完成
 
+  // 3.45 短消息反驳/争辩检测（"不是乱讲""你错了""我没说过""说的不对"等）→ 不是字段数据
+  if (msg.length < 20 && /^(不是|没有|我没|你错|说的不|搞错|弄错|瞎说|胡说|乱说|放屁|扯淡|骗人|忽悠)/.test(msg)) {
+    return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
+  }
   // 3.5 检测是否是提问/情绪化表达/复杂消息 → 交给 DeepSeek
   if (isQuestion(msg) && msg.length < 60) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
