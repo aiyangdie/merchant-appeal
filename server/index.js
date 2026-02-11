@@ -47,6 +47,10 @@ const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '24h'
 app.use(helmet({
   contentSecurityPolicy: false,   // SPA 需要内联脚本
   crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }))
 
 // CORS 配置
@@ -73,6 +77,16 @@ const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: parseInt(process.env.CHAT_RATE_LIMIT_MAX || '20'),
   message: { error: '发送消息过快，请稍后再试' },
+  validate: { xForwardedForHeader: false },
+})
+
+// 登录/注册接口严格限速（防暴力破解）
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分钟
+  max: 10, // 最多10次尝试
+  message: { error: '登录尝试过于频繁，请15分钟后再试' },
+  standardHeaders: true,
+  legacyHeaders: false,
   validate: { xForwardedForHeader: false },
 })
 
@@ -133,7 +147,7 @@ function optionalUser(req, res, next) {
 
 // ========== 用户 API ==========
 
-app.post('/api/user/register', async (req, res) => {
+app.post('/api/user/register', authLimiter, async (req, res) => {
   try {
     const { phone, nickname } = req.body
     if (!phone || phone.trim().length < 2 || phone.trim().length > 20) return res.status(400).json({ error: '请输入有效的手机号' })
@@ -162,7 +176,7 @@ app.post('/api/user/register', async (req, res) => {
   }
 })
 
-app.post('/api/user/login', async (req, res) => {
+app.post('/api/user/login', authLimiter, async (req, res) => {
   try {
     const { phone } = req.body
     if (!phone || phone.trim().length > 20) return res.status(400).json({ error: '请输入手机号' })
@@ -1831,7 +1845,7 @@ app.get('/api/recharge/orders', requireUser, async (req, res) => {
 // ========== 管理员 API ==========
 
 // 登录（不需要 JWT，返回 JWT）
-app.post('/api/admin/login', async (req, res) => {
+app.post('/api/admin/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body
     if (!username || !password) return res.status(400).json({ error: '请输入用户名和密码' })
@@ -2112,6 +2126,15 @@ app.get('*', (req, res) => {
     return res.status(404).json({ error: '接口不存在' })
   }
   res.sendFile(path.join(distPath, 'index.html'))
+})
+
+// 全局错误处理（生产环境不泄露内部错误细节）
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err)
+  const isDev = process.env.NODE_ENV !== 'production'
+  res.status(err.status || 500).json({
+    error: isDev ? err.message : '服务器内部错误，请稍后重试',
+  })
 })
 
 async function start() {
