@@ -412,6 +412,69 @@ export const VIOLATION_KNOWLEDGE = {
     common_rejection_reasons: ['仍有疑似违规内容', '整改不彻底', '业务模式说明不清'],
     success_key: '必须彻底清理所有可能被误判的内容，提供清理前后对比截图',
     estimated_success_rate: '30-50%（极难）'
+  },
+  '洗钱风险': {
+    aliases: ['洗钱', '反洗钱', '资金来源', '可疑交易', '大额可疑'],
+    severity: 5,
+    description: '交易模式被反洗钱系统标记，涉嫌利用商户号进行资金清洗',
+    appeal_key_points: [
+      '提供所有大额交易对应的真实合同和发票',
+      '证明资金流向清晰可追溯，每笔进出都有商业背景',
+      '提供公司银行流水与微信交易的对账报告',
+      '如涉及跨境业务，提供外汇许可和海关报关单',
+      '提供公司反洗钱内控制度文件'
+    ],
+    required_materials: ['商业合同', '银行流水对账', '发票/收据', '反洗钱内控制度', '法人声明书', '外汇许可（跨境）'],
+    common_rejection_reasons: ['资金流向不清晰', '交易缺乏商业背景', '无法提供合同/发票支撑'],
+    success_key: '每笔被标记交易都需要有合同+发票+物流/服务交付证明的三方印证',
+    estimated_success_rate: '35-55%（极难，需法律专业支持）'
+  },
+  '内容违规': {
+    aliases: ['内容违规', '违反法律法规', '违法内容', '敏感内容', '政治敏感', '侵权内容'],
+    severity: 4,
+    description: '发布的商品描述、宣传文案或页面内容违反相关法规或平台规则',
+    appeal_key_points: [
+      '立即下架/修改所有被标记的违规内容',
+      '提供修改前后的对比截图，证明已彻底整改',
+      '如是误判（如合规医疗器械被判为违禁品），提供相关资质证明',
+      '建立内容审核机制，提交内容管理制度文件',
+      '承诺后续所有上架内容经过合规审核'
+    ],
+    required_materials: ['违规内容整改截图', '整改报告', '内容审核制度', '相关资质证明（如有）', '法人承诺书'],
+    common_rejection_reasons: ['仍有违规内容未清理', '整改不彻底', '缺少相关经营资质'],
+    success_key: '先彻底整改再申诉，提供清理前后对比截图和内容管理制度',
+    estimated_success_rate: '55-75%（整改到位后较乐观）'
+  },
+  '虚假交易': {
+    aliases: ['虚假交易', '刷单', '虚假订单', '自买自卖', '虚构交易'],
+    severity: 4,
+    description: '交易被判定为虚假，如自买自卖、刷单刷量、无真实商品交付的空壳交易',
+    appeal_key_points: [
+      '提供被质疑交易的完整证据链：下单→付款→发货→物流→签收',
+      '证明买卖双方无关联关系（非同一人/同一公司/亲属）',
+      '提供物流实际配送记录和签收照片',
+      '如确实有刷单行为，承认并说明已停止、已处罚涉事人员',
+      '提供真实客户的评价和复购记录'
+    ],
+    required_materials: ['完整交易链路(5笔以上)', '物流签收记录', '客户沟通记录', '进货凭证', '商品实拍照', '整改报告'],
+    common_rejection_reasons: ['交易链路不完整', '买卖双方存在关联', '物流信息异常'],
+    success_key: '用无可辩驳的物流和签收证据证明交易真实存在',
+    estimated_success_rate: '50-70%（取决于证据完整度）'
+  },
+  '异地收款': {
+    aliases: ['异地收款', '异地交易', '收款地点异常', '地理位置异常'],
+    severity: 2,
+    description: '商户注册地与实际收款地不一致，触发地理位置风控',
+    appeal_key_points: [
+      '说明异地收款的合理原因（分支机构、外出展销、出差等）',
+      '提供异地经营的证明材料（分店执照、展会邀请函等）',
+      '如有多地经营，提供各地门店照片和员工证明',
+      '说明业务模式本身就需要多地收款（如物流、上门服务等）'
+    ],
+    required_materials: ['异地经营证明', '分店/分支机构证明', '业务模式说明', '门店照片（各地）'],
+    common_rejection_reasons: ['无法解释异地收款原因', '缺少异地经营证明'],
+    success_key: '合理解释异地收款的商业原因，提供辅助证明',
+    estimated_success_rate: '80-90%（通常容易解决）'
   }
 }
 
@@ -471,11 +534,15 @@ export function assessRisk(collectedData) {
   // 2. 违规原因评估
   const vr = (d.violation_reason || '').toLowerCase()
   if (vr.includes('赌博') || vr.includes('色情')) { riskScore += 25; factors.push('涉赌/涉黄类违规申诉极难') }
-  else if (vr.includes('欺诈') || vr.includes('诈骗')) { riskScore += 20; factors.push('欺诈类违规需要大量正品证明') }
+  else if (vr.includes('洗钱') || vr.includes('反洗钱')) { riskScore += 25; factors.push('涉嫌洗钱极难申诉，建议寻求法律支持') }
+  else if (vr.includes('欺诈') || vr.includes('诈骗') || vr.includes('售假')) { riskScore += 20; factors.push('欺诈类违规需要大量正品证明') }
+  else if (vr.includes('虚假交易') || vr.includes('刷单')) { riskScore += 18; factors.push('虚假交易需提供完整物流签收证据') }
   else if (vr.includes('套现')) { riskScore += 15; factors.push('套现嫌疑需要完整交易链路证明') }
   else if (vr.includes('分销') || vr.includes('传销')) { riskScore += 10; factors.push('分销模式需证明仅一级分佣') }
+  else if (vr.includes('内容违规') || vr.includes('违反法律')) { riskScore += 10; factors.push('内容违规需彻底整改后申诉') }
   else if (vr.includes('跨类目') || vr.includes('类目')) { riskScore += 5; factors.push('跨类目经营需整改后申诉') }
   else if (vr.includes('纠纷') || vr.includes('投诉')) { riskScore += 5; factors.push('交易纠纷需先处理所有投诉') }
+  else if (vr.includes('异地') || vr.includes('地点异常')) { riskScore -= 5; factors.push('异地收款通常较容易解释') }
   else if (vr.includes('异常')) { riskScore += 0; factors.push('交易异常是最常见的处罚原因') }
 
   // 2.5 敏感行业评估（来自行业智能检测）
@@ -574,11 +641,40 @@ export function generateMaterialChecklist(collectedData) {
     checklist.push({ item: '分销后台截图（显示仅一级）', required: true, category: '业务证明' })
     checklist.push({ item: '佣金结构说明', required: true, category: '业务证明' })
   }
+  if (vr.includes('洗钱') || vr.includes('反洗钱') || vr.includes('可疑交易')) {
+    checklist.push({ item: '商业合同（与交易对应）', required: true, category: '资金证明' })
+    checklist.push({ item: '银行流水与微信交易对账报告', required: true, category: '资金证明' })
+    checklist.push({ item: '增值税发票/收据', required: true, category: '资金证明' })
+    checklist.push({ item: '反洗钱内控制度文件', required: false, category: '合规文件' })
+    checklist.push({ item: '法人声明书（声明资金合法）', required: true, category: '合规文件' })
+  }
+  if (vr.includes('内容违规') || vr.includes('违反法律') || vr.includes('敏感内容')) {
+    checklist.push({ item: '违规内容整改前后对比截图', required: true, category: '整改证据' })
+    checklist.push({ item: '内容审核管理制度文件', required: true, category: '整改证据' })
+    checklist.push({ item: '相关经营资质证明（如有）', required: false, category: '资质证明' })
+  }
+  if (vr.includes('虚假交易') || vr.includes('刷单') || vr.includes('自买自卖')) {
+    checklist.push({ item: '物流实际签收记录（含签收照片）', required: true, category: '交易凭证' })
+    checklist.push({ item: '客户真实沟通记录截图', required: true, category: '交易凭证' })
+    checklist.push({ item: '商品实拍照片（含包装和标签）', required: true, category: '交易凭证' })
+    checklist.push({ item: '客户评价/复购记录截图', required: false, category: '交易凭证' })
+  }
+  if (vr.includes('赌博') || vr.includes('棋牌')) {
+    checklist.push({ item: '软件著作权登记证书', required: true, category: '资质证明' })
+    checklist.push({ item: '游戏用户协议（含禁止变现条款）', required: true, category: '业务证明' })
+    checklist.push({ item: '游戏内商城/交易系统截图（证明无变现功能）', required: true, category: '业务证明' })
+  }
 
   // 资金冻结特殊材料
   if (pt.includes('冻结') || pt.includes('延迟结算')) {
     checklist.push({ item: '结算账户开户信息', required: true, category: '账户信息' })
     checklist.push({ item: '交易流水明细导出', required: true, category: '交易凭证' })
+  }
+
+  // 商户号封禁特殊材料
+  if (pt.includes('封禁')) {
+    checklist.push({ item: '法人手持身份证+营业执照合影（视频认证用）', required: true, category: '证件信息' })
+    checklist.push({ item: '近6个月银行流水', required: false, category: '交易凭证' })
   }
 
   // 通用整改材料
