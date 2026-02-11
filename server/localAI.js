@@ -1232,6 +1232,9 @@ export function processLocal(userMessage, step, data) {
   const nextStep = findNextUnfilledStep(rawNextStep, d)
   const infoUpdate = { key: currentField.key, label: currentField.label, value: finalValue, group: currentField.group, icon: currentField.icon }
   const allInfoUpdates = [infoUpdate]
+  const autoFilledFields = [] // 自动推断已移至DeepSeek API，本地保留空数组兼容
+  const allAutoFields = autoFilledFields
+  const reasons = {}
 
   // 检查是否全部收集完毕
   if (nextStep >= TOTAL_STEPS) {
