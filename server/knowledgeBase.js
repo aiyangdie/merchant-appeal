@@ -339,7 +339,7 @@ export const VIOLATION_KNOWLEDGE = {
     estimated_success_rate: '整改到位后75-85%'
   },
   '信用卡套现': {
-    aliases: ['套现', '信用卡套现', '虚假交易', '刷单'],
+    aliases: ['套现', '信用卡套现', '信用卡', '大额交易'],
     severity: 4,
     description: '交易模式疑似信用卡套现：大额交易无对应商品、交易双方关联、交易后快速退款等',
     appeal_key_points: [

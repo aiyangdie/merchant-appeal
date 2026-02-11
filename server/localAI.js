@@ -937,7 +937,8 @@ export function processLocal(userMessage, step, data) {
   // 3. [已移除本地regex跨字段提取] 所有字段提取统一由DeepSeek API完成
 
   // 3.45 短消息反驳/争辩检测（"不是乱讲""你错了""我没说过""说的不对"等）→ 不是字段数据
-  if (msg.length < 20 && /^(不是|没有|我没|你错|说的不|搞错|弄错|瞎说|胡说|乱说|放屁|扯淡|骗人|忽悠)/.test(msg)) {
+  // 排除合法的否定回答（如"没有"用于回答"有没有投诉/申诉历史"）
+  if (msg.length < 20 && !isNegativeAnswer(msg) && /^(不是|没有|我没|你错|说的不|搞错|弄错|瞎说|胡说|乱说|放屁|扯淡|骗人|忽悠)/.test(msg)) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
   }
   // 3.5 检测是否是提问/情绪化表达/复杂消息 → 交给 DeepSeek
