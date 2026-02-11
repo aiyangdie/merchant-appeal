@@ -553,8 +553,14 @@ export default function AdminPage() {
     return (
       <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900 tracking-tight">数据概览</h2>
-          <button onClick={fetchStats} className="text-[11px] text-gray-400 hover:text-wechat-green px-2 py-1 rounded-lg hover:bg-green-50">刷新</button>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 tracking-tight">数据概览</h2>
+            <p className="text-xs text-gray-400 mt-0.5">商户申诉AI · 自我迭代超级系统</p>
+          </div>
+          <button onClick={fetchStats} className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+            刷新数据
+          </button>
         </div>
         {/* Main stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1397,30 +1403,40 @@ export default function AdminPage() {
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900/90 backdrop-blur-lg text-white text-sm px-5 py-2.5 rounded-2xl shadow-xl animate-fade-in font-medium">{toast}</div>
       )}
-      <header className="bg-white flex-shrink-0 z-20" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
-        <div className="px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#07C160] to-[#06ae56] flex items-center justify-center shadow-sm">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+      <header className="bg-white flex-shrink-0 z-20" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div className="px-4 py-2.5 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
-            <h1 className="text-sm font-semibold text-gray-900 tracking-tight">管理后台</h1>
+            <div>
+              <h1 className="text-sm font-bold text-white tracking-tight">商户申诉 · 管理后台</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />系统运行中</span>
+                <span className="text-[10px] text-slate-500">v2.0</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <a href="/" className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-wechat-green hover:bg-green-50 rounded-lg" title="前台">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+          <div className="flex items-center gap-1.5">
+            <a href="/" className="h-8 px-3 flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg text-[11px] font-medium transition-all" title="前台">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+              <span className="hidden sm:inline">访问前台</span>
             </a>
-            <button onClick={handleLogout} className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-lg" title="退出">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
+            <button onClick={handleLogout} className="h-8 px-3 flex items-center gap-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg text-[11px] font-medium transition-all" title="退出">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
+              <span className="hidden sm:inline">退出</span>
             </button>
           </div>
         </div>
-        <div className="px-2 sm:px-3 flex overflow-x-auto no-scrollbar">
+        <div className="px-2 sm:px-3 py-1 flex overflow-x-auto no-scrollbar bg-gray-50/80 border-b border-gray-100">
           {TABS.map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setMobileShowChat(false) }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-all ${
-                activeTab === tab.key ? 'border-[#07C160] text-[#07C160]' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-lg mx-0.5 transition-all ${
+                activeTab === tab.key
+                  ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
               }`}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
