@@ -304,14 +304,26 @@ pm2 restart merchant-appeal
 
 ```
 merchant-appeal/
-├── dist/              ← 前端构建产物（Nginx 直接服务）
-├── server/            ← 后端 Node.js 代码
-│   ├── index.js       ← 主入口（Express 服务器）
-│   ├── db.js          ← 数据库操作
-│   ├── ai.js          ← AI 对话引擎
-│   ├── tokenizer.js   ← Token 计算
-│   └── crypto.js      ← 加密工具
-├── .env               ← 环境变量（不要提交到 Git）
-├── package.json       ← 依赖配置
-└── DEPLOY.md          ← 本文件
+├── dist/                  ← 前端构建产物（Nginx 直接服务）
+├── server/                ← 后端 Node.js 代码
+│   ├── index.js           ← 主入口（Express API + SSE 流式聊天）
+│   ├── ai.js              ← DeepSeek AI 引擎（对话/提取/评估/扩展）
+│   ├── localAI.js         ← 本地规则引擎（对话流程+输入验证+报告生成）
+│   ├── knowledgeBase.js   ← 知识库（12种违规类型+16个案例+风险评估+材料清单）
+│   ├── db.js              ← MySQL 数据访问层（自动建表+迁移）
+│   ├── tokenizer.js       ← Token 统计与计费
+│   └── crypto.js          ← AES-256 加解密
+├── src/                   ← 前端源码（React 18 + TailwindCSS）
+│   ├── components/        ← 组件（ChatMessage/InfoPanel/AIAnalysis/AppealText...）
+│   ├── pages/             ← 页面（ChatPage/AdminPage/AdminLogin）
+│   ├── App.jsx            ← 路由配置
+│   └── main.jsx           ← 入口
+├── docs/                  ← 文档资源
+│   └── screenshots/       ← 功能截图
+├── .env                   ← 环境变量（不要提交到 Git）
+├── .env.example           ← 环境变量模板
+├── package.json           ← 依赖配置
+├── vite.config.js         ← Vite 构建配置
+├── README.md              ← 项目说明（含演示视频/PPT）
+└── DEPLOY.md              ← 本文件（宝塔部署指南）
 ```
