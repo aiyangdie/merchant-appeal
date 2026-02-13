@@ -20,15 +20,20 @@ function parseSections(text) {
     const lines = part.split('\n')
     const title = lines[0].trim()
     const content = lines.slice(1).join('\n').trim()
-    if (title.includes('案件概况')) sections.overview = content
-    else if (title.includes('对话')) sections.chatInsights = content
+    if (title.includes('案件概况') || title.includes('案情')) sections.overview = content
+    else if (title.includes('对话') || title.includes('信息提取')) sections.chatInsights = content
     else if (title.includes('风险评估')) sections.risk = content
     else if (title.includes('违规原因')) sections.violation = content
     else if (title.includes('风险警告') || title.includes('关键风险')) sections.warnings = content
+    else if (title.includes('资质')) sections.qualifications = content
+    else if (title.includes('证据链')) sections.evidence = content
     else if (title.includes('策略建议')) sections.strategies = content
-    else if (title.includes('材料清单')) sections.materials = content
-    else if (title.includes('行动计划')) sections.actionPlan = content
-    else if (title.includes('报价') || title.includes('服务')) sections.pricing = content
+    else if (title.includes('材料') || title.includes('清单')) sections.materials = content
+    else if (title.includes('风控') || title.includes('逆向推演')) sections.riskControl = content
+    else if (title.includes('行动') || title.includes('计划')) sections.actionPlan = content
+    else if (title.includes('话术')) sections.scripts = content
+    else if (title.includes('时机') || title.includes('最佳')) sections.timing = content
+    else if (title.includes('报价') || title.includes('服务') || title.includes('价格')) sections.pricing = content
   })
   return sections
 }
@@ -68,10 +73,11 @@ function parseMaterialGroups(text) {
 function parseRiskInfo(text) {
   if (!text) return {}
   const info = {}
-  const levelMatch = text.match(/难度等级[：:]\s*(.+)/); if (levelMatch) info.level = levelMatch[1].trim()
+  const levelMatch = text.match(/难度等级[：:]\s*(.+)/); if (levelMatch) info.level = levelMatch[1].replace(/\*\*/g, '').trim()
   const scoreMatch = text.match(/难度评分[：:]\s*(\d+)/); if (scoreMatch) info.score = parseInt(scoreMatch[1])
-  const rateMatch = text.match(/预估成功率[：:]\s*(.+)/); if (rateMatch) info.successRate = rateMatch[1].trim()
-  const factors = parseListItems(text.split('影响因素')[1] || '')
+  const rateMatch = text.match(/(?:预估)?成功率[：:]\s*(.+)/); if (rateMatch) info.successRate = rateMatch[1].replace(/\*\*/g, '').trim()
+  const factorPart = text.split(/影响因素|核心难点/)[1] || ''
+  const factors = parseListItems(factorPart)
   if (factors.length) info.factors = factors
   return info
 }
@@ -86,6 +92,10 @@ export default function ReportCard({ collectedData, analysisText, onClose }) {
   const actionItems = useMemo(() => parseNumberedItems(sections.actionPlan), [sections.actionPlan])
   const warningItems = useMemo(() => parseListItems(sections.warnings), [sections.warnings])
   const strategyItems = useMemo(() => parseNumberedItems(sections.strategies) || parseListItems(sections.strategies), [sections.strategies])
+  const qualGroups = useMemo(() => parseMaterialGroups(sections.qualifications), [sections.qualifications])
+  const evidenceGroups = useMemo(() => parseMaterialGroups(sections.evidence), [sections.evidence])
+  const riskControlItems = useMemo(() => parseNumberedItems(sections.riskControl), [sections.riskControl])
+  const scriptItems = useMemo(() => parseListItems(sections.scripts), [sections.scripts])
 
   const handleDownload = async () => {
     if (!cardRef.current) return
@@ -263,6 +273,62 @@ export default function ReportCard({ collectedData, analysisText, onClose }) {
                   <div key={i} style={{ fontSize: 11, color: '#4c1d95', padding: '6px 10px', backgroundColor: '#f5f3ff', borderRadius: 6, marginBottom: 4, lineHeight: 1.6, display: 'flex', gap: 6 }}>
                     <span style={{ fontWeight: 800, color: '#7c3aed', flexShrink: 0, width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ede9fe', borderRadius: '50%', fontSize: 10 }}>{i + 1}</span>
                     <span>{a.replace(/\*\*/g, '')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 资质要求 */}
+            {qualGroups.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 3, height: 14, backgroundColor: '#7c3aed', borderRadius: 2 }}></span>
+                  资质要求
+                </div>
+                {qualGroups.map((g, gi) => (
+                  <div key={gi} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', marginBottom: 4, paddingLeft: 6, borderLeft: '2px solid #c4b5fd' }}>{g.title}</div>
+                    {g.items.map((item, ii) => (
+                      <div key={ii} style={{ fontSize: 10, color: '#334155', padding: '4px 8px', marginBottom: 2, backgroundColor: '#f5f3ff', borderRadius: 6, lineHeight: 1.6 }}>
+                        {item.replace(/\*\*/g, '')}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 证据链 */}
+            {evidenceGroups.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 3, height: 14, backgroundColor: '#0284c7', borderRadius: 2 }}></span>
+                  证据链构建
+                </div>
+                {evidenceGroups.map((g, gi) => (
+                  <div key={gi} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', marginBottom: 4, paddingLeft: 6, borderLeft: '2px solid #7dd3fc' }}>{g.title}</div>
+                    {g.items.map((item, ii) => (
+                      <div key={ii} style={{ fontSize: 10, color: '#334155', padding: '4px 8px', marginBottom: 2, backgroundColor: '#f0f9ff', borderRadius: 6, lineHeight: 1.6 }}>
+                        {item.replace(/\*\*/g, '')}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 风控逆向推演 */}
+            {riskControlItems.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 3, height: 14, backgroundColor: '#e11d48', borderRadius: 2 }}></span>
+                  风控触发逆向推演
+                </div>
+                {riskControlItems.map((item, i) => (
+                  <div key={i} style={{ fontSize: 11, color: '#881337', padding: '6px 10px', backgroundColor: '#fff1f2', borderRadius: 6, marginBottom: 4, lineHeight: 1.6, display: 'flex', gap: 6 }}>
+                    <span style={{ fontWeight: 700, color: '#e11d48', flexShrink: 0 }}>{i + 1}.</span>
+                    <span>{item.replace(/\*\*/g, '')}</span>
                   </div>
                 ))}
               </div>

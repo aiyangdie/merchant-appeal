@@ -37,7 +37,14 @@ function parseAnalysisSections(text) {
         current.subSections.push({ title: mdToText(h3[1]).replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(), items: [] })
       } else {
         const bullet = line.match(/^[-·]\s+(.+)/) || line.match(/^\d+\.\s+(.+)/)
-        if (bullet) {
+        const indentedBullet = line.match(/^\s{2,}[-·]\s+(.+)/) || line.match(/^\s{2,}\d+\.\s+(.+)/)
+        if (indentedBullet) {
+          const cleanItem = indentedBullet[1].trim()
+          if (current.subSections.length > 0) {
+            current.subSections[current.subSections.length - 1].items.push(cleanItem)
+          }
+          current.items.push(cleanItem)
+        } else if (bullet) {
           const cleanItem = bullet[1].trim()
           if (current.subSections.length > 0) {
             current.subSections[current.subSections.length - 1].items.push(cleanItem)
@@ -64,6 +71,9 @@ function getSectionStyle(title) {
   if (title.includes('策略') || title.includes('建议')) return { bg: 'bg-green-50', border: 'border-green-200', icon: '🎯', iconBg: 'bg-green-500', dot: 'bg-green-500', color: 'text-green-700', light: 'bg-green-50/50' }
   if (title.includes('材料') || title.includes('清单')) return { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: '📦', iconBg: 'bg-indigo-500', dot: 'bg-indigo-500', color: 'text-indigo-700', light: 'bg-indigo-50/50' }
   if (title.includes('行动') || title.includes('计划') || title.includes('步骤')) return { bg: 'bg-teal-50', border: 'border-teal-200', icon: '📌', iconBg: 'bg-teal-500', dot: 'bg-teal-500', color: 'text-teal-700', light: 'bg-teal-50/50' }
+  if (title.includes('风控') || title.includes('逆向') || title.includes('推演')) return { bg: 'bg-rose-50', border: 'border-rose-200', icon: '🔬', iconBg: 'bg-rose-500', dot: 'bg-rose-500', color: 'text-rose-700', light: 'bg-rose-50/50' }
+  if (title.includes('话术') || title.includes('电话')) return { bg: 'bg-pink-50', border: 'border-pink-200', icon: '📞', iconBg: 'bg-pink-500', dot: 'bg-pink-500', color: 'text-pink-700', light: 'bg-pink-50/50' }
+  if (title.includes('时机') || title.includes('最佳')) return { bg: 'bg-lime-50', border: 'border-lime-200', icon: '⏰', iconBg: 'bg-lime-600', dot: 'bg-lime-600', color: 'text-lime-700', light: 'bg-lime-50/50' }
   if (title.includes('报价') || title.includes('服务') || title.includes('价格')) return { bg: 'bg-amber-50', border: 'border-amber-200', icon: '💰', iconBg: 'bg-amber-500', dot: 'bg-amber-500', color: 'text-amber-700', light: 'bg-amber-50/50' }
   if (title.includes('提交') || title.includes('指南')) return { bg: 'bg-cyan-50', border: 'border-cyan-200', icon: '📮', iconBg: 'bg-cyan-500', dot: 'bg-cyan-500', color: 'text-cyan-700', light: 'bg-cyan-50/50' }
   return { bg: 'bg-gray-50', border: 'border-gray-200', icon: '📄', iconBg: 'bg-gray-500', dot: 'bg-gray-500', color: 'text-gray-700', light: 'bg-gray-50/50' }
@@ -83,15 +93,28 @@ export default function AnalysisVisualView({ text }) {
   let riskLevel = '', riskScore = '', successRate = '', riskFactors = []
   if (riskSection) {
     const raw = mdToText(riskSection.raw)
-    const levelMatch = raw.match(/难度等级[：:]\s*([\u4e00-\u9fff/]+)/)
+    const levelMatch = raw.match(/难度等级[：:]\s*([\u4e00-\u9fff/\w]+)/)
     const scoreMatch = raw.match(/难度评分[：:]\s*(\d+)/)
-    const rateMatch = raw.match(/(?:预估)?成功率[：:]\s*([\d%～~\-—]+)/)
+    const rateMatch = raw.match(/(?:预估)?成功率[：:]\s*([\d%～~\-—.]+)/)
     riskLevel = levelMatch?.[1] || ''
     riskScore = scoreMatch?.[1] || ''
     successRate = rateMatch?.[1] || ''
-    // 提取影响因素
-    const factorLines = riskSection.raw.split('\n').filter(l => l.trim().startsWith('·') || l.trim().startsWith('- '))
-    riskFactors = factorLines.map(l => mdToText(l.replace(/^[\s·\-]+/, '').trim())).filter(Boolean).slice(0, 5)
+    // 提取核心难点/影响因素（包括缩进的子项）
+    const riskLines = riskSection.raw.split('\n')
+    let inFactors = false
+    for (const l of riskLines) {
+      const trimmed = l.trim()
+      if (trimmed.match(/核心难点|影响因素/)) { inFactors = true; continue }
+      if (trimmed.match(/^##/) || trimmed.match(/^###/)) { inFactors = false; continue }
+      if (inFactors && (trimmed.startsWith('- ') || trimmed.startsWith('· '))) {
+        riskFactors.push(mdToText(trimmed.replace(/^[-·]\s+/, '').trim()))
+      }
+    }
+    if (riskFactors.length === 0) {
+      const factorLines = riskLines.filter(l => l.trim().startsWith('·') || (l.trim().startsWith('- ') && !l.includes('难度') && !l.includes('成功率')))
+      riskFactors = factorLines.map(l => mdToText(l.replace(/^[\s·\-]+/, '').trim())).filter(Boolean)
+    }
+    riskFactors = riskFactors.slice(0, 6)
   }
 
   // 提取资质要求 — 按子分类展示
@@ -159,7 +182,7 @@ export default function AnalysisVisualView({ text }) {
     : 'from-emerald-500 to-green-600'
 
   // 过滤掉已单独展示的 sections
-  const specialTitles = ['风险评估', '资质', '证据链', '材料', '清单', '行动', '计划']
+  const specialTitles = ['风险评估', '资质', '证据链', '材料', '清单', '行动', '计划', '步骤']
   const otherSections = sections.filter(s => !specialTitles.some(t => s.title.includes(t)))
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 
 const BASE_GROUPS = [
   { key: '业务了解', color: 'purple' },
@@ -27,10 +27,44 @@ const C = {
   slate:   { dot: 'bg-slate-400',   bg: 'bg-slate-50/60',   text: 'text-slate-700' },
 }
 
-function EditableField({ fieldKey, label, value, onSave }) {
+function FieldHistory({ logs }) {
+  if (!logs || logs.length === 0) return <div className="text-[10px] text-gray-400 py-2 text-center">暂无修改记录</div>
+  const SOURCE_LABEL = { ai_extract: '🤖 AI识别', ai_correction: '🔄 AI更正', user_edit: '✏️ 用户修改', system: '⚙️ 系统' }
+  const SOURCE_COLOR = { ai_extract: 'border-blue-200 bg-blue-50/50', ai_correction: 'border-amber-200 bg-amber-50/50', user_edit: 'border-green-200 bg-green-50/50', system: 'border-gray-200 bg-gray-50/50' }
+  return (
+    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+      {logs.map((log, i) => {
+        const time = log.created_at ? new Date(log.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+        return (
+          <div key={i} className={`rounded-lg border p-2 ${SOURCE_COLOR[log.change_source] || SOURCE_COLOR.system}`}>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[10px] font-medium text-gray-600">{SOURCE_LABEL[log.change_source] || log.change_source}</span>
+              <span className="text-[9px] text-gray-400">{time}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px]">
+              {log.old_value ? (
+                <>
+                  <span className="text-red-400 line-through max-w-[80px] truncate">{log.old_value}</span>
+                  <span className="text-gray-400">→</span>
+                  <span className="text-green-600 font-medium max-w-[80px] truncate">{log.new_value}</span>
+                </>
+              ) : (
+                <span className="text-green-600 font-medium truncate">{log.new_value}</span>
+              )}
+            </div>
+            {log.change_reason && <div className="text-[9px] text-gray-500 mt-0.5 leading-tight">{log.change_reason}</div>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyLogs, historyLoading }) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const filled = value && String(value).trim()
 
   function startEdit() {
@@ -77,12 +111,21 @@ function EditableField({ fieldKey, label, value, onSave }) {
         <span className={`text-[11px] ${filled ? 'text-gray-500' : 'text-gray-300'}`}>{label}</span>
         <div className="flex items-center gap-1">
           {filled && (
-            <button onClick={e => { e.stopPropagation(); startEdit() }}
-              className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-              </svg>
-            </button>
+            <>
+              <button onClick={e => { e.stopPropagation(); if (!showHistory) onShowHistory?.(fieldKey); setShowHistory(!showHistory) }}
+                title="查看修改记录"
+                className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <button onClick={e => { e.stopPropagation(); startEdit() }}
+                className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+              </button>
+            </>
           )}
           {filled ? (
             <svg className="w-3 h-3 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd"/></svg>
@@ -94,6 +137,15 @@ function EditableField({ fieldKey, label, value, onSave }) {
       {filled && (
         <p className="text-[12px] text-gray-800 mt-0.5 leading-relaxed break-all line-clamp-2 font-medium">{value}</p>
       )}
+      {showHistory && (
+        <div className="px-1 pb-2 pt-1">
+          {historyLoading ? (
+            <div className="text-[10px] text-gray-400 py-1 text-center">加载中...</div>
+          ) : (
+            <FieldHistory logs={historyLogs} />
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -104,6 +156,21 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
   const filledCount = fieldList.filter(f => data[f.key] && String(data[f.key]).trim()).length
   const actualTotal = fieldList.length || totalSteps
   const progress = actualTotal > 0 ? Math.min(100, Math.round((filledCount / actualTotal) * 100)) : 0
+
+  const [fieldHistoryMap, setFieldHistoryMap] = useState({})
+  const [historyLoading, setHistoryLoading] = useState({})
+
+  const fetchFieldHistory = useCallback(async (fieldKey) => {
+    if (!sessionId) return
+    setHistoryLoading(prev => ({ ...prev, [fieldKey]: true }))
+    try {
+      const headers = getAuthHeaders ? getAuthHeaders() : {}
+      const res = await fetch(`/api/sessions/${sessionId}/field-history?field=${fieldKey}`, { headers })
+      const result = await res.json()
+      setFieldHistoryMap(prev => ({ ...prev, [fieldKey]: result.logs || [] }))
+    } catch { setFieldHistoryMap(prev => ({ ...prev, [fieldKey]: [] })) }
+    setHistoryLoading(prev => ({ ...prev, [fieldKey]: false }))
+  }, [sessionId, getAuthHeaders])
 
   const grouped = {}
   for (const f of fieldList) {
@@ -201,6 +268,9 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
                     label={f.label}
                     value={data[f.key]}
                     onSave={handleFieldSave}
+                    onShowHistory={fetchFieldHistory}
+                    historyLogs={fieldHistoryMap[f.key]}
+                    historyLoading={historyLoading[f.key]}
                   />
                 ))}
               </div>

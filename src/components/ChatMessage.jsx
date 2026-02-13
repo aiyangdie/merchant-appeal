@@ -144,6 +144,9 @@ function parseMarkdown(text) {
   html = html.replace(/<p><\/p>/g, '')
   html = html.replace(/<p><br \/><\/p>/g, '')
 
+  // 商品推荐标记 [推荐商品:ID] → 商品徽章
+  html = html.replace(/\[推荐商品:(\d+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 rounded-lg text-xs font-medium border border-indigo-100 cursor-pointer hover:shadow-sm" data-product-id="$1">🛒 查看推荐商品</span>')
+
   // 还原表格占位符
   tables.forEach((t, i) => { html = html.replace(`%%TABLE_${i}%%`, t) })
   // 还原代码块占位符

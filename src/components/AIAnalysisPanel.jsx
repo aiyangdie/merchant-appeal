@@ -8,14 +8,15 @@ function MarkdownRenderer({ text }) {
     if (!text) return ''
     return text
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/^## (.*$)/gm, '<h2 class="text-[13px] font-bold text-gray-900 mt-4 mb-1.5 flex items-center gap-1.5">$1</h2>')
-      .replace(/^### (.*$)/gm, '<h3 class="text-[12px] font-semibold text-gray-800 mt-3 mb-1 pl-1 border-l-2 border-indigo-300">$1</h3>')
+      .replace(/^## (.*$)/gm, '<div class="mt-4 mb-2 flex items-center gap-2"><span class="w-1 h-4 rounded-full bg-indigo-500 flex-shrink-0"></span><h2 class="text-[13px] font-bold text-gray-900">$1</h2></div>')
+      .replace(/^### (.*$)/gm, '<h3 class="text-[12px] font-semibold text-gray-700 mt-3 mb-1 pl-2 border-l-2 border-indigo-300">$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>')
-      .replace(/^- (.*$)/gm, '<div class="flex gap-1.5 ml-1 my-0.5"><span class="text-indigo-400 flex-shrink-0 mt-0.5">·</span><span>$1</span></div>')
-      .replace(/^(\d+)\. (.*$)/gm, '<div class="flex gap-1.5 ml-1 my-0.5"><span class="text-indigo-500 font-bold flex-shrink-0 min-w-[16px]">$1.</span><span>$2</span></div>')
-      .replace(/^  · (.*$)/gm, '<div class="flex gap-1.5 ml-3 my-0.5"><span class="text-gray-400 flex-shrink-0">·</span><span>$1</span></div>')
+      .replace(/^ +[-·] (.*$)/gm, '<div class="flex gap-1.5 ml-5 my-0.5"><span class="text-gray-300 flex-shrink-0">·</span><span class="text-gray-600">$1</span></div>')
+      .replace(/^- (.*$)/gm, '<div class="flex gap-1.5 ml-1.5 my-0.5"><span class="text-indigo-400 flex-shrink-0 mt-0.5">·</span><span>$1</span></div>')
+      .replace(/^(\d+)\. (.*$)/gm, '<div class="flex gap-1.5 ml-1.5 my-0.5"><span class="text-indigo-500 font-bold flex-shrink-0 min-w-[16px]">$1.</span><span>$2</span></div>')
       .replace(/^---$/gm, '<hr class="my-3 border-gray-100"/>')
-      .replace(/\n\n/g, '<br/>')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\n\n/g, '<div class="h-2"></div>')
       .replace(/\n/g, '<br/>')
   }, [text])
   return <div className="text-[11px] text-gray-700 leading-relaxed break-words analysis-markdown" dangerouslySetInnerHTML={{ __html: html }} />
@@ -208,9 +209,13 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
         {displayText && (
           <div className="rounded-xl border border-indigo-100/80 overflow-hidden">
             {isStreaming && (
-              <div className="px-3 py-1.5 bg-indigo-50/60 flex items-center gap-1.5 border-b border-indigo-100/50">
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                <span className="text-[10px] font-medium text-indigo-600">DeepSeek 正在生成分析报告...</span>
+              <div className="border-b border-indigo-100/50">
+                <div className="px-3 py-1.5 bg-indigo-50/60 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-medium text-indigo-600">DeepSeek 正在生成分析报告...</span>
+                  <span className="text-[9px] text-indigo-400 ml-auto">{displayText.length} 字</span>
+                </div>
+                <div className="h-0.5 bg-indigo-100 overflow-hidden"><div className="h-full bg-indigo-400 animate-[progress_2s_ease-in-out_infinite]" style={{width:'60%'}} /></div>
               </div>
             )}
             {!isStreaming && finalText && (
@@ -218,6 +223,7 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-2 h-2 rounded-full bg-green-400" />
                   <span className="text-[10px] font-medium text-green-600">DeepSeek 报告</span>
+                  <span className="text-[9px] text-gray-400">{finalText.length}字</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="flex bg-white/80 rounded-md p-0.5 border border-indigo-100">
@@ -239,14 +245,14 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
             )}
             {/* 全文模式 */}
             {(isStreaming || viewMode === 'text') && (
-              <div className="px-4 py-3">
+              <div className="px-4 py-3 animate-fadeIn">
                 <MarkdownRenderer text={displayText} />
                 {isStreaming && <span className="inline-block w-1.5 h-3.5 bg-indigo-400 animate-pulse ml-0.5 align-middle" />}
               </div>
             )}
             {/* 可视化清单模式 */}
             {!isStreaming && viewMode === 'visual' && finalText && (
-              <div className="px-3 py-3">
+              <div className="px-3 py-3 animate-fadeIn">
                 <AnalysisVisualView text={finalText} />
               </div>
             )}

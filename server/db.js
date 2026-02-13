@@ -257,6 +257,291 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
 
+  // ========== AI 自进化系统表 ==========
+
+  // AI 规则库：存储 AI 自动生成/优化的规则
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS ai_rules (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      category ENUM('collection_strategy','question_template','industry_knowledge','violation_strategy','conversation_pattern','diagnosis_rule') NOT NULL,
+      rule_key VARCHAR(128) NOT NULL,
+      rule_name VARCHAR(256) NOT NULL DEFAULT '',
+      rule_content JSON NOT NULL,
+      source ENUM('ai_generated','admin_manual','system_default') DEFAULT 'ai_generated',
+      status ENUM('active','pending_review','archived','rejected') DEFAULT 'pending_review',
+      effectiveness_score DECIMAL(5,2) DEFAULT 0.00,
+      usage_count INT DEFAULT 0,
+      version INT DEFAULT 1,
+      parent_id INT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_category_key_version (category, rule_key, version),
+      INDEX idx_category_status (category, status),
+      INDEX idx_effectiveness (effectiveness_score DESC),
+      INDEX idx_parent (parent_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 对话分析结果：每次对话结束后 AI 异步分析
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS conversation_analyses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      user_id INT DEFAULT NULL,
+      industry VARCHAR(64) DEFAULT '',
+      problem_type VARCHAR(128) DEFAULT '',
+      total_turns INT DEFAULT 0,
+      collection_turns INT DEFAULT 0,
+      fields_collected INT DEFAULT 0,
+      fields_skipped INT DEFAULT 0,
+      fields_refused INT DEFAULT 0,
+      completion_rate DECIMAL(5,2) DEFAULT 0.00,
+      professionalism_score DECIMAL(5,2) DEFAULT 0.00,
+      appeal_success_rate DECIMAL(5,2) DEFAULT 0.00,
+      user_satisfaction DECIMAL(5,2) DEFAULT 0.00,
+      response_quality JSON,
+      user_sentiment VARCHAR(32) DEFAULT 'neutral',
+      drop_off_point VARCHAR(128) DEFAULT '',
+      collection_efficiency JSON,
+      sentiment_trajectory JSON,
+      suggestions JSON,
+      raw_analysis MEDIUMTEXT,
+      analyzed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_analyzed (analyzed_at),
+      INDEX idx_industry (industry),
+      INDEX idx_sentiment (user_sentiment)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 自动添加新列（兼容旧数据库）
+  for (const col of [
+    "professionalism_score DECIMAL(5,2) DEFAULT 0.00 AFTER completion_rate",
+    "appeal_success_rate DECIMAL(5,2) DEFAULT 0.00 AFTER professionalism_score",
+    "user_satisfaction DECIMAL(5,2) DEFAULT 0.00 AFTER appeal_success_rate",
+    "response_quality JSON AFTER user_satisfaction",
+    "active_rule_ids JSON AFTER raw_analysis",
+  ]) {
+    await pool.execute(`ALTER TABLE conversation_analyses ADD COLUMN ${col}`).catch(() => {})
+  }
+
+  // learning_metrics 新增聚合列
+  for (const col of [
+    "avg_professionalism DECIMAL(5,2) DEFAULT 0.00 AFTER avg_user_satisfaction",
+    "avg_appeal_success DECIMAL(5,2) DEFAULT 0.00 AFTER avg_professionalism",
+    "product_recommendation_count INT DEFAULT 0 AFTER avg_appeal_success",
+  ]) {
+    await pool.execute(`ALTER TABLE learning_metrics ADD COLUMN ${col}`).catch(() => {})
+  }
+
+  // 规则变更日志：审计追踪
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS rule_change_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      rule_id INT NOT NULL,
+      action ENUM('created','updated','activated','archived','rejected','auto_promoted') NOT NULL,
+      old_content JSON,
+      new_content JSON,
+      reason TEXT,
+      changed_by VARCHAR(32) DEFAULT 'system',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_rule (rule_id),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 学习指标：每日聚合的效果数据
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS learning_metrics (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      metric_date DATE NOT NULL,
+      total_conversations INT DEFAULT 0,
+      avg_collection_turns DECIMAL(5,2) DEFAULT 0.00,
+      avg_completion_rate DECIMAL(5,2) DEFAULT 0.00,
+      avg_user_satisfaction DECIMAL(5,2) DEFAULT 0.00,
+      completion_count INT DEFAULT 0,
+      drop_off_count INT DEFAULT 0,
+      top_drop_off_fields JSON,
+      top_improvements JSON,
+      rules_generated INT DEFAULT 0,
+      rules_promoted INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_date (metric_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // ========== AI 智能标签 & 聚合 & 熔断 ==========
+
+  // 对话标签：AI自动打标分类
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS conversation_tags (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      analysis_id INT DEFAULT NULL,
+      difficulty ENUM('easy','medium','hard','extreme') DEFAULT 'medium',
+      user_type ENUM('first_time','returning','experienced','vip') DEFAULT 'first_time',
+      quality_score DECIMAL(5,2) DEFAULT 0.00,
+      outcome ENUM('completed','abandoned','partial','redirected') DEFAULT 'partial',
+      tags JSON,
+      industry_cluster VARCHAR(64) DEFAULT '',
+      violation_cluster VARCHAR(64) DEFAULT '',
+      pattern_flags JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_session (session_id),
+      INDEX idx_analysis (analysis_id),
+      INDEX idx_difficulty (difficulty),
+      INDEX idx_outcome (outcome),
+      INDEX idx_industry_cluster (industry_cluster),
+      INDEX idx_quality (quality_score DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 知识聚合簇：跨对话模式聚合
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS knowledge_clusters (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      cluster_type ENUM('industry_pattern','violation_pattern','question_effectiveness','user_behavior','success_factor') NOT NULL,
+      cluster_key VARCHAR(128) NOT NULL,
+      cluster_name VARCHAR(256) DEFAULT '',
+      insight_data JSON NOT NULL,
+      sample_count INT DEFAULT 0,
+      confidence DECIMAL(5,2) DEFAULT 0.00,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_type_key (cluster_type, cluster_key),
+      INDEX idx_type_confidence (cluster_type, confidence DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 引擎健康状态：熔断器 + 监控
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS engine_health (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      component VARCHAR(64) NOT NULL,
+      status ENUM('healthy','degraded','circuit_open','recovering') DEFAULT 'healthy',
+      error_count INT DEFAULT 0,
+      success_count INT DEFAULT 0,
+      last_error TEXT,
+      last_success_at DATETIME DEFAULT NULL,
+      last_error_at DATETIME DEFAULT NULL,
+      circuit_opened_at DATETIME DEFAULT NULL,
+      metadata JSON,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_component (component)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 探索实验：AI自主探索的A/B测试记录
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS exploration_experiments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      experiment_name VARCHAR(128) NOT NULL,
+      rule_id INT DEFAULT NULL,
+      hypothesis TEXT,
+      status ENUM('running','completed','aborted','failed') DEFAULT 'running',
+      variant_a JSON,
+      variant_b JSON,
+      sample_a INT DEFAULT 0,
+      sample_b INT DEFAULT 0,
+      result_a JSON,
+      result_b JSON,
+      winner ENUM('a','b','inconclusive') DEFAULT NULL,
+      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ended_at DATETIME DEFAULT NULL,
+      INDEX idx_status (status),
+      INDEX idx_rule (rule_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // ========== 字段变更记录 ==========
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS field_change_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      field_key VARCHAR(64) NOT NULL,
+      field_label VARCHAR(64) DEFAULT '',
+      old_value TEXT,
+      new_value TEXT,
+      change_source ENUM('ai_extract','user_edit','ai_correction','system') DEFAULT 'ai_extract',
+      change_reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_field (field_key),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // ========== AI 智能商城 ==========
+
+  // 商品表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS mall_products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(256) NOT NULL,
+      category VARCHAR(64) DEFAULT '',
+      price DECIMAL(10,2) DEFAULT 0.00,
+      original_price DECIMAL(10,2) DEFAULT 0.00,
+      description TEXT,
+      ai_description TEXT,
+      image_url VARCHAR(512) DEFAULT '',
+      tags JSON,
+      target_audience JSON,
+      status ENUM('active','draft','archived','sold_out') DEFAULT 'draft',
+      sort_order INT DEFAULT 0,
+      view_count INT DEFAULT 0,
+      click_count INT DEFAULT 0,
+      purchase_count INT DEFAULT 0,
+      recommendation_score DECIMAL(5,2) DEFAULT 50.00,
+      ai_optimized_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_status (status),
+      INDEX idx_category (category),
+      INDEX idx_recommendation (recommendation_score DESC),
+      INDEX idx_sort (sort_order, id DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 用户兴趣画像
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS user_interests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      session_id VARCHAR(64) DEFAULT '',
+      industry VARCHAR(64) DEFAULT '',
+      problem_type VARCHAR(128) DEFAULT '',
+      keywords JSON,
+      need_tags JSON,
+      interest_score JSON,
+      last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_user (user_id),
+      INDEX idx_session (session_id),
+      INDEX idx_industry (industry)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 商品推荐记录
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS product_recommendations (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      session_id VARCHAR(64) DEFAULT '',
+      product_id INT NOT NULL,
+      reason VARCHAR(256) DEFAULT '',
+      match_score DECIMAL(5,2) DEFAULT 0.00,
+      status ENUM('pending','shown','clicked','purchased','dismissed') DEFAULT 'pending',
+      shown_at DATETIME DEFAULT NULL,
+      clicked_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_session (session_id),
+      INDEX idx_product (product_id),
+      INDEX idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
   // 默认管理员（bcrypt 哈希密码）
   const [admins] = await pool.execute('SELECT COUNT(*) as cnt FROM admins')
   if (admins[0].cnt === 0) {
@@ -984,18 +1269,61 @@ export async function getAllTokenUsage(limit = 100) {
 
 export async function getTokenUsageStats() {
   const [[totals]] = await pool.execute(
-    `SELECT COUNT(*) as total_requests, COALESCE(SUM(total_tokens),0) as total_tokens,
-     COALESCE(SUM(cost),0) as total_cost FROM token_usage`
+    `SELECT COUNT(*) as total_requests,
+     COALESCE(SUM(input_tokens),0) as total_input,
+     COALESCE(SUM(output_tokens),0) as total_output,
+     COALESCE(SUM(total_tokens),0) as total_tokens,
+     COALESCE(SUM(cost),0) as total_cost
+     FROM token_usage`
   )
   const [[today]] = await pool.execute(
-    `SELECT COUNT(*) as requests, COALESCE(SUM(cost),0) as cost, COALESCE(SUM(total_tokens),0) as tokens
+    `SELECT COUNT(*) as requests,
+     COALESCE(SUM(input_tokens),0) as input_tokens,
+     COALESCE(SUM(output_tokens),0) as output_tokens,
+     COALESCE(SUM(cost),0) as cost,
+     COALESCE(SUM(total_tokens),0) as tokens
      FROM token_usage WHERE DATE(created_at) = CURDATE()`
   )
   const [byType] = await pool.execute(
-    `SELECT type, COUNT(*) as cnt, COALESCE(SUM(cost),0) as cost, COALESCE(SUM(total_tokens),0) as tokens
+    `SELECT type, COUNT(*) as cnt,
+     COALESCE(SUM(input_tokens),0) as input_tokens,
+     COALESCE(SUM(output_tokens),0) as output_tokens,
+     COALESCE(SUM(cost),0) as cost, COALESCE(SUM(total_tokens),0) as tokens
      FROM token_usage GROUP BY type`
   )
-  return { totals, today, byType }
+  const [byUser] = await pool.execute(
+    `SELECT t.user_id, u.phone, u.nickname,
+     COUNT(*) as requests,
+     COALESCE(SUM(t.input_tokens),0) as input_tokens,
+     COALESCE(SUM(t.output_tokens),0) as output_tokens,
+     COALESCE(SUM(t.total_tokens),0) as total_tokens,
+     COALESCE(SUM(t.cost),0) as total_cost,
+     MAX(t.created_at) as last_used
+     FROM token_usage t LEFT JOIN users u ON t.user_id = u.id
+     GROUP BY t.user_id ORDER BY total_cost DESC LIMIT 50`
+  )
+  const [daily] = await pool.execute(
+    `SELECT DATE(created_at) as day, COUNT(*) as requests,
+     COALESCE(SUM(input_tokens),0) as input_tokens,
+     COALESCE(SUM(output_tokens),0) as output_tokens,
+     COALESCE(SUM(total_tokens),0) as tokens,
+     COALESCE(SUM(cost),0) as cost
+     FROM token_usage WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+     GROUP BY DATE(created_at) ORDER BY day DESC`
+  )
+  // 系统级消耗（user_id=0 或 evolution类型）
+  const [[systemUsage]] = await pool.execute(
+    `SELECT COUNT(*) as requests,
+     COALESCE(SUM(input_tokens),0) as input_tokens,
+     COALESCE(SUM(output_tokens),0) as output_tokens,
+     COALESCE(SUM(cost),0) as cost
+     FROM token_usage WHERE user_id = 0 OR type LIKE 'evolution%' OR type LIKE 'auto_%'`
+  )
+  return {
+    totals, today, byType,
+    byUser: byUser.map(r => ({ ...r, phone: safeDecrypt(r.phone), nickname: safeDecrypt(r.nickname) })),
+    daily, systemUsage
+  }
 }
 
 // ========== 申诉文案 ==========
@@ -1015,4 +1343,654 @@ export async function getAppealText(sessionId) {
     [sessionId]
   )
   return rows.length > 0 ? rows[0] : null
+}
+
+// ========== AI 自进化：规则库 ==========
+
+export async function createAIRule({ category, ruleKey, ruleName, ruleContent, source = 'ai_generated', status = 'pending_review', parentId = null }) {
+  // 计算版本号
+  const [[{ maxVer }]] = await pool.execute(
+    'SELECT COALESCE(MAX(version), 0) as maxVer FROM ai_rules WHERE category = ? AND rule_key = ?',
+    [category, ruleKey]
+  )
+  const version = maxVer + 1
+  const [result] = await pool.execute(
+    `INSERT INTO ai_rules (category, rule_key, rule_name, rule_content, source, status, version, parent_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [category, ruleKey, ruleName || '', JSON.stringify(ruleContent), source, status, version, parentId]
+  )
+  // 记录变更日志
+  await logRuleChange(result.insertId, 'created', null, ruleContent, `${source} 创建 v${version}`, source === 'ai_generated' ? 'ai' : 'admin')
+  return { id: result.insertId, version }
+}
+
+export async function getActiveRules(category = null) {
+  let sql = 'SELECT * FROM ai_rules WHERE status = ?'
+  const params = ['active']
+  if (category) { sql += ' AND category = ?'; params.push(category) }
+  sql += ' ORDER BY effectiveness_score DESC, usage_count DESC'
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({ ...r, rule_content: safeParse(r.rule_content) }))
+}
+
+export async function getAllAIRules(category = null, status = null) {
+  let sql = 'SELECT * FROM ai_rules WHERE 1=1'
+  const params = []
+  if (category) { sql += ' AND category = ?'; params.push(category) }
+  if (status) { sql += ' AND status = ?'; params.push(status) }
+  sql += ' ORDER BY updated_at DESC LIMIT 200'
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({ ...r, rule_content: safeParse(r.rule_content) }))
+}
+
+export async function getAIRuleById(id) {
+  const [rows] = await pool.execute('SELECT * FROM ai_rules WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  rows[0].rule_content = safeParse(rows[0].rule_content)
+  return rows[0]
+}
+
+export async function updateAIRuleStatus(id, status, reason = '', changedBy = 'admin') {
+  const rule = await getAIRuleById(id)
+  if (!rule) return null
+  const oldStatus = rule.status
+  await pool.execute('UPDATE ai_rules SET status = ? WHERE id = ?', [status, id])
+  await logRuleChange(id, status === 'active' ? 'activated' : status === 'archived' ? 'archived' : status === 'rejected' ? 'rejected' : 'updated',
+    { status: oldStatus }, { status }, reason, changedBy)
+  return { ...rule, status }
+}
+
+export async function updateAIRuleContent(id, ruleContent, ruleName = null, changedBy = 'admin') {
+  const rule = await getAIRuleById(id)
+  if (!rule) return null
+  const sets = ['rule_content = ?']
+  const params = [JSON.stringify(ruleContent)]
+  if (ruleName !== null) { sets.push('rule_name = ?'); params.push(ruleName) }
+  params.push(id)
+  await pool.execute(`UPDATE ai_rules SET ${sets.join(', ')} WHERE id = ?`, params)
+  await logRuleChange(id, 'updated', rule.rule_content, ruleContent, `${changedBy} 编辑内容`, changedBy)
+  return { ...rule, rule_content: ruleContent }
+}
+
+export async function incrementRuleUsage(id) {
+  await pool.execute('UPDATE ai_rules SET usage_count = usage_count + 1 WHERE id = ?', [id])
+}
+
+export async function updateRuleEffectiveness(id, score) {
+  await pool.execute('UPDATE ai_rules SET effectiveness_score = ? WHERE id = ?', [score, id])
+}
+
+export async function deleteAIRule(id) {
+  await pool.execute('DELETE FROM rule_change_log WHERE rule_id = ?', [id])
+  await pool.execute('DELETE FROM ai_rules WHERE id = ?', [id])
+}
+
+export async function getAIRuleStats() {
+  const [byCategory] = await pool.execute(
+    `SELECT category, status, COUNT(*) as cnt FROM ai_rules GROUP BY category, status`
+  )
+  const [[totals]] = await pool.execute(
+    `SELECT COUNT(*) as total, SUM(status='active') as active, SUM(status='pending_review') as pending,
+     AVG(CASE WHEN status='active' THEN effectiveness_score END) as avg_score
+     FROM ai_rules`
+  )
+  const [topRules] = await pool.execute(
+    `SELECT id, category, rule_key, rule_name, effectiveness_score, usage_count
+     FROM ai_rules WHERE status = 'active' ORDER BY effectiveness_score DESC LIMIT 10`
+  )
+  return { byCategory, totals, topRules }
+}
+
+// ========== AI 自进化：对话分析 ==========
+
+export async function saveConversationAnalysis(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO conversation_analyses
+     (session_id, user_id, industry, problem_type, total_turns, collection_turns,
+      fields_collected, fields_skipped, fields_refused, completion_rate,
+      professionalism_score, appeal_success_rate, user_satisfaction, response_quality,
+      user_sentiment, drop_off_point, collection_efficiency, sentiment_trajectory, suggestions, raw_analysis, active_rule_ids)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.sessionId, data.userId || null, data.industry || '', data.problemType || '',
+      data.totalTurns || 0, data.collectionTurns || 0,
+      data.fieldsCollected || 0, data.fieldsSkipped || 0, data.fieldsRefused || 0,
+      data.completionRate || 0,
+      data.professionalismScore || 0, data.appealSuccessRate || 0, data.userSatisfaction || 0,
+      JSON.stringify(data.responseQuality || {}),
+      data.userSentiment || 'neutral', data.dropOffPoint || '',
+      JSON.stringify(data.collectionEfficiency || {}),
+      JSON.stringify(data.sentimentTrajectory || []),
+      JSON.stringify(data.suggestions || []),
+      data.rawAnalysis || '',
+      JSON.stringify(data.activeRuleIds || [])
+    ]
+  )
+  return result.insertId
+}
+
+export async function getConversationAnalyses(limit = 50, filters = {}) {
+  let sql = `SELECT ca.*, s.status as session_status
+    FROM conversation_analyses ca
+    LEFT JOIN sessions s ON ca.session_id = s.id
+    WHERE 1=1`
+  const params = []
+  if (filters.industry) { sql += ' AND ca.industry LIKE ?'; params.push(`%${escapeLike(filters.industry)}%`) }
+  if (filters.sentiment) { sql += ' AND ca.user_sentiment = ?'; params.push(filters.sentiment) }
+  if (filters.minCompletion) { sql += ' AND ca.completion_rate >= ?'; params.push(filters.minCompletion) }
+  if (filters.maxCompletion) { sql += ' AND ca.completion_rate <= ?'; params.push(filters.maxCompletion) }
+  sql += ' ORDER BY ca.analyzed_at DESC LIMIT ?'
+  params.push(limit)
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({
+    ...r,
+    collection_efficiency: safeParse(r.collection_efficiency),
+    sentiment_trajectory: safeParse(r.sentiment_trajectory),
+    suggestions: safeParse(r.suggestions),
+    active_rule_ids: safeParse(r.active_rule_ids),
+  }))
+}
+
+export async function getConversationAnalysisById(id) {
+  const [rows] = await pool.execute('SELECT * FROM conversation_analyses WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return {
+    ...r,
+    collection_efficiency: safeParse(r.collection_efficiency),
+    sentiment_trajectory: safeParse(r.sentiment_trajectory),
+    suggestions: safeParse(r.suggestions),
+  }
+}
+
+export async function getAnalysisStats() {
+  const [[totals]] = await pool.execute(
+    `SELECT COUNT(*) as total,
+     AVG(completion_rate) as avg_completion,
+     AVG(total_turns) as avg_turns,
+     AVG(collection_turns) as avg_collection_turns,
+     AVG(fields_collected) as avg_fields_collected,
+     AVG(professionalism_score) as avg_professionalism,
+     AVG(appeal_success_rate) as avg_appeal_success,
+     AVG(user_satisfaction) as avg_satisfaction,
+     SUM(drop_off_point != '') as drop_off_count,
+     SUM(completion_rate >= 80) as high_completion_count,
+     SUM(professionalism_score >= 70) as high_prof_count,
+     SUM(appeal_success_rate >= 60) as high_appeal_count,
+     SUM(user_satisfaction >= 70) as high_satisfaction_count
+     FROM conversation_analyses`
+  )
+  const [bySentiment] = await pool.execute(
+    `SELECT user_sentiment, COUNT(*) as cnt FROM conversation_analyses GROUP BY user_sentiment`
+  )
+  const [byIndustry] = await pool.execute(
+    `SELECT industry, COUNT(*) as cnt, AVG(completion_rate) as avg_completion, AVG(total_turns) as avg_turns,
+     AVG(professionalism_score) as avg_prof, AVG(appeal_success_rate) as avg_appeal, AVG(user_satisfaction) as avg_sat
+     FROM conversation_analyses WHERE industry != '' GROUP BY industry ORDER BY cnt DESC LIMIT 20`
+  )
+  const [recent7d] = await pool.execute(
+    `SELECT DATE(analyzed_at) as day, COUNT(*) as cnt, AVG(completion_rate) as avg_completion,
+     AVG(professionalism_score) as avg_prof, AVG(appeal_success_rate) as avg_appeal, AVG(user_satisfaction) as avg_sat
+     FROM conversation_analyses WHERE analyzed_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+     GROUP BY DATE(analyzed_at) ORDER BY day`
+  )
+  const [topDropOffs] = await pool.execute(
+    `SELECT drop_off_point, COUNT(*) as cnt FROM conversation_analyses
+     WHERE drop_off_point != '' GROUP BY drop_off_point ORDER BY cnt DESC LIMIT 10`
+  )
+  return { totals, bySentiment, byIndustry, recent7d, topDropOffs }
+}
+
+export async function getQualityTopAndLow() {
+  const cols = `session_id, industry, problem_type, completion_rate, professionalism_score,
+     appeal_success_rate, user_satisfaction, user_sentiment, fields_collected, total_turns, analyzed_at,
+     suggestions, drop_off_point, raw_analysis`
+  const [topAnalyses] = await pool.execute(
+    `SELECT ${cols} FROM conversation_analyses ORDER BY professionalism_score DESC, completion_rate DESC LIMIT 5`
+  )
+  const [lowAnalyses] = await pool.execute(
+    `SELECT ${cols} FROM conversation_analyses WHERE professionalism_score > 0 ORDER BY professionalism_score ASC LIMIT 5`
+  )
+  const pf = a => ({
+    ...a,
+    completion_rate: parseFloat(a.completion_rate),
+    professionalism_score: parseFloat(a.professionalism_score),
+    appeal_success_rate: parseFloat(a.appeal_success_rate),
+    user_satisfaction: parseFloat(a.user_satisfaction),
+    suggestions: safeParse(a.suggestions) || [],
+    drop_off_point: a.drop_off_point || '',
+    ai_highlights: extractAIHighlights(a),
+  })
+  return { topAnalyses: topAnalyses.map(pf), lowAnalyses: lowAnalyses.map(pf) }
+}
+
+function extractAIHighlights(analysis) {
+  try {
+    const raw = safeParse(analysis.raw_analysis) || {}
+    const eff = raw.efficiency || {}
+    return {
+      bestMoment: eff.bestMoment || '',
+      worstMoment: eff.worstMoment || '',
+      redundantQuestions: eff.redundantQuestions || 0,
+      smoothTransitions: eff.smoothTransitions ?? true,
+    }
+  } catch { return {} }
+}
+
+// ========== AI 自进化：规则变更日志 ==========
+
+async function logRuleChange(ruleId, action, oldContent, newContent, reason = '', changedBy = 'system') {
+  await pool.execute(
+    `INSERT INTO rule_change_log (rule_id, action, old_content, new_content, reason, changed_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [ruleId, action, oldContent ? JSON.stringify(oldContent) : null, newContent ? JSON.stringify(newContent) : null, reason, changedBy]
+  )
+}
+
+export async function getRuleChangeLog(ruleId = null, limit = 50) {
+  let sql = `SELECT cl.*, r.rule_key, r.rule_name, r.category
+    FROM rule_change_log cl
+    LEFT JOIN ai_rules r ON cl.rule_id = r.id`
+  const params = []
+  if (ruleId) { sql += ' WHERE cl.rule_id = ?'; params.push(ruleId) }
+  sql += ' ORDER BY cl.created_at DESC LIMIT ?'
+  params.push(limit)
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({
+    ...r,
+    old_content: safeParse(r.old_content),
+    new_content: safeParse(r.new_content),
+  }))
+}
+
+// ========== AI 自进化：学习指标 ==========
+
+export async function upsertLearningMetrics(date, data) {
+  await pool.execute(
+    `INSERT INTO learning_metrics
+     (metric_date, total_conversations, avg_collection_turns, avg_completion_rate, avg_user_satisfaction,
+      completion_count, drop_off_count, top_drop_off_fields, top_improvements, rules_generated, rules_promoted)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+      total_conversations = VALUES(total_conversations),
+      avg_collection_turns = VALUES(avg_collection_turns),
+      avg_completion_rate = VALUES(avg_completion_rate),
+      avg_user_satisfaction = VALUES(avg_user_satisfaction),
+      completion_count = VALUES(completion_count),
+      drop_off_count = VALUES(drop_off_count),
+      top_drop_off_fields = VALUES(top_drop_off_fields),
+      top_improvements = VALUES(top_improvements),
+      rules_generated = VALUES(rules_generated),
+      rules_promoted = VALUES(rules_promoted)`,
+    [
+      date, data.totalConversations || 0, data.avgCollectionTurns || 0,
+      data.avgCompletionRate || 0, data.avgUserSatisfaction || 0,
+      data.completionCount || 0, data.dropOffCount || 0,
+      JSON.stringify(data.topDropOffFields || []),
+      JSON.stringify(data.topImprovements || []),
+      data.rulesGenerated || 0, data.rulesPromoted || 0,
+    ]
+  )
+}
+
+export async function getLearningMetrics(days = 30) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM learning_metrics WHERE metric_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY) ORDER BY metric_date ASC`,
+    [days]
+  )
+  return rows.map(r => ({
+    ...r,
+    top_drop_off_fields: safeParse(r.top_drop_off_fields),
+    top_improvements: safeParse(r.top_improvements),
+  }))
+}
+
+// ========== AI 智能标签 ==========
+
+export async function upsertConversationTags(sessionId, data) {
+  await pool.execute(
+    `INSERT INTO conversation_tags
+     (session_id, analysis_id, difficulty, user_type, quality_score, outcome, tags, industry_cluster, violation_cluster, pattern_flags)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       analysis_id=VALUES(analysis_id), difficulty=VALUES(difficulty), user_type=VALUES(user_type),
+       quality_score=VALUES(quality_score), outcome=VALUES(outcome), tags=VALUES(tags),
+       industry_cluster=VALUES(industry_cluster), violation_cluster=VALUES(violation_cluster), pattern_flags=VALUES(pattern_flags)`,
+    [
+      sessionId, data.analysisId || null, data.difficulty || 'medium', data.userType || 'first_time',
+      data.qualityScore || 0, data.outcome || 'partial',
+      JSON.stringify(data.tags || []), data.industryCluster || '', data.violationCluster || '',
+      JSON.stringify(data.patternFlags || {}),
+    ]
+  )
+}
+
+export async function getConversationTags(sessionId) {
+  const [rows] = await pool.execute('SELECT * FROM conversation_tags WHERE session_id = ?', [sessionId])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, tags: safeParse(r.tags), pattern_flags: safeParse(r.pattern_flags) }
+}
+
+export async function getTagStats() {
+  const [byDifficulty] = await pool.execute(
+    `SELECT difficulty, COUNT(*) as cnt, AVG(quality_score) as avg_quality FROM conversation_tags GROUP BY difficulty`
+  )
+  const [byOutcome] = await pool.execute(
+    `SELECT outcome, COUNT(*) as cnt FROM conversation_tags GROUP BY outcome`
+  )
+  const [byUserType] = await pool.execute(
+    `SELECT user_type, COUNT(*) as cnt, AVG(quality_score) as avg_quality FROM conversation_tags GROUP BY user_type`
+  )
+  const [topClusters] = await pool.execute(
+    `SELECT industry_cluster, COUNT(*) as cnt, AVG(quality_score) as avg_quality
+     FROM conversation_tags WHERE industry_cluster != '' GROUP BY industry_cluster ORDER BY cnt DESC LIMIT 20`
+  )
+  const [total] = await pool.execute(`SELECT COUNT(*) as cnt FROM conversation_tags`)
+  return { total: total[0].cnt, byDifficulty, byOutcome, byUserType, topClusters }
+}
+
+// ========== 知识聚合簇 ==========
+
+export async function upsertKnowledgeCluster(type, key, data) {
+  await pool.execute(
+    `INSERT INTO knowledge_clusters (cluster_type, cluster_key, cluster_name, insight_data, sample_count, confidence)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       cluster_name=VALUES(cluster_name), insight_data=VALUES(insight_data),
+       sample_count=VALUES(sample_count), confidence=VALUES(confidence)`,
+    [type, key, data.name || key, JSON.stringify(data.insights || {}), data.sampleCount || 0, data.confidence || 0]
+  )
+}
+
+export async function getKnowledgeClusters(type = null, minConfidence = 0) {
+  let sql = 'SELECT * FROM knowledge_clusters WHERE confidence >= ?'
+  const params = [minConfidence]
+  if (type) { sql += ' AND cluster_type = ?'; params.push(type) }
+  sql += ' ORDER BY confidence DESC, sample_count DESC LIMIT 100'
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({ ...r, insight_data: safeParse(r.insight_data) }))
+}
+
+export async function getClusterStats() {
+  const [byType] = await pool.execute(
+    `SELECT cluster_type, COUNT(*) as cnt, AVG(confidence) as avg_confidence, SUM(sample_count) as total_samples
+     FROM knowledge_clusters GROUP BY cluster_type`
+  )
+  return { byType }
+}
+
+// ========== 引擎健康 & 熔断器 ==========
+
+export async function upsertEngineHealth(component, data) {
+  await pool.execute(
+    `INSERT INTO engine_health (component, status, error_count, success_count, last_error, last_success_at, last_error_at, circuit_opened_at, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       status=VALUES(status), error_count=VALUES(error_count), success_count=VALUES(success_count),
+       last_error=VALUES(last_error), last_success_at=VALUES(last_success_at), last_error_at=VALUES(last_error_at),
+       circuit_opened_at=VALUES(circuit_opened_at), metadata=VALUES(metadata)`,
+    [
+      component, data.status || 'healthy', data.errorCount || 0, data.successCount || 0,
+      data.lastError || null, data.lastSuccessAt || null, data.lastErrorAt || null,
+      data.circuitOpenedAt || null, JSON.stringify(data.metadata || {}),
+    ]
+  )
+}
+
+export async function getEngineHealth(component = null) {
+  if (component) {
+    const [rows] = await pool.execute('SELECT * FROM engine_health WHERE component = ?', [component])
+    return rows.length > 0 ? { ...rows[0], metadata: safeParse(rows[0].metadata) } : null
+  }
+  const [rows] = await pool.execute('SELECT * FROM engine_health ORDER BY component')
+  return rows.map(r => ({ ...r, metadata: safeParse(r.metadata) }))
+}
+
+export async function incrementEngineError(component, errorMsg) {
+  await pool.execute(
+    `INSERT INTO engine_health (component, status, error_count, last_error, last_error_at)
+     VALUES (?, 'degraded', 1, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+       error_count = error_count + 1, last_error = VALUES(last_error), last_error_at = NOW(),
+       status = CASE WHEN error_count + 1 >= 5 THEN 'circuit_open' WHEN error_count + 1 >= 3 THEN 'degraded' ELSE status END,
+       circuit_opened_at = CASE WHEN error_count + 1 >= 5 AND circuit_opened_at IS NULL THEN NOW() ELSE circuit_opened_at END`,
+    [component, errorMsg]
+  )
+}
+
+export async function recordEngineSuccess(component) {
+  await pool.execute(
+    `INSERT INTO engine_health (component, status, success_count, last_success_at)
+     VALUES (?, 'healthy', 1, NOW())
+     ON DUPLICATE KEY UPDATE
+       success_count = success_count + 1, last_success_at = NOW(),
+       status = CASE WHEN status = 'circuit_open' THEN 'recovering' ELSE 'healthy' END,
+       error_count = CASE WHEN success_count + 1 >= 3 AND status IN ('degraded','recovering') THEN 0 ELSE error_count END,
+       circuit_opened_at = CASE WHEN success_count + 1 >= 3 THEN NULL ELSE circuit_opened_at END`,
+    [component]
+  )
+}
+
+// ========== 探索实验 ==========
+
+export async function createExperiment(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO exploration_experiments (experiment_name, rule_id, hypothesis, variant_a, variant_b)
+     VALUES (?, ?, ?, ?, ?)`,
+    [data.name, data.ruleId || null, data.hypothesis || '', JSON.stringify(data.variantA || {}), JSON.stringify(data.variantB || {})]
+  )
+  return { id: result.insertId }
+}
+
+export async function updateExperiment(id, data) {
+  const sets = []
+  const params = []
+  if (data.sampleA !== undefined) { sets.push('sample_a = ?'); params.push(data.sampleA) }
+  if (data.sampleB !== undefined) { sets.push('sample_b = ?'); params.push(data.sampleB) }
+  if (data.resultA) { sets.push('result_a = ?'); params.push(JSON.stringify(data.resultA)) }
+  if (data.resultB) { sets.push('result_b = ?'); params.push(JSON.stringify(data.resultB)) }
+  if (data.status) { sets.push('status = ?'); params.push(data.status) }
+  if (data.winner) { sets.push('winner = ?'); params.push(data.winner) }
+  if (data.status === 'completed' || data.status === 'aborted') { sets.push('ended_at = NOW()') }
+  if (sets.length === 0) return
+  params.push(id)
+  await pool.execute(`UPDATE exploration_experiments SET ${sets.join(', ')} WHERE id = ?`, params)
+}
+
+export async function getExperiments(status = null) {
+  let sql = 'SELECT * FROM exploration_experiments'
+  const params = []
+  if (status) { sql += ' WHERE status = ?'; params.push(status) }
+  sql += ' ORDER BY started_at DESC LIMIT 50'
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({
+    ...r, variant_a: safeParse(r.variant_a), variant_b: safeParse(r.variant_b),
+    result_a: safeParse(r.result_a), result_b: safeParse(r.result_b),
+  }))
+}
+
+// ========== AI 智能商城 ==========
+
+export async function createProduct(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO mall_products (name, category, price, original_price, description, ai_description, image_url, tags, target_audience, status, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.name, data.category || '', data.price || 0, data.originalPrice || 0,
+      data.description || '', data.aiDescription || '', data.imageUrl || '',
+      JSON.stringify(data.tags || []), JSON.stringify(data.targetAudience || []),
+      data.status || 'draft', data.sortOrder || 0,
+    ]
+  )
+  return { id: result.insertId }
+}
+
+export async function updateProduct(id, data) {
+  const sets = []; const params = []
+  if (data.name !== undefined) { sets.push('name=?'); params.push(data.name) }
+  if (data.category !== undefined) { sets.push('category=?'); params.push(data.category) }
+  if (data.price !== undefined) { sets.push('price=?'); params.push(data.price) }
+  if (data.originalPrice !== undefined) { sets.push('original_price=?'); params.push(data.originalPrice) }
+  if (data.description !== undefined) { sets.push('description=?'); params.push(data.description) }
+  if (data.aiDescription !== undefined) { sets.push('ai_description=?'); params.push(data.aiDescription) }
+  if (data.imageUrl !== undefined) { sets.push('image_url=?'); params.push(data.imageUrl) }
+  if (data.tags !== undefined) { sets.push('tags=?'); params.push(JSON.stringify(data.tags)) }
+  if (data.targetAudience !== undefined) { sets.push('target_audience=?'); params.push(JSON.stringify(data.targetAudience)) }
+  if (data.status !== undefined) { sets.push('status=?'); params.push(data.status) }
+  if (data.sortOrder !== undefined) { sets.push('sort_order=?'); params.push(data.sortOrder) }
+  if (data.recommendationScore !== undefined) { sets.push('recommendation_score=?'); params.push(data.recommendationScore) }
+  if (data.aiOptimizedAt !== undefined) { sets.push('ai_optimized_at=NOW()') }
+  if (sets.length === 0) return null
+  params.push(id)
+  await pool.execute(`UPDATE mall_products SET ${sets.join(', ')} WHERE id = ?`, params)
+  return getProductById(id)
+}
+
+export async function deleteProduct(id) {
+  await pool.execute('DELETE FROM mall_products WHERE id = ?', [id])
+}
+
+export async function getProductById(id) {
+  const [rows] = await pool.execute('SELECT * FROM mall_products WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, tags: safeParse(r.tags), target_audience: safeParse(r.target_audience) }
+}
+
+export async function getProducts(filters = {}) {
+  let sql = 'SELECT * FROM mall_products WHERE 1=1'
+  const params = []
+  if (filters.status) { sql += ' AND status = ?'; params.push(filters.status) }
+  if (filters.category) { sql += ' AND category = ?'; params.push(filters.category) }
+  if (filters.search) { sql += ' AND (name LIKE ? OR description LIKE ?)'; params.push(`%${filters.search}%`, `%${filters.search}%`) }
+  sql += ' ORDER BY sort_order ASC, recommendation_score DESC, id DESC'
+  if (filters.limit) { sql += ' LIMIT ?'; params.push(parseInt(filters.limit)) }
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({ ...r, tags: safeParse(r.tags), target_audience: safeParse(r.target_audience) }))
+}
+
+export async function getActiveProductsForAI() {
+  const [rows] = await pool.execute(
+    `SELECT id, name, category, price, original_price, description, ai_description, tags, target_audience, recommendation_score
+     FROM mall_products WHERE status = 'active' ORDER BY recommendation_score DESC, sort_order ASC LIMIT 50`
+  )
+  return rows.map(r => ({ ...r, tags: safeParse(r.tags), target_audience: safeParse(r.target_audience) }))
+}
+
+export async function getProductStats() {
+  const [totals] = await pool.execute(
+    `SELECT COUNT(*) as total, SUM(status='active') as active, SUM(status='draft') as draft,
+     SUM(status='sold_out') as sold_out, SUM(view_count) as total_views, SUM(click_count) as total_clicks,
+     SUM(purchase_count) as total_purchases FROM mall_products`
+  )
+  const [byCategory] = await pool.execute(
+    `SELECT category, COUNT(*) as cnt, AVG(recommendation_score) as avg_score
+     FROM mall_products WHERE category != '' GROUP BY category ORDER BY cnt DESC`
+  )
+  return { totals: totals[0], byCategory }
+}
+
+export async function incrementProductMetric(id, field) {
+  const allowed = ['view_count', 'click_count', 'purchase_count']
+  if (!allowed.includes(field)) return
+  await pool.execute(`UPDATE mall_products SET ${field} = ${field} + 1 WHERE id = ?`, [id])
+}
+
+// --- 用户兴趣画像 ---
+
+export async function upsertUserInterest(userId, data) {
+  await pool.execute(
+    `INSERT INTO user_interests (user_id, session_id, industry, problem_type, keywords, need_tags, interest_score, last_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+       session_id=VALUES(session_id), industry=VALUES(industry), problem_type=VALUES(problem_type),
+       keywords=VALUES(keywords), need_tags=VALUES(need_tags), interest_score=VALUES(interest_score), last_active=NOW()`,
+    [
+      userId, data.sessionId || '', data.industry || '', data.problemType || '',
+      JSON.stringify(data.keywords || []), JSON.stringify(data.needTags || []),
+      JSON.stringify(data.interestScore || {}),
+    ]
+  )
+}
+
+export async function getUserInterest(userId) {
+  const [rows] = await pool.execute('SELECT * FROM user_interests WHERE user_id = ?', [userId])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, keywords: safeParse(r.keywords), need_tags: safeParse(r.need_tags), interest_score: safeParse(r.interest_score) }
+}
+
+// --- 商品推荐记录 ---
+
+export async function createRecommendation(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO product_recommendations (user_id, session_id, product_id, reason, match_score)
+     VALUES (?, ?, ?, ?, ?)`,
+    [data.userId || null, data.sessionId || '', data.productId, data.reason || '', data.matchScore || 0]
+  )
+  return { id: result.insertId }
+}
+
+export async function getRecommendations(userId = null, sessionId = null, limit = 10) {
+  let sql = `SELECT r.*, p.name as product_name, p.price, p.image_url, p.category, p.ai_description
+     FROM product_recommendations r LEFT JOIN mall_products p ON r.product_id = p.id WHERE 1=1`
+  const params = []
+  if (userId) { sql += ' AND r.user_id = ?'; params.push(userId) }
+  if (sessionId) { sql += ' AND r.session_id = ?'; params.push(sessionId) }
+  sql += ' ORDER BY r.match_score DESC, r.created_at DESC LIMIT ?'
+  params.push(limit)
+  const [rows] = await pool.execute(sql, params)
+  return rows
+}
+
+export async function updateRecommendationStatus(id, status) {
+  const timeField = status === 'shown' ? ', shown_at=NOW()' : status === 'clicked' ? ', clicked_at=NOW()' : ''
+  await pool.execute(`UPDATE product_recommendations SET status=?${timeField} WHERE id = ?`, [status, id])
+}
+
+export async function getRecommendationStats() {
+  const [totals] = await pool.execute(
+    `SELECT COUNT(*) as total, SUM(status='shown') as shown, SUM(status='clicked') as clicked,
+     SUM(status='purchased') as purchased, SUM(status='dismissed') as dismissed FROM product_recommendations`
+  )
+  const [topProducts] = await pool.execute(
+    `SELECT p.id, p.name, COUNT(*) as rec_count, SUM(r.status='clicked') as clicks, SUM(r.status='purchased') as purchases
+     FROM product_recommendations r JOIN mall_products p ON r.product_id = p.id
+     GROUP BY p.id ORDER BY rec_count DESC LIMIT 10`
+  )
+  return { totals: totals[0], topProducts }
+}
+
+export async function getUnanalyzedSessions(limit = 20) {
+  const [rows] = await pool.execute(
+    `SELECT s.id, s.user_id, s.collected_data, s.step, s.status, s.created_at,
+      (SELECT COUNT(*) FROM messages WHERE session_id = s.id) as message_count
+     FROM sessions s
+     WHERE NOT EXISTS (SELECT 1 FROM conversation_analyses ca WHERE ca.session_id = s.id)
+       AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.role = 'user')
+       AND s.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+     ORDER BY s.created_at DESC LIMIT ?`,
+    [limit]
+  )
+  return rows.map(r => ({ ...r, collected_data: safeParse(r.collected_data) }))
+}
+
+// ========== 字段变更记录 ==========
+
+export async function logFieldChange(sessionId, fieldKey, fieldLabel, oldValue, newValue, changeSource, changeReason) {
+  await pool.execute(
+    `INSERT INTO field_change_log (session_id, field_key, field_label, old_value, new_value, change_source, change_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sessionId, fieldKey, fieldLabel || fieldKey, oldValue || '', newValue || '', changeSource || 'ai_extract', changeReason || '']
+  )
+}
+
+export async function getFieldChangeLog(sessionId, fieldKey = null) {
+  let sql = 'SELECT * FROM field_change_log WHERE session_id = ?'
+  const params = [sessionId]
+  if (fieldKey) { sql += ' AND field_key = ?'; params.push(fieldKey) }
+  sql += ' ORDER BY created_at ASC'
+  const [rows] = await pool.execute(sql, params)
+  return rows
 }

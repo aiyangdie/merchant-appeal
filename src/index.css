@@ -207,6 +207,19 @@ body {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+@keyframes progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes fadeContent {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes newChatIn {
+  0% { opacity: 0; transform: scale(0.97) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
 
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-scale-in { animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -215,6 +228,8 @@ body {
 .animate-bar { animation: bar-grow 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
 .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-fadeIn { animation: fadeContent 0.25s ease-out; }
+.animate-new-chat { animation: newChatIn 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
 
 /* 加载骨架屏闪烁 */
 .shimmer {

@@ -26,10 +26,31 @@ import {
   createSuccessCase, getSuccessCases, getSuccessCaseById, updateSuccessCase, deleteSuccessCase, findSimilarCases,
   recordTokenUsage, getUserTokenUsage, getUserTokenStats, getAllTokenUsage, getTokenUsageStats,
   saveAppealText, getAppealText,
+  getAllAIRules, getAIRuleById, createAIRule, updateAIRuleStatus, updateAIRuleContent, deleteAIRule, getAIRuleStats,
+  getConversationAnalyses, getConversationAnalysisById, getAnalysisStats, getQualityTopAndLow,
+  logFieldChange, getFieldChangeLog,
+  getRuleChangeLog, getLearningMetrics, getUnanalyzedSessions,
+  getTagStats, getConversationTags,
+  getKnowledgeClusters, getClusterStats,
+  getEngineHealth, getExperiments,
+  createProduct, updateProduct, deleteProduct, getProductById, getProducts, getProductStats,
+  incrementProductMetric, getRecommendations, updateRecommendationStatus, getRecommendationStats,
 } from './db.js'
-import { getWelcomeMessage, chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI } from './ai.js'
-import { processLocal, buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep } from './localAI.js'
+import { getWelcomeMessage, chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction } from './ai.js'
+import { buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep } from './localAI.js'
 import { calculateCost } from './tokenizer.js'
+import {
+  analyzeConversation, batchAnalyzeConversations, aggregateDailyMetrics,
+  generateRulesFromAnalysis, startEvolutionScheduler, stopEvolutionScheduler,
+  schedulePostConversationAnalysis, evaluateRuleEffectiveness, autoPromoteRules,
+  invalidateRulesCache, autoTagConversation, autoReviewRule, batchAutoReviewRules,
+  aggregateKnowledgeClusters, getEngineHealthSummary, safeExecute, runExplorationCycle,
+} from './evolution.js'
+import {
+  loadProductCatalogForPrompt, invalidateProductCache,
+  aiOptimizeProduct, batchOptimizeProducts,
+  getSmartRecommendations, updateUserInterestFromConversation, parseProductRecommendations,
+} from './mall.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -378,12 +399,36 @@ app.put('/api/sessions/:id/field', optionalUser, async (req, res) => {
     if (!key || key.length > 50) return res.status(400).json({ error: '字段名无效' })
     if (value && value.length > 2000) return res.status(400).json({ error: '字段内容过长' })
     const collectedData = session.collected_data || {}
+    const oldValue = collectedData[key] || ''
     // 智能标准化用户编辑的值
     const normalizedValue = normalizeFieldValue(key, value || '', collectedData)
+    // 记录变更（仅值真正改变时）
+    if (normalizedValue !== oldValue) {
+      const fieldDef = INFO_FIELDS.find(f => f.key === key)
+      const label = fieldDef?.label || key
+      const reason = oldValue && oldValue !== '用户暂未提供' && oldValue !== '⏳待补充'
+        ? `用户手动将"${label}"从"${oldValue}"修改为"${normalizedValue}"`
+        : `用户手动填写了"${label}"`
+      logFieldChange(req.params.id, key, label, oldValue, normalizedValue, 'user_edit', reason).catch(() => {})
+    }
     collectedData[key] = normalizedValue
     await updateSession(req.params.id, session.step, collectedData)
     res.json({ success: true, collectedData, normalizedValue, wasNormalized: normalizedValue !== (value || '').trim() })
   } catch (err) { console.error(err); res.status(500).json({ error: '更新失败' }) }
+})
+
+// ========== 获取字段变更历史 ==========
+app.get('/api/sessions/:id/field-history', optionalUser, async (req, res) => {
+  try {
+    const session = await getSession(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    if (session.user_id && req.userId && String(session.user_id) !== String(req.userId)) {
+      return res.status(403).json({ error: '无权查看' })
+    }
+    const fieldKey = req.query.field || null
+    const logs = await getFieldChangeLog(req.params.id, fieldKey)
+    res.json({ logs })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取变更历史失败' }) }
 })
 
 // ========== 获取AI分析摘要（基于已收集数据本地生成，不消耗DeepSeek） ==========
@@ -451,7 +496,7 @@ app.get('/api/sessions/:id/deep-analysis', optionalUser, async (req, res) => {
     const session = await getSession(req.params.id)
     if (!session) return res.status(404).json({ error: '会话不存在' })
     const d = session.collected_data || {}
-    const filledKeys = Object.keys(d).filter(k => d[k]?.trim())
+    const filledKeys = Object.keys(d).filter(k => d[k] != null && String(d[k]).trim())
     if (filledKeys.length < 1) return res.json({ deepAnalysis: null, reason: 'not_enough_data' })
 
     // 同时生成本地分析作为兜底
@@ -537,7 +582,7 @@ app.get('/api/sessions/:id/deep-analysis', optionalUser, async (req, res) => {
     let dataSection = '## 一、客户基础信息（系统已收集）\n\n'
     const missingFields = []
     for (const [key, label] of Object.entries(fieldLabels)) {
-      if (d[key]?.trim()) {
+      if (d[key] != null && String(d[key]).trim()) {
         dataSection += `- **${label}**：${d[key]}\n`
       } else {
         missingFields.push(label)
@@ -1103,410 +1148,182 @@ app.post('/api/chat/stream', async (req, res) => {
     // 先发送 sessionId + 当前收集进度
     safeSend(`data: ${JSON.stringify({ type: 'start', sessionId, isNew, step: currentStep, totalSteps: TOTAL_STEPS })}\n\n`)
 
-    // ===== 阶段判断：用 _collection_complete 标记（AI判断），不再硬编码 step 上限 =====
+    // ===== AI-First: 用 _collection_complete 标记判断阶段 =====
     const isCollectionDone = collectedData._collection_complete === true
     if (!isCollectionDone) {
-      // ===== 信息收集阶段：规则引擎 + AI 协作，动态无限收集 =====
-      const inBasePhase = currentStep < TOTAL_STEPS
-      const result = inBasePhase
-        ? processLocal(content, currentStep, collectedData)
-        : { response: null, nextStep: currentStep, collectedData: { ...collectedData }, infoUpdate: null, needDeepSeek: true, allCollected: false }
-
-      // Step 1: 发送本轮提取到的字段 + 保存进度
-      if (result.infoUpdate) {
-        const updates = Array.isArray(result.infoUpdate) ? result.infoUpdate : [result.infoUpdate]
-        for (const upd of updates) {
-          if (upd && upd.key) safeSend(`data: ${JSON.stringify({ type: 'info_update', ...upd, step: result.nextStep, totalSteps: TOTAL_STEPS })}\n\n`)
-        }
-      }
-      await updateSession(sessionId, result.nextStep, result.collectedData)
-
-      // Step 1.5: 行业自适应字段扩展（当 industry 首次被识别时触发）
-      if (canUseAI && result.collectedData.industry && !result.collectedData._dynamic_fields) {
+      // ===== AI-First: 所有消息统一由 DeepSeek 驱动对话 + 并行字段提取 =====
+      if (!canUseAI) {
+        const errMsg = '⚠️ 余额不足，无法使用AI咨询服务。请充值后继续。'
+        safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg, needRecharge: true })}\n\n`)
+      } else {
         try {
-          const expansion = await expandFieldsForIndustry(result.collectedData.industry, result.collectedData.problem_type, result.collectedData, apiKeyToUse)
-          if (expansion && expansion.fields?.length > 0) {
-            result.collectedData._dynamic_fields = expansion.fields
-            result.collectedData._industry_tip = expansion.industryTip
-            await updateSession(sessionId, result.nextStep, result.collectedData)
-            // 通知前端新增动态字段
-            for (const df of expansion.fields) {
-              safeSend(`data: ${JSON.stringify({ type: 'info_update', key: df.key, label: df.label, value: '', group: df.group || '行业信息', icon: df.icon || '🏭', step: result.nextStep, totalSteps: TOTAL_STEPS, dynamic: true })}\n\n`)
+          const stepStartTime = Date.now()
+          let updatedData = { ...collectedData }
+          let updatedStep = currentStep
+
+          // 构建收集上下文
+          const filledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
+          const filledCount = filledFields.length
+          const collectionCtx = buildCollectionContext(updatedData, currentStep)
+          const dynamicFields = updatedData._dynamic_fields || []
+          const unfilled = dynamicFields.filter(df => !updatedData[df.key] || !String(updatedData[df.key]).trim()).map(df => `${df.label}: ${df.question || df.hint || ''}`).join('\n')
+          const dynamicNote = unfilled ? `\n\n[行业专属信息待收集]\n${unfilled}` : ''
+
+          const enrichedData = {
+            ...updatedData,
+            _current_step: `已收集${filledCount}项`,
+            _collection_context: collectionCtx,
+            _instruction: buildCollectionInstruction('', dynamicNote)
+          }
+
+          // 并行：AI字段提取 + 流式对话回复
+          const allMessages = await getMessages(sessionId)
+          const extractionPromise = extractFieldsWithAI(content, updatedData, currentStep, apiKeyToUse, allMessages.slice(-6)).catch(e => {
+            console.error('AI extraction error (non-fatal):', e.message)
+            return null
+          })
+
+          // 流式回复（用户秒看到内容）
+          const streamResult = await streamChatWithAI(allMessages, apiKeyToUse, enrichedData)
+          const firstByteMs = Date.now() - stepStartTime
+          safeSend(`data: ${JSON.stringify({ type: 'timing', firstByteMs })}\n\n`)
+
+          const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat_collection' })
+          if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
+
+          const totalMs = Date.now() - stepStartTime
+          safeSend(`data: ${JSON.stringify({ type: 'timing', totalMs, firstByteMs })}\n\n`)
+
+          // 处理后台AI提取结果
+          const aiResult = await extractionPromise
+          if (aiResult && Object.keys(aiResult.extracted).length > 0) {
+            const fieldValidators = {
+              merchant_id: v => /^\d{8,12}$/.test(v.replace(/\s/g, '')),
+              legal_id_last4: v => /^\d{3}[\dxX]$/.test(v.replace(/\s/g, '')),
+              bank_account_last4: v => /^\d{4}$/.test(v.replace(/\s/g, '')),
+              contact_phone: v => /^1[3-9]\d{9}$/.test(v.replace(/[\s\-]/g, '')),
+              license_no: v => /^[0-9A-Z]{15,18}$/i.test(v.replace(/\s/g, '')),
+              business_model: v => v.length <= 30,
+              problem_type: v => v.length <= 20,
+              industry: v => v.length <= 20,
+              violation_reason: v => v.length <= 60,
+              merchant_name: v => v.length <= 40,
+              company_name: v => v.length <= 50 && !/^(就是|哎呀|那个|反正)/.test(v),
+              legal_name: v => v.length >= 2 && v.length <= 10 && /^[\u4e00-\u9fff·]+$/.test(v),
+              bank_name: v => v.length <= 20 && /银行|信用社|支付宝|财付通/.test(v) && !/[？?怎么吗呢呀吧]/.test(v),
+              complaint_status: v => v.length <= 50 && !/[？?]$/.test(v.trim()),
+              refund_policy: v => v.length <= 80 && !/[？?]$/.test(v.trim()),
+              appeal_history: v => v.length <= 60 && !/[？?]$/.test(v.trim()),
             }
-            console.log(`[行业扩展] 为 ${result.collectedData.industry} 生成 ${expansion.fields.length} 个动态字段`)
-            if (expansion.inputTokens || expansion.outputTokens) {
+            const aiInfoUpdates = []
+            const allFieldDefs = [...INFO_FIELDS, ...(updatedData._dynamic_fields || [])]
+            for (const [key, value] of Object.entries(aiResult.extracted)) {
+              let fieldDef = allFieldDefs.find(f => f.key === key)
+              if (!fieldDef && key && !key.startsWith('_') && value) {
+                const v = String(value).trim()
+                if (v.length > 0 && v.length <= 100) fieldDef = { key, label: key, group: '补充信息', icon: '📌', dynamic: true }
+              }
+              if (!fieldDef) continue
+              const v = String(value).trim()
+              if (!v) continue
+              const validator = fieldValidators[key]
+              if (validator && !validator(v)) continue
+              const existing = updatedData[key]
+              const shouldUpdate = aiResult.correction || !existing || existing === '用户暂未提供' || existing === '⏳待补充'
+              if (shouldUpdate) {
+                const oldVal = existing || ''
+                const source = (existing && existing !== '用户暂未提供' && existing !== '⏳待补充') ? 'ai_correction' : 'ai_extract'
+                const reason = source === 'ai_correction'
+                  ? `AI根据用户最新描述将"${fieldDef.label}"从"${oldVal}"更正为"${v}"`
+                  : `AI从用户对话中识别并提取了"${fieldDef.label}"`
+                logFieldChange(sessionId, key, fieldDef.label, oldVal, v, source, reason).catch(() => {})
+                updatedData[key] = v
+                aiInfoUpdates.push({ key, label: fieldDef.label, value: v, group: fieldDef.group || '补充信息', icon: fieldDef.icon || '📌' })
+              }
+            }
+            if (aiInfoUpdates.length > 0) {
+              updatedStep = findNextUnfilledStep(0, updatedData)
+              if (updatedStep >= TOTAL_STEPS) updatedStep = TOTAL_STEPS
+              for (const upd of aiInfoUpdates) {
+                safeSend(`data: ${JSON.stringify({ type: 'info_update', ...upd, step: updatedStep, totalSteps: TOTAL_STEPS })}\n\n`)
+              }
+              await updateSession(sessionId, updatedStep, updatedData)
+              console.log(`[AI提取成功] session=${sessionId} 提取${aiInfoUpdates.length}个字段, step→${updatedStep}`)
+            }
+            // 扣费
+            if (aiResult.inputTokens || aiResult.outputTokens) {
               const multiplierStr = await getSystemConfig('cost_multiplier')
               const multiplier = parseFloat(multiplierStr || '2')
-              const tokenInfo = calculateCost(expansion.inputTokens, expansion.outputTokens, multiplier)
+              const tokenInfo = calculateCost(aiResult.inputTokens, aiResult.outputTokens, multiplier)
               if (isOfficialMode && tokenInfo.cost > 0) {
                 await deductBalance(user.id, tokenInfo.cost)
                 await incrementUserSpent(user.id, tokenInfo.cost)
-                try { await recordTokenUsage({ userId: user.id, sessionId, type: 'industry_expansion', inputTokens: expansion.inputTokens, outputTokens: expansion.outputTokens, totalTokens: expansion.inputTokens + expansion.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+                try { await recordTokenUsage({ userId: user.id, sessionId, type: 'ai_extraction', inputTokens: aiResult.inputTokens, outputTokens: aiResult.outputTokens, totalTokens: aiResult.inputTokens + aiResult.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
               }
             }
           }
-        } catch (e) { console.error('Industry expansion error (non-fatal):', e.message) }
-      }
 
-      // Step 2: 格式校验错误 → 本地即时反馈（同时也让DeepSeek提取其他字段）
-      const isValidationError = result.response && result.nextStep === currentStep &&
-        /⚠️.*格式|⚠️.*位数|⚠️.*数字|⚠️.*重新输入|⚠️.*不太对|🤔/.test(result.response)
-
-      if (isValidationError) {
-        await simulateTypingSSE(res, result.response)
-        await addMessage(sessionId, 'assistant', result.response)
-        // 即使校验失败，也跑DeepSeek提取（用户消息可能包含其他字段的数据）
-        if (canUseAI) {
-          try {
-            const allMsgsForExtract = await getMessages(sessionId)
-            const valExtraction = await extractFieldsWithAI(content, result.collectedData, currentStep, apiKeyToUse, allMsgsForExtract.slice(-6))
-            if (valExtraction && Object.keys(valExtraction.extracted).length > 0) {
-              const fieldValidators = {
-                merchant_id: v => /^\d{8,12}$/.test(v.replace(/\s/g, '')),
-                legal_id_last4: v => /^\d{3}[\dxX]$/.test(v.replace(/\s/g, '')),
-                bank_account_last4: v => /^\d{4}$/.test(v.replace(/\s/g, '')),
-                contact_phone: v => /^1[3-9]\d{9}$/.test(v.replace(/[\s\-]/g, '')),
-                license_no: v => /^[0-9A-Z]{15,18}$/i.test(v.replace(/\s/g, '')),
-                bank_name: v => v.length <= 20 && /银行|信用社|支付宝|财付通/.test(v) && !/[？?怎么吗呢呀吧]/.test(v),
-                company_name: v => v.length <= 50 && !/^(就是|哎呀|那个|反正)/.test(v),
-                legal_name: v => v.length >= 2 && v.length <= 10 && /^[\u4e00-\u9fff·]+$/.test(v),
-              }
-              const allFieldDefs = [...INFO_FIELDS, ...(result.collectedData._dynamic_fields || [])]
-              for (const [key, value] of Object.entries(valExtraction.extracted)) {
-                let fieldDef = allFieldDefs.find(f => f.key === key)
-                if (!fieldDef) continue
-                const v = String(value).trim()
-                if (!v) continue
-                const validator = fieldValidators[key]
-                if (validator && !validator(v)) continue
-                const existing = result.collectedData[key]
-                if (!existing || existing === '用户暂未提供' || existing === '⏳待补充') {
-                  result.collectedData[key] = v
-                  safeSend(`data: ${JSON.stringify({ type: 'info_update', key, label: fieldDef.label, value: v, group: fieldDef.group, icon: fieldDef.icon, step: result.nextStep, totalSteps: TOTAL_STEPS })}\n\n`)
-                }
-              }
-              await updateSession(sessionId, result.nextStep, result.collectedData)
-            }
-          } catch (e) { console.error('Step 2 extraction error (non-fatal):', e.message) }
-        }
-      }
-      // Step 3: 基础字段收集完毕或AI提取后 → AI评估是否可以生成报告
-      else if (result.allCollected || result.nextStep >= TOTAL_STEPS) {
-        // 先发送本地汇总
-        if (result.response) {
-          await simulateTypingSSE(res, result.response)
-          await addMessage(sessionId, 'assistant', result.response)
-        }
-
-        // ===== Step 3.1: 对最后一条用户消息也跑DeepSeek提取（确保无遗漏） =====
-        if (canUseAI) {
-          try {
-            const allMsgsForExtract = await getMessages(sessionId)
-            const lastExtraction = await extractFieldsWithAI(content, result.collectedData, currentStep, apiKeyToUse, allMsgsForExtract.slice(-6))
-            if (lastExtraction && Object.keys(lastExtraction.extracted).length > 0) {
-              const fieldValidators = {
-                merchant_id: v => /^\d{8,12}$/.test(v.replace(/\s/g, '')),
-                legal_id_last4: v => /^\d{3}[\dxX]$/.test(v.replace(/\s/g, '')),
-                bank_account_last4: v => /^\d{4}$/.test(v.replace(/\s/g, '')),
-                contact_phone: v => /^1[3-9]\d{9}$/.test(v.replace(/[\s\-]/g, '')),
-                license_no: v => /^[0-9A-Z]{15,18}$/i.test(v.replace(/\s/g, '')),
-                bank_name: v => v.length <= 20 && /银行|信用社|支付宝|财付通/.test(v) && !/[？?怎么吗呢呀吧]/.test(v),
-                company_name: v => v.length <= 50 && !/^(就是|哎呀|那个|反正)/.test(v),
-                legal_name: v => v.length >= 2 && v.length <= 10 && /^[\u4e00-\u9fff·]+$/.test(v),
-              }
-              const allFieldDefs = [...INFO_FIELDS, ...(result.collectedData._dynamic_fields || [])]
-              for (const [key, value] of Object.entries(lastExtraction.extracted)) {
-                let fieldDef = allFieldDefs.find(f => f.key === key)
-                if (!fieldDef && key && !key.startsWith('_') && value) {
-                  const v = String(value).trim()
-                  if (v.length > 0 && v.length <= 100) fieldDef = { key, label: key, group: '补充信息', icon: '📌', dynamic: true }
-                }
-                if (!fieldDef) continue
-                const v = String(value).trim()
-                if (!v) continue
-                const validator = fieldValidators[key]
-                if (validator && !validator(v)) continue
-                const existing = result.collectedData[key]
-                const shouldUpdate = lastExtraction.correction || !existing || existing === '用户暂未提供' || existing === '⏳待补充'
-                if (shouldUpdate) {
-                  result.collectedData[key] = v
-                  safeSend(`data: ${JSON.stringify({ type: 'info_update', key, label: fieldDef.label, value: v, group: fieldDef.group || '补充信息', icon: fieldDef.icon || '📌', step: result.nextStep, totalSteps: TOTAL_STEPS })}\n\n`)
-                }
-              }
-              await updateSession(sessionId, result.nextStep, result.collectedData)
-              // 扣费
-              if (lastExtraction.inputTokens || lastExtraction.outputTokens) {
-                const multiplierStr = await getSystemConfig('cost_multiplier')
-                const multiplier = parseFloat(multiplierStr || '2')
-                const tokenInfo = calculateCost(lastExtraction.inputTokens, lastExtraction.outputTokens, multiplier)
-                if (isOfficialMode && tokenInfo.cost > 0) {
-                  await deductBalance(user.id, tokenInfo.cost)
-                  await incrementUserSpent(user.id, tokenInfo.cost)
-                  try { await recordTokenUsage({ userId: user.id, sessionId, type: 'ai_extraction', inputTokens: lastExtraction.inputTokens, outputTokens: lastExtraction.outputTokens, totalTokens: lastExtraction.inputTokens + lastExtraction.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
-                }
-              }
-            }
-          } catch (e) { console.error('Step 3 extraction error (non-fatal):', e.message) }
-        }
-
-        // AI 评估完成度
-        let shouldGenerate = false
-        if (canUseAI) {
-          try {
-            const assessment = await assessCompletenessWithAI(result.collectedData, apiKeyToUse)
-            safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: assessment.ready })}\n\n`)
-            if (assessment.inputTokens || assessment.outputTokens) {
-              const multiplierStr = await getSystemConfig('cost_multiplier')
-              const multiplier = parseFloat(multiplierStr || '2')
-              const tokenInfo = calculateCost(assessment.inputTokens, assessment.outputTokens, multiplier)
-              if (isOfficialMode && tokenInfo.cost > 0) {
-                await deductBalance(user.id, tokenInfo.cost)
-                await incrementUserSpent(user.id, tokenInfo.cost)
-                try { await recordTokenUsage({ userId: user.id, sessionId, type: 'completeness_check', inputTokens: assessment.inputTokens, outputTokens: assessment.outputTokens, totalTokens: assessment.inputTokens + assessment.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
-              }
-            }
-            if (assessment.ready && assessment.score >= 75) {
-              shouldGenerate = true
-            } else {
-              // AI说信息还不够 → 继续收集，引导用户补充
-              const guideMsg = assessment.nextQuestion
-                ? `📊 信息完成度：${assessment.score}%\n\n${assessment.reason}\n\n${assessment.nextQuestion}`
-                : `📊 当前信息完成度 ${assessment.score}%，还需要补充一些关键信息：${(assessment.missingCritical || []).join('、')}。\n\n您可以继续告诉我更多信息，信息越充分，申诉材料质量越高~`
-              await simulateTypingSSE(res, guideMsg)
-              await addMessage(sessionId, 'assistant', guideMsg)
-            }
-          } catch (assessErr) {
-            console.error('Completeness assessment error:', assessErr.message)
-            shouldGenerate = true // 评估失败时降级为直接生成
-          }
-        } else {
-          shouldGenerate = true // 无AI能力时直接生成
-        }
-
-        if (shouldGenerate) {
-          result.collectedData._collection_complete = true
-          await updateSession(sessionId, result.nextStep, result.collectedData)
-          if (!canUseAI) {
-            const errMsg = '\n\n⚠️ **余额不足，无法生成申诉报告。** 请充值后发送"生成报告"即可继续。'
-            await simulateTypingSSE(res, errMsg)
-            await addMessage(sessionId, 'assistant', errMsg)
-            safeSend(`data: ${JSON.stringify({ type: 'error', needRecharge: true })}\n\n`)
-          } else {
+          // 行业自适应字段扩展（当 industry 首次被识别时触发）
+          if (updatedData.industry && !updatedData._dynamic_fields) {
             try {
-              const similarCases = await findSimilarCases(result.collectedData.industry, result.collectedData.problem_type, 3)
-              if (similarCases.length > 0) {
-                const caseMsg = `\n\n💼 **发现 ${similarCases.length} 个相似成功案例**，AI 将参考这些案例为您生成更有针对性的申诉材料。\n`
-                await simulateTypingSSE(res, caseMsg)
-              }
-              const reportPrompt = buildReportPrompt(result.collectedData, similarCases)
-              const reportMessages = [{ role: 'user', content: reportPrompt }]
-              const streamResult = await streamChatWithAI(reportMessages, apiKeyToUse)
-              const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'report' })
-              if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
-            } catch (err) {
-              console.error('DeepSeek report error:', err.message)
-              const errMsg = `\n\n⚠️ 报告生成失败（${err.message}），请稍后发送"生成报告"重试。`
-              await simulateTypingSSE(res, errMsg)
-              await addMessage(sessionId, 'assistant', errMsg)
-            }
-          }
-        }
-      }
-      // Step 4: 其他所有情况 → DeepSeek 驱动对话（先回复，后台提取）
-      else {
-        if (!canUseAI) {
-          const fallbackResponse = result.response || `请继续回答当前问题~`
-          await simulateTypingSSE(res, fallbackResponse)
-          await addMessage(sessionId, 'assistant', fallbackResponse)
-        } else {
-          try {
-            const stepStartTime = Date.now()
-            const effectiveStep = result.nextStep < TOTAL_STEPS ? result.nextStep : currentStep
-            let updatedData = { ...result.collectedData }
-            let updatedStep = effectiveStep
-
-            // ===== 4.1 先构建上下文，立即开始流式回复（用户秒看到内容） =====
-            let extractionNote = ''
-            if (result.infoUpdate) {
-              const updates = Array.isArray(result.infoUpdate) ? result.infoUpdate : [result.infoUpdate]
-              const extracted = updates.filter(u => u && u.key).map(u => `${u.label}: ${u.value}`)
-              if (extracted.length > 0) extractionNote = `\n\n[系统提示] 规则引擎已提取：${extracted.join('、')}。请在回复中自然确认。`
-            }
-
-            const filledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
-            const filledCount = filledFields.length
-            const currentFieldInfo = INFO_FIELDS[Math.min(updatedStep, TOTAL_STEPS - 1)] || INFO_FIELDS[INFO_FIELDS.length - 1]
-            const collectionCtx = buildCollectionContext(updatedData, Math.min(updatedStep, TOTAL_STEPS - 1))
-            const dynamicFields = updatedData._dynamic_fields || []
-            const unfilled = dynamicFields.filter(df => !updatedData[df.key] || !String(updatedData[df.key]).trim()).map(df => `${df.label}: ${df.question || df.hint || ''}`).join('\n')
-            const dynamicNote = unfilled ? `\n\n[行业专属信息待收集]\n${unfilled}` : ''
-
-            const enrichedData = {
-              ...updatedData,
-              _current_step: `已收集${filledCount}项`,
-              _current_question: currentFieldInfo.question,
-              _current_field_label: currentFieldInfo.label,
-              _collection_context: collectionCtx,
-              _instruction: `你是顶尖商户号申诉专家，8年实战经验，1200+成功案例，整体成功率82%。你不是普通客服——你是能深度推理、精准诊断、给出战略级建议的专家顾问。${extractionNote}${dynamicNote}
-
-【你的核心竞争力——深度推理】
-你要像资深律师一样思考每个案件：
-1. 拿到行业+违规原因→立刻推演风控触发点（为什么微信会判定违规？是交易模式？频率？金额？投诉？）
-2. 反向设计申诉策略→需要什么证据来反驳风控判定？证据链怎么组织？
-3. 引用真实案例→"之前有个做微商的客户也是交易异常，用朋友圈经营记录+发货物流，3天就通过了"
-4. 主动预判风险→发现隐患立刻预警，不等用户问
-
-【实战案例库（对话中自然引用）】
-- 微商/社交电商交易拦截→朋友圈记录+客户聊天+发货凭证，3-5天通过
-- 游戏陪玩收款限额→平台入驻证明+接单记录+对局截图
-- 直播带货权限关闭→直播回放+下单截图+发货记录
-- 知识付费交易纠纷→处理退款+课程交付证明+完善退费政策
-- 跨境代购封禁→海关清关单+正品凭证+法人视频认证
-- 餐饮交易拦截→门店实景+外卖平台截图+食品资质
-- 被驳回二次申诉→先打95017转3查驳回原因，针对性补材料，间隔3-5天
-
-【反幻觉铁律】
-⛔ 100%基于用户已提供的信息，严禁编造、脑补任何细节
-⛔ 用户说"游戏陪练"→只说"游戏陪练"，绝不自动加"王者荣耀"等
-⛔ 确认信息只复述原话，不修饰不扩展
-⛔ 用户没说的=不存在
-
-【信息修正规则】
-✅ 用户说"不对""搞错了"→立刻确认要改哪个，确认新值
-✅ 前后矛盾→温和提醒，让用户确认
-
-【严禁事项】
-⛔ 绝不说"我不能上网""我无法访问网络"等技术限制
-⛔ 绝不编造时间日期——用户问时间就说"您看下手机就知道了"
-⛔ 绝不说"我是AI""我是语言模型"——你就是专业申诉顾问
-⛔ 绝不讨论技术原理
-
-【处理跑题】
-- 闲聊/无关问题→1句话带过，自然拉回正题
-- 用户骂人/发泄→共情但不纠缠，拉回正事
-
-【对话风格——像资深顾问朋友】
-1. 说大白话，别整术语，像微信聊天
-2. 自然过渡，别机械一问一答。收到信息后顺带给个专业判断再问下一个
-3. 收到关键信息（行业+违规原因）后，主动给出初步诊断和成功率预估
-4. 100-200字简短回复，一次只问一个问题
-5. 用户急/有情绪→先共情（"理解，换谁都着急"），再继续
-6. 体现你见多识广——"这种情况我处理过很多，关键是..."
-7. 用户提供额外信息（日活、交易量等），积极接收
-8. 不要用"亲""您好"等客服腔，不要过多emoji`
-            }
-
-            // 立即开始流式回复 + 同时后台启动AI提取（并行）
-            const allMessages = await getMessages(sessionId)
-            const extractionPromise = extractFieldsWithAI(content, updatedData, effectiveStep, apiKeyToUse, allMessages.slice(-6)).catch(e => {
-              console.error('AI extraction error (non-fatal):', e.message)
-              return null
-            })
-
-            // 发送计时：首字节延迟
-            const streamResult = await streamChatWithAI(allMessages, apiKeyToUse, enrichedData)
-            const firstByteMs = Date.now() - stepStartTime
-            safeSend(`data: ${JSON.stringify({ type: 'timing', firstByteMs })}\n\n`)
-
-            const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat_qa' })
-            if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
-
-            const totalMs = Date.now() - stepStartTime
-            safeSend(`data: ${JSON.stringify({ type: 'timing', totalMs, firstByteMs })}\n\n`)
-
-            // ===== 4.2 流式回复结束后，处理后台AI提取结果 =====
-            const aiResult = await extractionPromise
-            if (aiResult && Object.keys(aiResult.extracted).length > 0) {
-              const fieldValidators = {
-                merchant_id: v => /^\d{8,12}$/.test(v.replace(/\s/g, '')),
-                legal_id_last4: v => /^\d{3}[\dxX]$/.test(v.replace(/\s/g, '')),
-                bank_account_last4: v => /^\d{4}$/.test(v.replace(/\s/g, '')),
-                contact_phone: v => /^1[3-9]\d{9}$/.test(v.replace(/[\s\-]/g, '')),
-                license_no: v => /^[0-9A-Z]{15,18}$/i.test(v.replace(/\s/g, '')),
-                business_model: v => v.length <= 30,
-                problem_type: v => v.length <= 20,
-                industry: v => v.length <= 20,
-                violation_reason: v => v.length <= 60,
-                merchant_name: v => v.length <= 40,
-                company_name: v => v.length <= 50 && !/^(就是|哎呀|那个|反正)/.test(v),
-                legal_name: v => v.length >= 2 && v.length <= 10 && /^[\u4e00-\u9fff·]+$/.test(v),
-                bank_name: v => v.length <= 20 && /银行|信用社|支付宝|财付通/.test(v) && !/[？?怎么吗呢呀吧]/.test(v),
-                complaint_status: v => v.length <= 50 && !/[？?]$/.test(v.trim()),
-                refund_policy: v => v.length <= 80 && !/[？?]$/.test(v.trim()),
-                appeal_history: v => v.length <= 60 && !/[？?]$/.test(v.trim()),
-              }
-              const aiInfoUpdates = []
-              const allFieldDefs = [...INFO_FIELDS, ...(updatedData._dynamic_fields || [])]
-              for (const [key, value] of Object.entries(aiResult.extracted)) {
-                let fieldDef = allFieldDefs.find(f => f.key === key)
-                if (!fieldDef && key && !key.startsWith('_') && value) {
-                  const v = String(value).trim()
-                  if (v.length > 0 && v.length <= 100) fieldDef = { key, label: key, group: '补充信息', icon: '📌', dynamic: true }
-                }
-                if (!fieldDef) continue
-                const v = String(value).trim()
-                if (!v) continue
-                const validator = fieldValidators[key]
-                if (validator && !validator(v)) continue
-                const existing = updatedData[key]
-                const shouldUpdate = aiResult.correction || !existing || existing === '用户暂未提供' || existing === '⏳待补充'
-                if (shouldUpdate) {
-                  updatedData[key] = v
-                  aiInfoUpdates.push({ key, label: fieldDef.label, value: v, group: fieldDef.group || '补充信息', icon: fieldDef.icon || '📌' })
-                }
-              }
-              if (aiInfoUpdates.length > 0) {
-                updatedStep = findNextUnfilledStep(0, updatedData)
-                if (updatedStep >= TOTAL_STEPS) updatedStep = TOTAL_STEPS
-                for (const upd of aiInfoUpdates) {
-                  safeSend(`data: ${JSON.stringify({ type: 'info_update', ...upd, step: updatedStep, totalSteps: TOTAL_STEPS })}\n\n`)
-                }
+              const expansion = await expandFieldsForIndustry(updatedData.industry, updatedData.problem_type, updatedData, apiKeyToUse)
+              if (expansion && expansion.fields?.length > 0) {
+                updatedData._dynamic_fields = expansion.fields
+                updatedData._industry_tip = expansion.industryTip
                 await updateSession(sessionId, updatedStep, updatedData)
-                console.log(`[AI提取成功] session=${sessionId} 提取${aiInfoUpdates.length}个字段, step: ${effectiveStep}→${updatedStep}`)
-              }
-              // 扣费
-              if (aiResult.inputTokens || aiResult.outputTokens) {
-                const multiplierStr = await getSystemConfig('cost_multiplier')
-                const multiplier = parseFloat(multiplierStr || '2')
-                const tokenInfo = calculateCost(aiResult.inputTokens, aiResult.outputTokens, multiplier)
-                if (isOfficialMode && tokenInfo.cost > 0) {
-                  await deductBalance(user.id, tokenInfo.cost)
-                  await incrementUserSpent(user.id, tokenInfo.cost)
-                  try { await recordTokenUsage({ userId: user.id, sessionId, type: 'ai_extraction', inputTokens: aiResult.inputTokens, outputTokens: aiResult.outputTokens, totalTokens: aiResult.inputTokens + aiResult.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+                for (const df of expansion.fields) {
+                  safeSend(`data: ${JSON.stringify({ type: 'info_update', key: df.key, label: df.label, value: '', group: df.group || '行业信息', icon: df.icon || '🏭', step: updatedStep, totalSteps: TOTAL_STEPS, dynamic: true })}\n\n`)
                 }
-              }
-            }
-
-            // ===== 4.3 后台完成度检查（不阻塞用户） =====
-            const postFilledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
-            const hasCore = updatedData.industry && updatedData.problem_type && updatedData.violation_reason
-            if (hasCore && postFilledFields.length >= 8) {
-              try {
-                const assessment = await assessCompletenessWithAI(updatedData, apiKeyToUse)
-                safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: assessment.ready })}\n\n`)
-                if (assessment.inputTokens || assessment.outputTokens) {
+                console.log(`[行业扩展] 为 ${updatedData.industry} 生成 ${expansion.fields.length} 个动态字段`)
+                if (expansion.inputTokens || expansion.outputTokens) {
                   const multiplierStr = await getSystemConfig('cost_multiplier')
                   const multiplier = parseFloat(multiplierStr || '2')
-                  const tokenInfo = calculateCost(assessment.inputTokens, assessment.outputTokens, multiplier)
+                  const tokenInfo = calculateCost(expansion.inputTokens, expansion.outputTokens, multiplier)
                   if (isOfficialMode && tokenInfo.cost > 0) {
                     await deductBalance(user.id, tokenInfo.cost)
                     await incrementUserSpent(user.id, tokenInfo.cost)
-                    try { await recordTokenUsage({ userId: user.id, sessionId, type: 'completeness_check', inputTokens: assessment.inputTokens, outputTokens: assessment.outputTokens, totalTokens: assessment.inputTokens + assessment.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+                    try { await recordTokenUsage({ userId: user.id, sessionId, type: 'industry_expansion', inputTokens: expansion.inputTokens, outputTokens: expansion.outputTokens, totalTokens: expansion.inputTokens + expansion.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
                   }
                 }
-                if (assessment.ready && assessment.score >= 75) {
-                  updatedData._collection_complete = true
-                  await updateSession(sessionId, updatedStep, updatedData)
-                  safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: true, triggerReport: true })}\n\n`)
-                }
-              } catch (e) { console.error('Completeness check error (non-fatal):', e.message) }
-            }
-          } catch (err) {
-            console.error('DeepSeek collection error:', err.message)
-            const fallbackResponse = result.response || '抱歉，AI暂时无法回答。请继续提供信息即可。'
-            await simulateTypingSSE(res, fallbackResponse)
-            await addMessage(sessionId, 'assistant', fallbackResponse)
+              }
+            } catch (e) { console.error('Industry expansion error (non-fatal):', e.message) }
           }
+
+          // 完成度检查（有核心字段且已收集8+项时触发）
+          const postFilledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
+          const hasCore = updatedData.industry && updatedData.problem_type && updatedData.violation_reason
+          if (hasCore && postFilledFields.length >= 8) {
+            try {
+              const assessment = await assessCompletenessWithAI(updatedData, apiKeyToUse)
+              safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: assessment.ready })}\n\n`)
+              if (assessment.inputTokens || assessment.outputTokens) {
+                const multiplierStr = await getSystemConfig('cost_multiplier')
+                const multiplier = parseFloat(multiplierStr || '2')
+                const tokenInfo = calculateCost(assessment.inputTokens, assessment.outputTokens, multiplier)
+                if (isOfficialMode && tokenInfo.cost > 0) {
+                  await deductBalance(user.id, tokenInfo.cost)
+                  await incrementUserSpent(user.id, tokenInfo.cost)
+                  try { await recordTokenUsage({ userId: user.id, sessionId, type: 'completeness_check', inputTokens: assessment.inputTokens, outputTokens: assessment.outputTokens, totalTokens: assessment.inputTokens + assessment.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+                }
+              }
+              if (assessment.ready && assessment.score >= 75) {
+                updatedData._collection_complete = true
+                await updateSession(sessionId, updatedStep, updatedData)
+                safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: true, triggerReport: true })}\n\n`)
+              }
+            } catch (e) { console.error('Completeness check error (non-fatal):', e.message) }
+          }
+        } catch (err) {
+          console.error('DeepSeek collection error:', err.message)
+          const errMap = {
+            'API_KEY_INVALID': '⚠️ AI 服务配置异常（API Key 无效）',
+            'API_BALANCE_INSUFFICIENT': '⚠️ DeepSeek API 余额不足',
+            'API_RATE_LIMIT': '⚠️ 请求过于频繁，请稍后重试',
+            'NETWORK_ERROR': '⚠️ 网络连接超时',
+            'NO_API_KEY': '⚠️ AI 服务未配置 API Key',
+          }
+          const errMsg = errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）`
+          safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
         }
       }
     } else {
@@ -1550,14 +1367,33 @@ app.post('/api/chat/stream', async (req, res) => {
 
     safeSend('data: [DONE]\n\n')
     if (!clientDisconnected) res.end()
+
+    // 商城：异步解析AI回复中的商品推荐标记 + 更新用户兴趣（不阻塞响应）
+    const allMsgs = await getMessages(sessionId).catch(() => [])
+    const lastAssistant = [...allMsgs].reverse().find(m => m.role === 'assistant')
+    if (lastAssistant?.content) {
+      parseProductRecommendations(lastAssistant.content).catch(() => {})
+    }
+    if (user?.id) {
+      updateUserInterestFromConversation(user.id, sessionId, collectedData, allMsgs).catch(() => {})
+    }
+
+    // V2: 对话结束后异步触发AI分析（不阻塞响应）
+    // 当收集完成 或 消息数>=8 时触发分析
+    const msgCount = allMsgs.length
+    if (collectedData._collection_complete || msgCount >= 8) {
+      schedulePostConversationAnalysis(sessionId)
+    }
   } catch (err) {
     console.error('Stream chat error:', err)
     if (!res.headersSent) {
       res.status(500).json({ error: '处理消息失败' })
     } else {
-      res.write(`data: ${JSON.stringify({ type: 'error', content: '处理消息失败' })}\n\n`)
-      res.write('data: [DONE]\n\n')
-      res.end()
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: '处理消息失败' })}\n\n`)
+        res.write('data: [DONE]\n\n')
+        res.end()
+      } catch { /* stream already closed */ }
     }
   }
 })
@@ -2190,6 +2026,418 @@ app.put('/api/admin/payment-config', requireAdmin, async (req, res) => {
   } catch (err) { console.error('[Payment Config Save Error]', err); res.status(500).json({ error: '更新支付配置失败: ' + err.message }) }
 })
 
+// ========== AI 自进化 API（需要管理员认证） ==========
+
+// --- 规则管理 ---
+app.get('/api/admin/evolution/rules', requireAdmin, async (req, res) => {
+  try {
+    const { category, status } = req.query
+    const rules = await getAllAIRules(category || null, status || null)
+    res.json({ rules })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取规则列表失败' }) }
+})
+
+app.get('/api/admin/evolution/rules/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getAIRuleStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取规则统计失败' }) }
+})
+
+app.get('/api/admin/evolution/rules/:id', requireAdmin, async (req, res) => {
+  try {
+    const rule = await getAIRuleById(parseInt(req.params.id))
+    if (!rule) return res.status(404).json({ error: '规则不存在' })
+    const changeLog = await getRuleChangeLog(rule.id, 20)
+    res.json({ rule, changeLog })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取规则详情失败' }) }
+})
+
+app.post('/api/admin/evolution/rules', requireAdmin, async (req, res) => {
+  try {
+    const { category, ruleKey, ruleName, ruleContent, status } = req.body
+    if (!category || !ruleKey) return res.status(400).json({ error: '缺少 category 或 ruleKey' })
+    const result = await createAIRule({
+      category, ruleKey, ruleName: ruleName || ruleKey,
+      ruleContent: ruleContent || {}, source: 'admin_manual',
+      status: status || 'active',
+    })
+    invalidateRulesCache()
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '创建规则失败: ' + err.message }) }
+})
+
+app.put('/api/admin/evolution/rules/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const { status, reason } = req.body
+    if (!status) return res.status(400).json({ error: '缺少 status' })
+    const result = await updateAIRuleStatus(parseInt(req.params.id), status, reason || '', 'admin')
+    if (!result) return res.status(404).json({ error: '规则不存在' })
+    invalidateRulesCache()
+    res.json({ success: true, rule: result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '更新状态失败' }) }
+})
+
+app.put('/api/admin/evolution/rules/:id/content', requireAdmin, async (req, res) => {
+  try {
+    const { ruleContent, ruleName } = req.body
+    if (!ruleContent) return res.status(400).json({ error: '缺少 ruleContent' })
+    const result = await updateAIRuleContent(parseInt(req.params.id), ruleContent, ruleName || null, 'admin')
+    if (!result) return res.status(404).json({ error: '规则不存在' })
+    invalidateRulesCache()
+    res.json({ success: true, rule: result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '更新内容失败' }) }
+})
+
+app.delete('/api/admin/evolution/rules/:id', requireAdmin, async (req, res) => {
+  try {
+    await deleteAIRule(parseInt(req.params.id))
+    invalidateRulesCache()
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '删除规则失败' }) }
+})
+
+// --- 对话分析 ---
+app.get('/api/admin/evolution/analyses', requireAdmin, async (req, res) => {
+  try {
+    const { industry, sentiment, minCompletion, maxCompletion, limit } = req.query
+    const analyses = await getConversationAnalyses(
+      parseInt(limit) || 50,
+      { industry, sentiment, minCompletion: minCompletion ? parseFloat(minCompletion) : undefined, maxCompletion: maxCompletion ? parseFloat(maxCompletion) : undefined }
+    )
+    res.json({ analyses })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取分析列表失败' }) }
+})
+
+app.get('/api/admin/evolution/analyses/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getAnalysisStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取分析统计失败' }) }
+})
+
+// 质量仪表板 - 多维度AI能力展示
+app.get('/api/admin/evolution/quality-dashboard', requireAdmin, async (req, res) => {
+  try {
+    const [stats, qualityData] = await Promise.all([
+      getAnalysisStats(),
+      getQualityTopAndLow(),
+    ])
+    let mallStats = null, productStats = null
+    try { mallStats = await getRecommendationStats() } catch {}
+    try { productStats = await getProductStats() } catch {}
+    const t = stats.totals || {}
+    const total = parseInt(t.total) || 0
+    const pct = (field) => total > 0 ? Math.round((parseInt(t[field]) || 0) / total * 100) : 0
+    res.json({
+      overview: {
+        totalAnalyses: total,
+        avgProfessionalism: parseFloat(t.avg_professionalism) || 0,
+        avgAppealSuccess: parseFloat(t.avg_appeal_success) || 0,
+        avgSatisfaction: parseFloat(t.avg_satisfaction) || 0,
+        avgCompletion: parseFloat(t.avg_completion) || 0,
+        avgTurns: parseFloat(t.avg_turns) || 0,
+        highCompletionRate: pct('high_completion_count'),
+        highProfRate: pct('high_prof_count'),
+        highAppealRate: pct('high_appeal_count'),
+        highSatisfactionRate: pct('high_satisfaction_count'),
+      },
+      sentiment: stats.bySentiment || [],
+      trend: (stats.recent7d || []).map(d => ({
+        day: d.day, count: parseInt(d.cnt),
+        avgCompletion: parseFloat(d.avg_completion) || 0,
+        avgProf: parseFloat(d.avg_prof) || 0,
+        avgAppeal: parseFloat(d.avg_appeal) || 0,
+        avgSat: parseFloat(d.avg_sat) || 0,
+      })),
+      qualityByIndustry: (stats.byIndustry || []).map(i => ({
+        industry: i.industry, count: parseInt(i.cnt),
+        avgCompletion: parseFloat(i.avg_completion) || 0,
+        avgProf: parseFloat(i.avg_prof) || 0,
+        avgAppeal: parseFloat(i.avg_appeal) || 0,
+        avgSat: parseFloat(i.avg_sat) || 0,
+      })),
+      topDropOffs: stats.topDropOffs || [],
+      topAnalyses: qualityData.topAnalyses,
+      lowAnalyses: qualityData.lowAnalyses,
+      mall: {
+        totalProducts: parseInt(productStats?.totals?.total) || 0,
+        activeProducts: parseInt(productStats?.totals?.active) || 0,
+        totalRecommendations: parseInt(mallStats?.totals?.total) || 0,
+        clickedRecommendations: parseInt(mallStats?.totals?.clicked) || 0,
+        purchasedRecommendations: parseInt(mallStats?.totals?.purchased) || 0,
+      },
+    })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取质量仪表板失败' }) }
+})
+
+app.get('/api/admin/evolution/analyses/:id', requireAdmin, async (req, res) => {
+  try {
+    const analysis = await getConversationAnalysisById(parseInt(req.params.id))
+    if (!analysis) return res.status(404).json({ error: '分析不存在' })
+    res.json({ analysis })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取分析详情失败' }) }
+})
+
+// 手动触发单个对话分析
+app.post('/api/admin/evolution/analyze/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const result = await analyzeConversation(req.params.sessionId)
+    if (!result) return res.status(400).json({ error: '分析失败：对话不存在或消息过少' })
+    // 尝试从分析结果生成规则
+    const rules = await generateRulesFromAnalysis(result)
+    res.json({ success: true, analysis: result, rulesGenerated: rules.length })
+  } catch (err) { console.error(err); res.status(500).json({ error: '分析失败: ' + err.message }) }
+})
+
+// 手动触发批量分析
+app.post('/api/admin/evolution/batch-analyze', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.body.limit) || 10
+    const count = await batchAnalyzeConversations(limit)
+    res.json({ success: true, analyzed: count })
+  } catch (err) { console.error(err); res.status(500).json({ error: '批量分析失败: ' + err.message }) }
+})
+
+// 获取未分析的对话列表
+app.get('/api/admin/evolution/unanalyzed', requireAdmin, async (req, res) => {
+  try {
+    const sessions = await getUnanalyzedSessions(parseInt(req.query.limit) || 20)
+    res.json({ sessions })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取未分析列表失败' }) }
+})
+
+// --- 学习指标 ---
+app.get('/api/admin/evolution/metrics', requireAdmin, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30
+    const metrics = await getLearningMetrics(days)
+    res.json({ metrics })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取学习指标失败' }) }
+})
+
+// 手动触发每日聚合
+app.post('/api/admin/evolution/aggregate', requireAdmin, async (req, res) => {
+  try {
+    await aggregateDailyMetrics()
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '聚合失败: ' + err.message }) }
+})
+
+// --- 规则自动评估 & 升降级 ---
+app.post('/api/admin/evolution/evaluate', requireAdmin, async (req, res) => {
+  try {
+    await evaluateRuleEffectiveness()
+    res.json({ success: true, message: '规则效果评估完成' })
+  } catch (err) { console.error(err); res.status(500).json({ error: '评估失败: ' + err.message }) }
+})
+
+app.post('/api/admin/evolution/auto-promote', requireAdmin, async (req, res) => {
+  try {
+    const result = await autoPromoteRules()
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '升降级失败: ' + err.message }) }
+})
+
+// --- AI自动审批 ---
+app.post('/api/admin/evolution/rules/:id/auto-review', requireAdmin, async (req, res) => {
+  try {
+    const result = await autoReviewRule(parseInt(req.params.id))
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'AI审批失败: ' + err.message }) }
+})
+
+app.post('/api/admin/evolution/rules/batch-auto-review', requireAdmin, async (req, res) => {
+  try {
+    const result = await batchAutoReviewRules()
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '批量AI审批失败: ' + err.message }) }
+})
+
+// --- 标签系统 ---
+app.get('/api/admin/evolution/tags/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getTagStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取标签统计失败' }) }
+})
+
+app.get('/api/admin/evolution/tags/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const tags = await getConversationTags(req.params.sessionId)
+    res.json({ tags })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取标签失败' }) }
+})
+
+// --- 知识聚合 ---
+app.get('/api/admin/evolution/clusters', requireAdmin, async (req, res) => {
+  try {
+    const { type, minConfidence } = req.query
+    const clusters = await getKnowledgeClusters(type || null, parseFloat(minConfidence) || 0)
+    res.json({ clusters })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取知识簇失败' }) }
+})
+
+app.get('/api/admin/evolution/clusters/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getClusterStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取聚合统计失败' }) }
+})
+
+app.post('/api/admin/evolution/clusters/refresh', requireAdmin, async (req, res) => {
+  try {
+    await aggregateKnowledgeClusters()
+    res.json({ success: true, message: '知识聚合完成' })
+  } catch (err) { console.error(err); res.status(500).json({ error: '聚合失败: ' + err.message }) }
+})
+
+// --- 引擎健康 & 熔断器 ---
+app.get('/api/admin/evolution/health', requireAdmin, async (req, res) => {
+  try { res.json(await getEngineHealthSummary()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取健康状态失败' }) }
+})
+
+// --- 探索实验 ---
+app.get('/api/admin/evolution/experiments', requireAdmin, async (req, res) => {
+  try {
+    const experiments = await getExperiments(req.query.status || null)
+    res.json({ experiments })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取实验列表失败' }) }
+})
+
+app.post('/api/admin/evolution/explore', requireAdmin, async (req, res) => {
+  try {
+    await runExplorationCycle()
+    res.json({ success: true, message: '探索周期完成' })
+  } catch (err) { console.error(err); res.status(500).json({ error: '探索失败: ' + err.message }) }
+})
+
+// --- 变更日志 ---
+app.get('/api/admin/evolution/changelog', requireAdmin, async (req, res) => {
+  try {
+    const ruleId = req.query.ruleId ? parseInt(req.query.ruleId) : null
+    const log = await getRuleChangeLog(ruleId, parseInt(req.query.limit) || 50)
+    res.json({ log })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取变更日志失败' }) }
+})
+
+// ============================
+// AI 智能商城 API
+// ============================
+
+// --- 后台: 商品管理 ---
+app.get('/api/admin/mall/products', requireAdmin, async (req, res) => {
+  try {
+    const { status, category, search, limit } = req.query
+    const products = await getProducts({ status, category, search, limit: limit || 100 })
+    res.json({ products })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取商品列表失败' }) }
+})
+
+app.get('/api/admin/mall/products/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getProductStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取商品统计失败' }) }
+})
+
+app.get('/api/admin/mall/products/:id', requireAdmin, async (req, res) => {
+  try {
+    const product = await getProductById(parseInt(req.params.id))
+    if (!product) return res.status(404).json({ error: '商品不存在' })
+    res.json({ product })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取商品失败' }) }
+})
+
+app.post('/api/admin/mall/products', requireAdmin, async (req, res) => {
+  try {
+    const { name, category, price, originalPrice, description, imageUrl, tags, targetAudience, status, sortOrder } = req.body
+    if (!name) return res.status(400).json({ error: '商品名称不能为空' })
+    const result = await createProduct({ name, category, price, originalPrice, description, imageUrl, tags, targetAudience, status, sortOrder })
+    invalidateProductCache()
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '创建商品失败: ' + err.message }) }
+})
+
+app.put('/api/admin/mall/products/:id', requireAdmin, async (req, res) => {
+  try {
+    const product = await updateProduct(parseInt(req.params.id), req.body)
+    if (!product) return res.status(404).json({ error: '商品不存在' })
+    invalidateProductCache()
+    res.json({ success: true, product })
+  } catch (err) { console.error(err); res.status(500).json({ error: '更新商品失败' }) }
+})
+
+app.delete('/api/admin/mall/products/:id', requireAdmin, async (req, res) => {
+  try {
+    await deleteProduct(parseInt(req.params.id))
+    invalidateProductCache()
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '删除商品失败' }) }
+})
+
+// --- 后台: AI商品优化 ---
+app.post('/api/admin/mall/products/:id/optimize', requireAdmin, async (req, res) => {
+  try {
+    const result = await aiOptimizeProduct(parseInt(req.params.id))
+    if (!result) return res.status(500).json({ error: 'AI优化失败' })
+    res.json({ success: true, optimization: result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '优化失败: ' + err.message }) }
+})
+
+app.post('/api/admin/mall/products/batch-optimize', requireAdmin, async (req, res) => {
+  try {
+    const result = await batchOptimizeProducts()
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: '批量优化失败: ' + err.message }) }
+})
+
+// --- 后台: 推荐统计 ---
+app.get('/api/admin/mall/recommendations/stats', requireAdmin, async (req, res) => {
+  try { res.json(await getRecommendationStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取推荐统计失败' }) }
+})
+
+// --- 用户端: 商品浏览 ---
+app.get('/api/mall/products', async (req, res) => {
+  try {
+    const { category, search } = req.query
+    const products = await getProducts({ status: 'active', category, search, limit: 50 })
+    res.json({ products: products.map(p => ({
+      id: p.id, name: p.name, category: p.category, price: p.price, originalPrice: p.original_price,
+      description: p.ai_description || p.description, imageUrl: p.image_url, tags: p.tags,
+    })) })
+  } catch (err) { res.status(500).json({ error: '获取商品失败' }) }
+})
+
+app.get('/api/mall/products/:id', async (req, res) => {
+  try {
+    const product = await getProductById(parseInt(req.params.id))
+    if (!product || product.status !== 'active') return res.status(404).json({ error: '商品不存在' })
+    await incrementProductMetric(product.id, 'view_count').catch(() => {})
+    res.json({ product: {
+      id: product.id, name: product.name, category: product.category,
+      price: product.price, originalPrice: product.original_price,
+      description: product.ai_description || product.description, imageUrl: product.image_url, tags: product.tags,
+    } })
+  } catch (err) { res.status(500).json({ error: '获取商品失败' }) }
+})
+
+app.post('/api/mall/products/:id/click', async (req, res) => {
+  try {
+    await incrementProductMetric(parseInt(req.params.id), 'click_count')
+    res.json({ success: true })
+  } catch (err) { res.status(500).json({ error: '记录失败' }) }
+})
+
+// --- 用户端: 个性化推荐 ---
+app.get('/api/mall/recommendations', async (req, res) => {
+  try {
+    const { sessionId } = req.query
+    const userId = req.user?.id || null
+    const recs = await getRecommendations(userId, sessionId || null, 10)
+    res.json({ recommendations: recs })
+  } catch (err) { res.status(500).json({ error: '获取推荐失败' }) }
+})
+
+app.put('/api/mall/recommendations/:id/status', async (req, res) => {
+  try {
+    await updateRecommendationStatus(parseInt(req.params.id), req.body.status || 'clicked')
+    res.json({ success: true })
+  } catch (err) { res.status(500).json({ error: '更新失败' }) }
+})
+
 // SPA fallback（排除 /api 路径，避免 API 404 返回 HTML）
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
@@ -2212,9 +2460,13 @@ async function start() {
     await initDatabase()
     const server = app.listen(PORT, () => console.log(`🚀 服务器已启动: http://localhost:${PORT}`))
 
+    // 启动 AI 自进化引擎
+    startEvolutionScheduler()
+
     // 优雅关闭：先停止接受新连接，等待现有请求完成，再关闭数据库
     const shutdown = (signal) => {
       console.log(`\n⏹ 收到 ${signal}，正在优雅关闭...`)
+      stopEvolutionScheduler()
       server.close(() => {
         console.log('✅ HTTP 服务器已关闭')
         process.exit(0)

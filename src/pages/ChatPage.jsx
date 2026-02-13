@@ -117,6 +117,8 @@ export default function ChatPage() {
   const [showAppealPanel, setShowAppealPanel] = useState(false)
   const [showUserCenter, setShowUserCenter] = useState(false)
   const [analysisKey, setAnalysisKey] = useState(0) // force re-fetch analysis
+  const [newChatAnim, setNewChatAnim] = useState(false) // new chat transition
+  const [chatFading, setChatFading] = useState(false) // fade-out before reset
 
   useEffect(() => {
     if (view === 'chat') bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -438,11 +440,18 @@ export default function ChatPage() {
   }
 
   function handleNewChat() {
-    localStorage.removeItem('appeal_session_id')
-    setSessionId(null)
-    setMessages([{ role: 'assistant', content: WELCOME }])
-    setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setAnalysisKey(0)
-    setView('chat')
+    // Smooth transition: fade out → reset → animate in
+    setChatFading(true)
+    setTimeout(() => {
+      localStorage.removeItem('appeal_session_id')
+      setSessionId(null)
+      setMessages([{ role: 'assistant', content: WELCOME }])
+      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setAnalysisKey(0)
+      setView('chat')
+      setChatFading(false)
+      setNewChatAnim(true)
+      setTimeout(() => { setNewChatAnim(false); inputRef.current?.focus() }, 400)
+    }, 150)
   }
 
   function handleFieldUpdate(key, value) {
@@ -1013,7 +1022,7 @@ export default function ChatPage() {
         {/* 中间聊天区域 */}
         <div className="flex-1 flex flex-col min-w-0">
           <main className="flex-1 overflow-y-auto overscroll-contain bg-[#f5f5f5]">
-            <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5">
+            <div className={`max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
               {messages.map((msg, i) => (
                 <React.Fragment key={i}>
                   <ChatMessage role={msg.role} content={msg.content} animate={i === messages.length - 1} timing={msg.timing} tokenUsage={msg.tokenUsage} />
