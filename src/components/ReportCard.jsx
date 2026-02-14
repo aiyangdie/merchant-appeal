@@ -137,7 +137,7 @@ export default function ReportCard({ collectedData, analysisText, onClose }) {
             {/* 报告头部 */}
             <div style={{ textAlign: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '2px solid #e0e7ff' }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#312e81', marginBottom: 4 }}>微信商户号申诉分析报告</div>
-              <div style={{ fontSize: 10, color: '#9ca3af' }}>DeepSeek AI · {now}</div>
+              <div style={{ fontSize: 10, color: '#9ca3af' }}>AI 智能分析 · {now}</div>
             </div>
 
             {/* 客户基本信息 */}

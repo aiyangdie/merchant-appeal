@@ -13,8 +13,11 @@ export default function MallPanel({ adminFetch }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ name: '', category: '', price: '', originalPrice: '', description: '', imageUrl: '', tags: '', targetAudience: '', status: 'draft' })
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiProductAssist, setAiProductAssist] = useState(false)
+  const [aiProductDesc, setAiProductDesc] = useState('')
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500) }
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -22,7 +25,7 @@ export default function MallPanel({ adminFetch }) {
       const data = await (await adminFetch('/api/admin/mall/products')).json()
       setProducts(data.products || [])
     } catch (e) { console.error(e) }
-    setLoading(false)
+    finally { setLoading(false) }
   }, [adminFetch])
 
   const fetchStats = useCallback(async () => {
@@ -71,6 +74,32 @@ export default function MallPanel({ adminFetch }) {
     setShowForm(true)
   }
 
+  async function handleAIAssistProduct() {
+    if (!aiProductDesc.trim()) { showToast('请输入商品描述'); return }
+    setAiProductAssist(true)
+    try {
+      const data = await (await adminFetch('/api/admin/ai-assist', {
+        method: 'POST', body: JSON.stringify({ type: 'product', description: aiProductDesc.trim() }),
+      })).json()
+      if (data.product) {
+        setForm(f => ({
+          ...f,
+          name: data.product.name || f.name,
+          category: data.product.category || f.category,
+          price: data.product.price != null ? String(data.product.price) : f.price,
+          originalPrice: data.product.originalPrice != null ? String(data.product.originalPrice) : f.originalPrice,
+          description: data.product.description || f.description,
+          tags: Array.isArray(data.product.tags) ? data.product.tags.join(', ') : (data.product.tags || f.tags),
+          targetAudience: Array.isArray(data.product.targetAudience) ? data.product.targetAudience.join(', ') : (data.product.targetAudience || f.targetAudience),
+        }))
+        showToast('✅ AI已填充商品信息')
+      } else {
+        showToast('AI生成失败: ' + (data.error || '未知错误'))
+      }
+    } catch (e) { showToast('AI辅助失败: ' + e.message) }
+    setAiProductAssist(false)
+  }
+
   async function handleDelete(id) { if (!confirm('确定删除?')) return; await adminFetch('/api/admin/mall/products/' + id, { method: 'DELETE' }); showToast('已删除'); fetchProducts(); fetchStats() }
   async function handleOptimize(id) { showToast('AI优化中...'); try { await adminFetch('/api/admin/mall/products/' + id + '/optimize', { method: 'POST' }); showToast('优化完成'); fetchProducts() } catch { showToast('优化失败') } }
   async function handleBatchOptimize() { showToast('批量优化中...'); try { const d = await (await adminFetch('/api/admin/mall/products/batch-optimize', { method: 'POST' })).json(); showToast('优化了' + (d.optimized || 0) + '个商品') ; fetchProducts() } catch { showToast('失败') } }
@@ -78,18 +107,22 @@ export default function MallPanel({ adminFetch }) {
   return (
     <div className="h-full flex flex-col">
       {toast && <div className="fixed top-4 right-4 z-50 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm">{toast}</div>}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white/80">
+      <div className="flex items-center gap-1.5 px-4 lg:px-6 py-3 border-b border-gray-100 bg-white/80 backdrop-blur-sm">
         {[{k:'products',l:'商品管理',i:'🛒'},{k:'stats',l:'数据统计',i:'📊'}].map(t=>(
-          <button key={t.k} onClick={()=>setTab(t.k)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.k?'bg-indigo-50 text-indigo-700':'text-gray-500 hover:bg-gray-50'}`}>{t.i} {t.l}</button>
+          <button key={t.k} onClick={()=>setTab(t.k)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab===t.k?'bg-indigo-50 text-indigo-700 shadow-sm':'text-gray-500 hover:bg-gray-50'}`}>{t.i} {t.l}</button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5 gpu-scroll">
         {tab === 'products' && (
           <>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-gray-700">🛒 商品列表 ({products.length})</span>
               <div className="flex-1" />
+              <button disabled={aiGenerating} onClick={async () => { setAiGenerating(true); showToast('🤖 AI正在分析用户需求，自动生成商品...'); try { const d = await (await adminFetch('/api/admin/mall/products/ai-generate', { method: 'POST' })).json(); showToast(d.created > 0 ? `✅ AI成功创建${d.created}个商品草稿！` : '💡 暂无新商品建议'); fetchProducts(); fetchStats() } catch { showToast('❌ AI生成失败') } finally { setAiGenerating(false) } }}
+                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${aiGenerating ? 'bg-amber-200 text-amber-700 animate-pulse cursor-wait' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}>
+                {aiGenerating ? '⏳ AI生成中...' : 'AI自动生成'}
+              </button>
               <button onClick={handleBatchOptimize} className="px-3 py-1.5 text-xs bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 font-medium">AI批量优化</button>
               <button onClick={() => { setEditingId(null); setForm({ name:'',category:'',price:'',originalPrice:'',description:'',imageUrl:'',tags:'',targetAudience:'',status:'draft' }); setShowForm(true) }}
                 className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">+ 添加商品</button>
@@ -98,6 +131,21 @@ export default function MallPanel({ adminFetch }) {
             {showForm && (
               <div className="bg-indigo-50/50 rounded-xl border border-indigo-100 p-4 space-y-3">
                 <h3 className="font-semibold text-sm text-indigo-700">{editingId ? '编辑商品' : '添加商品'}</h3>
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-medium text-purple-700">🤖 AI辅助填写</span>
+                    <span className="text-[10px] text-purple-400">描述你想要的商品，AI自动生成全部信息</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={aiProductDesc} onChange={e => setAiProductDesc(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-purple-200 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+                      placeholder="如：一个帮助游戏行业商户处理涉赌封号的VIP申诉服务" />
+                    <button onClick={handleAIAssistProduct} disabled={aiProductAssist}
+                      className={`px-4 py-1.5 text-xs rounded-lg font-medium whitespace-nowrap transition-all ${aiProductAssist ? 'bg-purple-200 text-purple-700 animate-pulse cursor-wait' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
+                      {aiProductAssist ? '⏳ 生成中...' : '✨ AI填充'}
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="text-[11px] text-gray-500 block mb-1">商品名称 *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm" /></div>
                   <div><label className="text-[11px] text-gray-500 block mb-1">分类</label><input value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm" placeholder="如: 申诉服务" /></div>
@@ -122,7 +170,7 @@ export default function MallPanel({ adminFetch }) {
               </div>
             )}
 
-            {loading ? <div className="text-center py-8 text-gray-400">加载中...</div> : (
+            {loading && products.length === 0 ? <div className="text-center py-8 text-gray-400">加载中...</div> : (
               <div className="space-y-2">
                 {products.map(p => (
                   <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">

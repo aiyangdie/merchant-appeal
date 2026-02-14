@@ -144,8 +144,11 @@ function parseMarkdown(text) {
   html = html.replace(/<p><\/p>/g, '')
   html = html.replace(/<p><br \/><\/p>/g, '')
 
-  // 商品推荐标记 [推荐商品:ID] → 商品徽章
-  html = html.replace(/\[推荐商品:(\d+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 rounded-lg text-xs font-medium border border-indigo-100 cursor-pointer hover:shadow-sm" data-product-id="$1">🛒 查看推荐商品</span>')
+  // 商品推荐标记 [推荐商品:ID] → 美化商品卡片
+  html = html.replace(/\[推荐商品:(\d+)\]/g, `<div class="product-rec-card my-2 p-3 rounded-xl bg-gradient-to-br from-white to-indigo-50/60 border border-indigo-100/80 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all group" data-product-id="$1"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg></div><div class="flex-1 min-w-0"><div class="text-[13px] font-semibold text-gray-800 group-hover:text-indigo-700 transition-colors">为您推荐专属服务方案</div><div class="text-[11px] text-gray-400 mt-0.5">AI智能匹配 · 点击查看详情</div></div><div class="flex-shrink-0 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[11px] font-medium rounded-lg shadow-sm group-hover:shadow-md transition-all">查看</div></div></div>`)
+
+  // 名片推荐标记 [推荐名片:ID] → 美化名片卡片
+  html = html.replace(/\[推荐名片:(\d+)\]/g, `<div class="contact-rec-card my-2 p-3 rounded-xl bg-gradient-to-br from-white to-amber-50/60 border border-amber-100/80 cursor-pointer hover:shadow-md hover:border-amber-200 transition-all group" data-card-id="$1"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z"/></svg></div><div class="flex-1 min-w-0"><div class="text-[13px] font-semibold text-gray-800 group-hover:text-amber-700 transition-colors">专属技术顾问</div><div class="text-[11px] text-gray-400 mt-0.5">点击查看联系方式</div></div><div class="flex-shrink-0 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-medium rounded-lg shadow-sm group-hover:shadow-md transition-all">联系</div></div></div>`)
 
   // 还原表格占位符
   tables.forEach((t, i) => { html = html.replace(`%%TABLE_${i}%%`, t) })
@@ -307,7 +310,7 @@ function MessageMeta({ timing, tokenUsage }) {
   )
 }
 
-export default function ChatMessage({ role, content, animate = false, timing, tokenUsage }) {
+export default function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false }) {
   const isUser = role === 'user'
   const isSystem = role === 'system'
 
@@ -315,8 +318,8 @@ export default function ChatMessage({ role, content, animate = false, timing, to
   if (isSystem) {
     return (
       <div className={`flex justify-center my-3 ${animate ? 'message-animate' : ''}`}>
-        <div className="max-w-[85%] lg:max-w-[70%] rounded-2xl px-4 py-3 bg-amber-50/80 border border-amber-100 text-center">
-          <div className="message-content text-[13px] leading-relaxed text-amber-800"
+        <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl px-4 py-3 text-center ${proMode ? 'bg-amber-50 border border-amber-200/60' : 'bg-amber-50/80 border border-amber-100'}`}>
+          <div className={`message-content text-[13px] leading-relaxed ${proMode ? 'text-amber-800' : 'text-amber-800'}`}
             dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }} />
         </div>
       </div>
@@ -329,13 +332,19 @@ export default function ChatMessage({ role, content, animate = false, timing, to
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} my-1.5 sm:my-2.5 ${animate ? 'message-animate' : ''}`}>
       {!isUser && (
-        <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mr-2 sm:mr-2.5 mt-0.5 shadow-sm ${
+        <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mr-2 sm:mr-2.5 mt-0.5 ${
           role === 'admin'
-            ? 'bg-gradient-to-br from-orange-400 to-orange-500'
-            : 'bg-gradient-to-br from-[#07C160] to-[#059669]'
+            ? 'bg-gradient-to-br from-orange-400 to-orange-500 shadow-sm'
+            : proMode
+              ? 'bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm shadow-amber-500/15'
+              : 'bg-gradient-to-br from-[#07C160] to-[#059669] shadow-sm'
         }`}>
           {role === 'admin' ? (
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+          ) : proMode ? (
+            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+            </svg>
           ) : (
             <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
@@ -347,17 +356,23 @@ export default function ChatMessage({ role, content, animate = false, timing, to
       <div
         className={`${isReport ? 'max-w-[92%] lg:max-w-[80%]' : 'max-w-[78%] sm:max-w-[75%] lg:max-w-[70%]'} ${
           isUser
-            ? 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
+            ? (proMode
+                ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
+                : 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3')
             : role === 'admin'
               ? 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3 border border-orange-100/80'
-              : 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
+              : proMode
+                ? 'pro-bubble-ai rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
+                : 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
         }`}
-        style={!isUser && role !== 'admin' ? { boxShadow: 'var(--shadow-bubble)' } : isUser ? { boxShadow: 'var(--shadow-bubble-user)' } : {}}
+        style={!isUser && role !== 'admin' && !proMode ? { boxShadow: 'var(--shadow-bubble)' } : isUser && !proMode ? { boxShadow: 'var(--shadow-bubble-user)' } : isUser && proMode ? { boxShadow: '0 1px 3px rgba(184,134,11,0.15)' } : {}}
       >
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-1">
             {role === 'admin' ? (
               <span className="text-[10px] text-orange-500 font-medium">人工客服</span>
+            ) : proMode ? (
+              <span className="text-[10px] text-amber-600 font-medium">AI 专业顾问</span>
             ) : (
               <span className="text-[10px] text-gray-400 font-medium">AI 助手</span>
             )}

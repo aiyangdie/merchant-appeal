@@ -1,6 +1,6 @@
 {
   "name": "merchant-appeal",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,10 +21,12 @@
     "js-tiktoken": "^1.0.21",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.16.3",
+    "node-fetch": "^3.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

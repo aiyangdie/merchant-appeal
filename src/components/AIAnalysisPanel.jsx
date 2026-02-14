@@ -61,7 +61,7 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
       .finally(() => setLoading(false))
   }
 
-  // DeepSeek流式分析（逐字输出中文报告）
+  // AI流式深度分析（逐字输出中文报告）
   const fetchDeepAnalysis = async () => {
     if (!sessionId || filledCount < 1) return
     if (abortRef.current) abortRef.current.abort()
@@ -146,7 +146,7 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="text-[13px] font-semibold text-gray-900 leading-tight">AI 智能分析</h2>
-                {hasDeepAnalysis && <span className="text-[8px] px-1.5 py-0.5 bg-indigo-100 text-indigo-600 rounded-full font-bold">DeepSeek</span>}
+                {hasDeepAnalysis && <span className="text-[8px] px-1.5 py-0.5 bg-indigo-100 text-indigo-600 rounded-full font-bold">AI深度</span>}
                 {!hasDeepAnalysis && hasData && !loading && <span className="text-[8px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium">规则</span>}
               </div>
               <p className="text-[10px] text-gray-400 leading-tight mt-0.5">实时申诉策略建议</p>
@@ -198,21 +198,21 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
         {isStreaming && !streamingText && (
           <div className="text-center py-8">
             <div className="w-6 h-6 mx-auto mb-2 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
-            <p className="text-[11px] text-indigo-400">正在连接 DeepSeek AI...</p>
+            <p className="text-[11px] text-indigo-400">正在连接 AI 分析服务...</p>
             <p className="text-[9px] text-gray-400 mt-0.5">基于收集数据 + 聊天记录</p>
           </div>
         )}
 
         {error && !loading && !isStreaming && <div className="text-center py-3 text-[11px] text-amber-500">{error}</div>}
 
-        {/* DeepSeek 分析报告（流式/完成态共用） */}
+        {/* AI 深度分析报告（流式/完成态共用） */}
         {displayText && (
           <div className="rounded-xl border border-indigo-100/80 overflow-hidden">
             {isStreaming && (
               <div className="border-b border-indigo-100/50">
                 <div className="px-3 py-1.5 bg-indigo-50/60 flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                  <span className="text-[10px] font-medium text-indigo-600">DeepSeek 正在生成分析报告...</span>
+                  <span className="text-[10px] font-medium text-indigo-600">AI 正在生成分析报告...</span>
                   <span className="text-[9px] text-indigo-400 ml-auto">{displayText.length} 字</span>
                 </div>
                 <div className="h-0.5 bg-indigo-100 overflow-hidden"><div className="h-full bg-indigo-400 animate-[progress_2s_ease-in-out_infinite]" style={{width:'60%'}} /></div>
@@ -222,7 +222,7 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
               <div className="px-3 py-1.5 bg-indigo-50/40 flex items-center justify-between border-b border-indigo-100/50 gap-1.5">
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-2 h-2 rounded-full bg-green-400" />
-                  <span className="text-[10px] font-medium text-green-600">DeepSeek 报告</span>
+                  <span className="text-[10px] font-medium text-green-600">AI 深度报告</span>
                   <span className="text-[9px] text-gray-400">{finalText.length}字</span>
                 </div>
                 <div className="flex items-center gap-1.5">

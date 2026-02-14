@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
 import ReportCard from '../components/ReportCard'
 import AnalysisVisualView from '../components/AnalysisVisualView'
 import EvolutionPanel from '../components/EvolutionPanel'
 import MallPanel from '../components/MallPanel'
+import ContactCardsPanel from '../components/ContactCardsPanel'
+import AIActivityPanel from '../components/AIActivityPanel'
 import TokenPanel from '../components/TokenPanel'
+import AIModelsPanel from '../components/AIModelsPanel'
+import MonitorPanel from '../components/MonitorPanel'
+import BackupPanel from '../components/BackupPanel'
 
 const TABS = [
   { key: 'dashboard', label: '仪表盘', icon: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5' },
@@ -15,9 +20,15 @@ const TABS = [
   { key: 'analytics', label: '数据分析', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
   { key: 'settings', label: '设置', icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
   { key: 'recharge', label: '充值管理', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { key: 'ai-models', label: 'AI模型', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z' },
   { key: 'evolution', label: 'AI进化', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V5.846a3 3 0 00-.879-2.121l-.22-.22a3 3 0 00-2.121-.879H8.22a3 3 0 00-2.121.879l-.22.22A3 3 0 005 5.846V14.5' },
   { key: 'mall', label: '智能商城', icon: 'M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z' },
+  { key: 'contact-cards', label: '名片管理', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z' },
+  { key: 'ai-activity', label: 'AI日志', icon: 'M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z' },
   { key: 'tokens', label: 'Token明细', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { key: 'deepseek-balance', label: 'DS余额', icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z' },
+  { key: 'monitor', label: '监控告警', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
+  { key: 'backup', label: '数据备份', icon: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125' },
 ]
 
 const SETTINGS_SUB_TABS = [
@@ -26,6 +37,7 @@ const SETTINGS_SUB_TABS = [
   { key: 'rechargeConfig', label: '充值设置', icon: '💰' },
   { key: 'wechat', label: '微信支付', icon: '💚' },
   { key: 'alipay', label: '支付宝', icon: '🔵' },
+  { key: 'contact', label: '技术名片', icon: '📇' },
   { key: 'security', label: '安全设置', icon: '🔒' },
 ]
 
@@ -262,7 +274,7 @@ export default function AdminPage() {
   const [selectedSession, setSelectedSession] = useState(null)
   const [messages, setMessages] = useState([])
   const [sessionDetail, setSessionDetail] = useState(null)
-  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingSessions, setLoadingSessions] = useState(false)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [stats, setStats] = useState(null)
   const [systemConfigs, setSystemConfigs] = useState([])
@@ -281,6 +293,7 @@ export default function AdminPage() {
   const [rechargeOrders, setRechargeOrders] = useState([])
   const [loadingRecharge, setLoadingRecharge] = useState(false)
   const [rechargeFilter, setRechargeFilter] = useState('')
+  const [appealStats, setAppealStats] = useState(null)
   // 知识库
   const [knowledgeCases, setKnowledgeCases] = useState([])
   const [loadingCases, setLoadingCases] = useState(false)
@@ -294,9 +307,19 @@ export default function AdminPage() {
   const [showAdminReport, setShowAdminReport] = useState(false)
   const [adminDetailTab, setAdminDetailTab] = useState('chat') // 'chat' | 'data' | 'analysis'
   const [analysisViewMode, setAnalysisViewMode] = useState('text') // 'text' | 'visual'
+  // DeepSeek多账号余额
+  const [dsAccounts, setDsAccounts] = useState([])
+  const [dsSummary, setDsSummary] = useState({})
+  const [dsLoading, setDsLoading] = useState(false)
+  const [dsChecking, setDsChecking] = useState(false)
+  const [dsCheckingId, setDsCheckingId] = useState(null)
+  const [dsShowAdd, setDsShowAdd] = useState(false)
+  const [dsForm, setDsForm] = useState({ label: '', apiKey: '', warningThreshold: '10' })
+  const [dsEditId, setDsEditId] = useState(null)
+  const [dsFetched, setDsFetched] = useState(false)
   const navigate = useNavigate()
 
-  function adminFetch(url, options = {}) {
+  const adminFetch = useCallback((url, options = {}) => {
     const token = localStorage.getItem('admin_token')
     if (!token) { navigate('/admin'); return Promise.reject('no token') }
     const headers = { ...options.headers, 'Authorization': `Bearer ${token}` }
@@ -309,7 +332,7 @@ export default function AdminPage() {
       }
       return res
     })
-  }
+  }, [navigate])
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -318,12 +341,21 @@ export default function AdminPage() {
     fetchSessions()
   }, [])
 
+  useEffect(() => {
+    if (activeTab === 'deepseek-balance' && !dsFetched) {
+      setDsFetched(true)
+      fetchDsAccounts()
+    }
+  }, [activeTab, dsFetched])
+
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   async function fetchStats() {
     try { setStats(await (await adminFetch('/api/admin/stats')).json()) } catch (e) { console.error(e) }
+    try { setAppealStats(await (await adminFetch('/api/admin/appeal-stats')).json()) } catch {}
   }
-  async function fetchSessions() {
+  async function fetchSessions(force = false) {
+    if (sessions.length === 0 || force) setLoadingSessions(true)
     try { setSessions((await (await adminFetch('/api/admin/sessions')).json()).sessions || []) }
     catch (e) { console.error(e) } finally { setLoadingSessions(false) }
   }
@@ -333,9 +365,9 @@ export default function AdminPage() {
     try {
       const [msgRes, infoRes, analysisRes, deepRes] = await Promise.all([
         adminFetch(`/api/admin/sessions/${id}/messages`).then(r => r.json()),
-        fetch(`/api/sessions/${id}/info`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`/api/sessions/${id}/analysis`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`/api/sessions/${id}/deep-analysis-result`).then(r => r.ok ? r.json() : null).catch(() => null),
+        adminFetch(`/api/sessions/${id}/info`).then(r => r.ok ? r.json() : null).catch(() => null),
+        adminFetch(`/api/sessions/${id}/analysis`).then(r => r.ok ? r.json() : null).catch(() => null),
+        adminFetch(`/api/sessions/${id}/deep-analysis-result`).then(r => r.ok ? r.json() : null).catch(() => null),
       ])
       setMessages(msgRes.messages || []); setSessionDetail(msgRes.session || null)
       if (infoRes) {
@@ -382,14 +414,15 @@ export default function AdminPage() {
   }
 
   async function fetchUsers() {
-    setLoadingUsers(true)
+    if (users.length === 0) setLoadingUsers(true)
     try { setUsers((await (await adminFetch('/api/admin/users')).json()).users || []) }
     catch (e) { console.error(e) } finally { setLoadingUsers(false) }
   }
-  async function fetchRechargeOrders() {
+  async function fetchRechargeOrders(filterOverride) {
     setLoadingRecharge(true)
     try {
-      const url = rechargeFilter ? `/api/admin/recharge-orders?status=${rechargeFilter}` : '/api/admin/recharge-orders'
+      const f = filterOverride !== undefined ? filterOverride : rechargeFilter
+      const url = f ? `/api/admin/recharge-orders?status=${f}` : '/api/admin/recharge-orders'
       const data = await (await adminFetch(url)).json()
       setRechargeOrders(data.orders || [])
     } catch (e) { console.error(e) } finally { setLoadingRecharge(false) }
@@ -434,7 +467,7 @@ export default function AdminPage() {
   }
 
   async function fetchCases() {
-    setLoadingCases(true)
+    if (knowledgeCases.length === 0) setLoadingCases(true)
     try { setKnowledgeCases((await (await adminFetch('/api/admin/cases')).json()).cases || []) }
     catch (e) { console.error(e) } finally { setLoadingCases(false) }
   }
@@ -481,7 +514,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'settings') { fetchSystemConfigs(); fetchPaymentConfigs() }
-    if (activeTab === 'sessions') { setLoadingSessions(true); fetchSessions() }
+    if (activeTab === 'sessions') fetchSessions()
     if (activeTab === 'dashboard' || activeTab === 'analytics') fetchStats()
     if (activeTab === 'users') fetchUsers()
     if (activeTab === 'recharge') fetchRechargeOrders()
@@ -543,65 +576,245 @@ export default function AdminPage() {
   }
 
   // ========== Dashboard ==========
+  const TOKEN_TYPE_LABELS = {
+    chat: { label: '用户对话', icon: '💬', color: 'bg-blue-50 text-blue-700' },
+    chat_collection: { label: '信息收集', icon: '📋', color: 'bg-cyan-50 text-cyan-700' },
+    deep_analysis: { label: '深度分析', icon: '🔍', color: 'bg-purple-50 text-purple-700' },
+    appeal_text: { label: '申诉文案', icon: '📝', color: 'bg-orange-50 text-orange-700' },
+    report_retry: { label: '报告重试', icon: '🔄', color: 'bg-yellow-50 text-yellow-700' },
+    field_extraction: { label: '字段提取', icon: '🏷️', color: 'bg-teal-50 text-teal-700' },
+    evolution_analysis: { label: '进化分析', icon: '🧬', color: 'bg-indigo-50 text-indigo-700' },
+    auto_review: { label: 'AI审批', icon: '✅', color: 'bg-emerald-50 text-emerald-700' },
+  }
+
   function renderDashboard() {
-    const mainCards = [
-      { label: '总用户', value: stats?.totalUsers ?? '-', sub: `今日 +${stats?.todayUsers ?? 0}`, color: 'from-blue-500 to-blue-600', iconBg: 'bg-blue-400/20', iconPath: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
-      { label: '总会话', value: stats?.totalSessions ?? '-', sub: `今日 +${stats?.todaySessions ?? 0}`, color: 'from-emerald-500 to-green-600', iconBg: 'bg-green-400/20', iconPath: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-      { label: '总消息', value: stats?.totalMessages ?? '-', sub: `今日 +${stats?.todayMessages ?? 0}`, color: 'from-orange-400 to-rose-500', iconBg: 'bg-orange-400/20', iconPath: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75' },
-      { label: '总收入', value: `¥${parseFloat(stats?.totalRevenue ?? 0).toFixed(2)}`, sub: `活跃 ${stats?.activeUsersToday ?? 0}`, color: 'from-violet-500 to-purple-600', iconBg: 'bg-violet-400/20', iconPath: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    ]
-    const miniCards = [
-      { label: '有效对话', value: stats?.chatSessions ?? '-', dot: 'bg-blue-400' },
-      { label: '活跃会话', value: stats?.activeSessions ?? '-', dot: 'bg-green-400' },
-      { label: '今日活跃', value: stats?.activeUsersToday ?? '-', dot: 'bg-violet-400' },
-      { label: '平均消息', value: stats?.avgMsgsPerSession ?? '-', dot: 'bg-orange-400' },
-    ]
+    const profit = stats?.profitAnalysis || {}
+    const ts = stats?.tokenSummary || {}
+    const mh = stats?.modelHealth || {}
+    const rs = stats?.rechargeStats || {}
+
     return (
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
+        {/* Branding Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 tracking-tight">数据概览</h2>
-            <p className="text-xs text-gray-400 mt-0.5">商户申诉AI · 自我迭代超级系统</p>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <span className="bg-gradient-to-r from-emerald-500 to-blue-600 bg-clip-text text-transparent">商户申诉AI</span>
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700">自我迭代超级系统</span>
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">AI全自动赚钱 · 智能健康巡检 · 故障自动切换 · 免费模型优先</p>
           </div>
-          <button onClick={fetchStats} className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+          <button onClick={fetchStats} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-purple-600 px-4 py-2 rounded-xl hover:bg-purple-50 transition-colors border border-transparent hover:border-purple-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
             刷新数据
           </button>
         </div>
-        {/* Main stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {mainCards.map((c, i) => (
-            <div key={i} className={`bg-gradient-to-br ${c.color} rounded-2xl p-4 text-white relative overflow-hidden`} style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
-              <div className={`absolute right-3 top-3 w-9 h-9 ${c.iconBg} rounded-xl flex items-center justify-center`}>
-                <svg className="w-4.5 h-4.5 text-white/60" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={c.iconPath}/></svg>
-              </div>
-              <p className="text-white/70 text-[11px] font-medium">{c.label}</p>
-              <p className="text-xl font-bold mt-0.5 tracking-tight">{c.value}</p>
-              <p className="text-white/50 text-[10px] mt-1">{c.sub}</p>
-            </div>
-          ))}
+
+        {/* === Row 1: Revenue & Profit Cards === */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+            <p className="text-white/70 text-xs font-medium">充值收入</p>
+            <p className="text-2xl font-bold mt-1 tracking-tight">¥{(profit.rechargeIncome || 0).toFixed(2)}</p>
+            <p className="text-white/50 text-[11px] mt-1.5">{rs.confirmedCount || 0}笔成功 · {rs.pendingCount || 0}笔待确认</p>
+          </div>
+          <div className="bg-gradient-to-br from-orange-400 to-rose-500 rounded-2xl p-5 text-white relative overflow-hidden card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+            <p className="text-white/70 text-xs font-medium">AI成本</p>
+            <p className="text-2xl font-bold mt-1 tracking-tight">¥{(profit.aiCostEstimate || 0).toFixed(4)}</p>
+            <p className="text-white/50 text-[11px] mt-1.5">{mh.activeModel?.isFree ? '当前免费模型 🎉' : 'Token消耗成本'}</p>
+          </div>
+          <div className={`bg-gradient-to-br ${(profit.grossProfit || 0) >= 0 ? 'from-violet-500 to-purple-600' : 'from-red-500 to-rose-600'} rounded-2xl p-5 text-white relative overflow-hidden card-hover`} style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+            <p className="text-white/70 text-xs font-medium">毛利润</p>
+            <p className="text-2xl font-bold mt-1 tracking-tight">¥{(profit.grossProfit || 0).toFixed(2)}</p>
+            <p className="text-white/50 text-[11px] mt-1.5">利润率 {profit.profitRate || 0}%</p>
+          </div>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+            <p className="text-white/70 text-xs font-medium">总用户</p>
+            <p className="text-2xl font-bold mt-1 tracking-tight">{stats?.totalUsers ?? '-'}</p>
+            <p className="text-white/50 text-[11px] mt-1.5">今日 +{stats?.todayUsers ?? 0} · 活跃 {stats?.activeUsersToday ?? 0}</p>
+          </div>
         </div>
-        {/* Mini stat pills */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {miniCards.map((c, i) => (
-            <div key={i} className="bg-white rounded-xl px-3 py-2.5 text-center border border-gray-100/80">
-              <p className="text-base font-bold text-gray-800 tabular-nums">{c.value}</p>
-              <div className="flex items-center justify-center gap-1 mt-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                <p className="text-[10px] text-gray-400">{c.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        {/* 7-day trends */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+        {/* === Row 2: Quick Stats Pills === */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
-            { title: '会话趋势 (7天)', data: stats?.dailySessions, color: '#22c55e' },
-            { title: '消息趋势 (7天)', data: stats?.dailyMessages, color: '#8b5cf6' },
-            { title: '新用户趋势 (7天)', data: stats?.dailyUsers, color: '#3b82f6' },
+            { label: '总会话', value: stats?.totalSessions ?? '-', sub: `+${stats?.todaySessions ?? 0}`, dot: 'bg-green-400' },
+            { label: '总消息', value: stats?.totalMessages ?? '-', sub: `+${stats?.todayMessages ?? 0}`, dot: 'bg-purple-400' },
+            { label: '活跃会话', value: stats?.activeSessions ?? '-', sub: '', dot: 'bg-blue-400' },
+            { label: '总Token', value: parseInt(ts.total_tokens || 0).toLocaleString(), sub: `今日${parseInt(ts.todayTokens || 0).toLocaleString()}`, dot: 'bg-orange-400' },
+            { label: 'AI请求', value: parseInt(ts.total_requests || 0).toLocaleString(), sub: `今日${ts.todayRequests || 0}`, dot: 'bg-cyan-400' },
+            { label: '平均消息/会话', value: stats?.avgMsgsPerSession ?? '-', sub: '', dot: 'bg-pink-400' },
+          ].map((c, i) => (
+            <div key={i} className="bg-white rounded-xl px-3 py-3 text-center border border-gray-100/80 hover:shadow-md transition-shadow">
+              <p className="text-base font-bold text-gray-800 tabular-nums">{c.value}</p>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <div className={`w-2 h-2 rounded-full ${c.dot}`} />
+                <p className="text-[11px] text-gray-500 font-medium">{c.label}</p>
+              </div>
+              {c.sub && <p className="text-[10px] text-gray-400 mt-0.5">{c.sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* === Row 3: Token消耗分类 + 模型健康 + 收入趋势 === */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Token by type */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">Token消耗分类 (哪里最费钱)</h3>
+            {stats?.tokenByType?.length > 0 ? (
+              <div className="space-y-1.5">
+                {stats.tokenByType.map((t, i) => {
+                  const total = stats.tokenByType.reduce((s, x) => s + parseInt(x.tokens), 0)
+                  const pct = total > 0 ? (parseInt(t.tokens) / total * 100).toFixed(0) : 0
+                  const meta = TOKEN_TYPE_LABELS[t.type] || { label: t.type, icon: '📦', color: 'bg-gray-50 text-gray-600' }
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-sm flex-shrink-0">{meta.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-[11px] mb-0.5">
+                          <span className="text-gray-600 font-medium truncate">{meta.label}</span>
+                          <span className="text-gray-400 flex-shrink-0">{parseInt(t.tokens).toLocaleString()} ({pct}%)</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-400 to-purple-500 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : <p className="text-xs text-gray-300 text-center py-4">暂无数据</p>}
+          </div>
+
+          {/* Model health */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-600">AI模型健康</h3>
+              <button onClick={() => setActiveTab('ai-models')} className="text-[10px] text-purple-500 hover:text-purple-700">管理</button>
+            </div>
+            {mh.activeModel ? (
+              <div className={`p-3 rounded-xl border ${mh.activeModel.status === 'healthy' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} mb-3`}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${mh.activeModel.status === 'healthy' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                  <span className="text-xs font-semibold text-gray-700">{mh.activeModel.name}</span>
+                  {mh.activeModel.isFree && <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">免费</span>}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1 ml-[18px]">{mh.activeModel.status === 'healthy' ? '运行正常 · 当前使用中' : '异常 · 等待自动切换'}</p>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 rounded-lg bg-green-50">
+                <div className="text-base font-bold text-green-600">{mh.healthy || 0}</div>
+                <div className="text-[9px] text-green-500">健康</div>
+              </div>
+              <div className="p-2 rounded-lg bg-red-50">
+                <div className="text-base font-bold text-red-500">{mh.error || 0}</div>
+                <div className="text-[9px] text-red-400">异常</div>
+              </div>
+              <div className="p-2 rounded-lg bg-gray-50">
+                <div className="text-base font-bold text-gray-500">{mh.unknown || 0}</div>
+                <div className="text-[9px] text-gray-400">未检测</div>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-300 mt-2 text-center">每30分钟自动巡检 · 故障秒级切换</p>
+          </div>
+
+          {/* Revenue trend */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">收入趋势 (7天)</h3>
+            <MiniChart data={(stats?.dailyRevenue || []).map(d => ({ cnt: parseFloat(d.revenue), label: fmtDay(d.day) }))} color="#8b5cf6" height={56} />
+            <div className="hidden sm:flex justify-between mt-1.5 text-[9px] text-gray-300">
+              {(stats?.dailyRevenue || []).map((d, j) => <span key={j}>{fmtDay(d.day)}</span>)}
+            </div>
+            <div className="mt-3 pt-2 border-t border-gray-50 space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-gray-400">今日收入</span>
+                <span className="font-semibold text-green-600">¥{parseFloat(stats?.todayRevenue ?? 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-gray-400">待确认</span>
+                <span className="font-medium text-orange-500">¥{(rs.pendingTotal || 0).toFixed(2)} ({rs.pendingCount || 0}笔)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* === Row 3.5: 申诉成功率闭环 === */}
+        {appealStats?.totals && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-600">📊 申诉成功率 (用户真实反馈 → AI进化学习)</h3>
+              <span className="text-[11px] px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-full font-medium">
+                {appealStats.totals.decided || 0} 个已结案
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+              {[
+                { label: '已生成', value: appealStats.totals.generated || 0, color: 'text-gray-600 bg-gray-50' },
+                { label: '已提交', value: appealStats.totals.submitted || 0, color: 'text-blue-600 bg-blue-50' },
+                { label: '审核中', value: appealStats.totals.under_review || 0, color: 'text-yellow-600 bg-yellow-50' },
+                { label: '通过 ✅', value: appealStats.totals.approved || 0, color: 'text-green-700 bg-green-50' },
+                { label: '驳回 ❌', value: appealStats.totals.rejected || 0, color: 'text-red-600 bg-red-50' },
+                { label: '重新提交', value: appealStats.totals.resubmitted || 0, color: 'text-orange-600 bg-orange-50' },
+                { label: '成功率', value: `${appealStats.totals.successRate || 0}%`, color: 'text-emerald-700 bg-emerald-50 font-bold' },
+              ].map((c, i) => (
+                <div key={i} className={`px-3 py-2.5 rounded-xl text-center ${c.color}`}>
+                  <div className="text-lg font-bold">{c.value}</div>
+                  <div className="text-[11px] mt-0.5">{c.label}</div>
+                </div>
+              ))}
+            </div>
+            {/* By industry / by violation breakdown */}
+            {(appealStats.byIndustry?.length > 0 || appealStats.byViolation?.length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {appealStats.byIndustry?.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-gray-400 mb-1.5">按行业成功率</h4>
+                    <div className="space-y-1">
+                      {appealStats.byIndustry.slice(0, 5).map((r, i) => (
+                        <div key={i} className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-600 truncate flex-1">{r.industry}</span>
+                          <span className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-green-600">{r.approved || 0}通过</span>
+                            <span className="text-red-500">{r.rejected || 0}驳回</span>
+                            <span className={`font-bold ${parseFloat(r.successRate) >= 60 ? 'text-green-700' : 'text-orange-600'}`}>{r.successRate}%</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {appealStats.byViolation?.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-gray-400 mb-1.5">按违规类型成功率</h4>
+                    <div className="space-y-1">
+                      {appealStats.byViolation.slice(0, 5).map((r, i) => (
+                        <div key={i} className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-600 truncate flex-1">{r.violation_type}</span>
+                          <span className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-green-600">{r.approved || 0}通过</span>
+                            <span className="text-red-500">{r.rejected || 0}驳回</span>
+                            <span className={`font-bold ${parseFloat(r.successRate) >= 60 ? 'text-green-700' : 'text-orange-600'}`}>{r.successRate}%</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] text-gray-300 mt-3 text-center">用户标记申诉结果 → 自动喂入进化引擎 → AI越用越准 · 越用越赚钱</p>
+          </div>
+        )}
+
+        {/* === Row 4: 7-day trends === */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { title: '会话趋势', data: stats?.dailySessions, color: '#22c55e' },
+            { title: '消息趋势', data: stats?.dailyMessages, color: '#8b5cf6' },
+            { title: '新用户趋势', data: stats?.dailyUsers, color: '#3b82f6' },
           ].map((chart, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <h3 className="text-xs font-semibold text-gray-500 mb-3">{chart.title}</h3>
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-gray-600 mb-4">{chart.title} (7天)</h3>
               <MiniChart data={(chart.data || []).map(d => ({ cnt: d.cnt, label: fmtDay(d.day) }))} color={chart.color} />
               <div className="hidden sm:flex justify-between mt-1.5 text-[9px] text-gray-300">
                 {(chart.data || []).map((d, j) => <span key={j}>{fmtDay(d.day)}</span>)}
@@ -609,17 +822,18 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
-        {/* Hourly + API mode + Quick actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm md:col-span-2">
-            <h3 className="text-xs font-semibold text-gray-500 mb-3">24小时消息分布</h3>
+
+        {/* === Row 5: 24h distribution + API mode + Quick actions === */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow md:col-span-2">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">24小时消息分布</h3>
             <HourlyChart data={stats?.hourlyMessages} />
-            <div className="flex justify-between mt-1 text-[9px] text-gray-300">
+            <div className="flex justify-between mt-2 text-[10px] text-gray-400">
               <span>0时</span><span>6时</span><span>12时</span><span>18时</span><span>23时</span>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <h3 className="text-xs font-semibold text-gray-500 mb-3">API 模式分布</h3>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">API 模式分布</h3>
             {stats?.apiModes?.length > 0 ? (
               <div className="space-y-2">
                 {stats.apiModes.map((m, i) => {
@@ -639,22 +853,61 @@ export default function AdminPage() {
                 })}
               </div>
             ) : <p className="text-xs text-gray-300 text-center py-4">暂无数据</p>}
-            <div className="mt-4 pt-3 border-t border-gray-50">
-              <h4 className="text-xs font-semibold text-gray-500 mb-2">快速操作</h4>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button onClick={() => setActiveTab('sessions')} className="px-2 py-1.5 text-[11px] bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">聊天记录</button>
-                <button onClick={() => setActiveTab('users')} className="px-2 py-1.5 text-[11px] bg-green-50 text-green-600 rounded-lg hover:bg-green-100">用户管理</button>
-                <button onClick={() => setActiveTab('analytics')} className="px-2 py-1.5 text-[11px] bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100">数据分析</button>
-                <a href="/" className="px-2 py-1.5 text-[11px] bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-center">访问前台</a>
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <h4 className="text-xs font-semibold text-gray-500 mb-2.5">快速操作</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setActiveTab('tokens')} className="px-3 py-2 text-xs bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 font-medium transition-colors">Token明细</button>
+                <button onClick={() => setActiveTab('users')} className="px-3 py-2 text-xs bg-green-50 text-green-600 rounded-lg hover:bg-green-100 font-medium transition-colors">用户管理</button>
+                <button onClick={() => setActiveTab('ai-models')} className="px-3 py-2 text-xs bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 font-medium transition-colors">AI模型</button>
+                <a href="/" className="px-3 py-2 text-xs bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-center font-medium transition-colors">访问前台</a>
               </div>
             </div>
           </div>
         </div>
-        {/* Recent activity feed */}
+
+        {/* === Row 6: Top Users (Money makers) === */}
+        {stats?.topUsers?.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">Top 用户排行 (消息量/消费)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-100">
+                    <th className="text-left py-2 pr-3 font-medium">#</th>
+                    <th className="text-left py-2 px-3 font-medium">用户</th>
+                    <th className="text-right py-2 px-3 font-medium">消息</th>
+                    <th className="text-right py-2 px-3 font-medium">会话</th>
+                    <th className="text-right py-2 px-3 font-medium">消费</th>
+                    <th className="text-right py-2 px-3 font-medium">余额</th>
+                    <th className="text-right py-2 pl-3 font-medium">活跃</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.topUsers.slice(0, 10).map((u, i) => (
+                    <tr key={i} className="border-b border-gray-50/50 hover:bg-gray-50/50 transition-colors">
+                      <td className="py-2.5 pr-3 text-gray-400">{i < 3 ? ['🥇','🥈','🥉'][i] : i+1}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-medium text-gray-700">{u.nickname || '匿名'}</div>
+                        <div className="text-[11px] text-gray-400">{u.phone}</div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-gray-700">{u.total_messages}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-500">{u.sessions}</td>
+                      <td className="py-2.5 px-3 text-right text-orange-600 font-semibold">¥{parseFloat(u.total_spent || 0).toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right text-green-600">¥{parseFloat(u.balance || 0).toFixed(2)}</td>
+                      <td className="py-2.5 pl-3 text-right text-gray-400">{timeAgo(u.last_active_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* === Row 7: Recent activity feed === */}
         {stats?.recentActions?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <h3 className="text-xs font-semibold text-gray-500 mb-3">最近用户活动</h3>
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4">最近用户活动</h3>
+            <div className="space-y-1.5 max-h-72 overflow-y-auto gpu-scroll">
               {stats.recentActions.slice(0, 15).map((a, i) => {
                 const meta = ACTION_LABELS[a.action] || { label: a.action, color: 'bg-gray-100 text-gray-600' }
                 return (
@@ -676,10 +929,10 @@ export default function AdminPage() {
   function renderAnalytics() {
     const topUsers = stats?.topUsers || []
     return (
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">数据分析</h2>
-          <button onClick={fetchStats} className="text-xs text-gray-400 hover:text-wechat-green px-2 py-1 rounded hover:bg-green-50">刷新</button>
+          <button onClick={fetchStats} className="text-xs text-gray-400 hover:text-wechat-green px-3 py-1.5 rounded-lg hover:bg-green-50">刷新</button>
         </div>
         {/* Top users */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -918,7 +1171,7 @@ export default function AdminPage() {
                         <div className="px-3 sm:px-4 py-2.5 bg-indigo-50/60 flex items-center justify-between border-b border-indigo-100/50 gap-2">
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="w-2 h-2 rounded-full bg-green-400" />
-                            <span className="text-[12px] font-semibold text-indigo-700 hidden sm:inline">DeepSeek 深度分析</span>
+                            <span className="text-[12px] font-semibold text-indigo-700 hidden sm:inline">AI 深度分析</span>
                             <span className="text-[12px] font-semibold text-indigo-700 sm:hidden">分析报告</span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -976,7 +1229,7 @@ export default function AdminPage() {
                     <div className="text-center py-16 text-gray-400 text-sm">暂无AI分析数据（需要用户在前端触发深度分析后才会生成）</div>
                   ) : (
                     <>
-                      <div className="px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 text-center">以下为规则引擎分析（用户尚未触发DeepSeek深度分析）</div>
+                      <div className="px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 text-center">以下为规则引擎分析（用户尚未触发AI深度分析）</div>
                       {sessionAnalysis.risk && (
                         <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                           <h3 className="text-[13px] font-semibold text-gray-800 mb-3">� 风险评估</h3>
@@ -1035,7 +1288,7 @@ export default function AdminPage() {
   // ========== 知识库 ==========
   function renderKnowledge() {
     return (
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
         <div className="flex items-start sm:items-center justify-between mb-4 gap-3 flex-col sm:flex-row">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-gray-800">成功案例知识库</h2>
@@ -1152,6 +1405,271 @@ export default function AdminPage() {
     )
   }
 
+  // ========== DeepSeek 多账号余额 ==========
+  async function fetchDsAccounts() {
+    setDsLoading(true)
+    try {
+      const res = await adminFetch('/api/admin/deepseek-accounts')
+      const data = await res.json()
+      setDsAccounts(data.accounts || [])
+      setDsSummary(data.summary || {})
+    } catch (e) { console.error(e) }
+    setDsLoading(false)
+  }
+
+  async function handleDsCheckAll() {
+    setDsChecking(true)
+    try {
+      const res = await adminFetch('/api/admin/deepseek-accounts/check-all', { method: 'POST' })
+      const data = await res.json()
+      showToast(`已查询 ${data.summary?.checked || 0} 个账号，总余额 ¥${data.summary?.totalBalance || '0.00'}`)
+      fetchDsAccounts()
+    } catch (e) { showToast('批量查询失败') }
+    setDsChecking(false)
+  }
+
+  async function handleDsCheckOne(id) {
+    setDsCheckingId(id)
+    try {
+      const res = await adminFetch(`/api/admin/deepseek-accounts/${id}/check-balance`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        showToast(`余额: ¥${data.totalBalance?.toFixed(2)}${data.isWarning ? ' ⚠️ 低于预警线' : ''}`)
+      } else {
+        showToast('查询失败: ' + data.error)
+      }
+      fetchDsAccounts()
+    } catch (e) { showToast('查询失败') }
+    setDsCheckingId(null)
+  }
+
+  async function handleDsAdd() {
+    if (!dsForm.apiKey) { showToast('请填写 API Key'); return }
+    try {
+      await adminFetch('/api/admin/deepseek-accounts', {
+        method: 'POST',
+        body: JSON.stringify({ label: dsForm.label, apiKey: dsForm.apiKey, warningThreshold: parseFloat(dsForm.warningThreshold) || 10 }),
+      })
+      showToast('添加成功，正在查询余额...')
+      setDsShowAdd(false)
+      setDsForm({ label: '', apiKey: '', warningThreshold: '10' })
+      fetchDsAccounts()
+    } catch (e) { showToast('添加失败') }
+  }
+
+  async function handleDsUpdate(id) {
+    try {
+      const body = { label: dsForm.label, warningThreshold: parseFloat(dsForm.warningThreshold) || 10 }
+      if (dsForm.apiKey) body.apiKey = dsForm.apiKey
+      await adminFetch(`/api/admin/deepseek-accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+      showToast('更新成功')
+      setDsEditId(null)
+      setDsForm({ label: '', apiKey: '', warningThreshold: '10' })
+      fetchDsAccounts()
+    } catch (e) { showToast('更新失败') }
+  }
+
+  async function handleDsToggle(id, currentEnabled) {
+    try {
+      await adminFetch(`/api/admin/deepseek-accounts/${id}`, { method: 'PUT', body: JSON.stringify({ isEnabled: !currentEnabled }) })
+      fetchDsAccounts()
+    } catch (e) { showToast('操作失败') }
+  }
+
+  async function handleDsDelete(id) {
+    if (!confirm('确定删除此账号？')) return
+    try {
+      await adminFetch(`/api/admin/deepseek-accounts/${id}`, { method: 'DELETE' })
+      showToast('已删除')
+      fetchDsAccounts()
+    } catch (e) { showToast('删除失败') }
+  }
+
+  function renderDeepseekBalance() {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">DeepSeek 账号余额</span>
+              {dsSummary.warningCount > 0 && (
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-600 animate-pulse">
+                  {dsSummary.warningCount} 个低余额
+                </span>
+              )}
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">管理多个 DeepSeek API 账号 · 实时查询余额 · 低余额自动预警</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleDsCheckAll} disabled={dsChecking}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl transition-all ${dsChecking ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}`}>
+              {dsChecking ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+              )}
+              {dsChecking ? '查询中...' : '一键查询全部余额'}
+            </button>
+            <button onClick={() => { setDsEditId(null); setDsForm({ label: '', apiKey: '', warningThreshold: '10' }); setDsShowAdd(!dsShowAdd) }}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+              添加账号
+            </button>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        {dsAccounts.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+              <p className="text-white/70 text-xs font-medium">总账号数</p>
+              <p className="text-2xl font-bold mt-1">{dsSummary.total || 0}</p>
+              <p className="text-white/50 text-[11px] mt-1.5">已启用 {dsAccounts.filter(a => a.is_enabled).length} 个</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 text-white card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+              <p className="text-white/70 text-xs font-medium">总余额</p>
+              <p className="text-2xl font-bold mt-1">¥{dsSummary.totalBalance || '0.00'}</p>
+              <p className="text-white/50 text-[11px] mt-1.5">所有账号合计</p>
+            </div>
+            <div className={`bg-gradient-to-br ${dsSummary.warningCount > 0 ? 'from-red-500 to-rose-600' : 'from-violet-500 to-purple-600'} rounded-2xl p-5 text-white card-hover`} style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+              <p className="text-white/70 text-xs font-medium">低余额预警</p>
+              <p className="text-2xl font-bold mt-1">{dsSummary.warningCount || 0}</p>
+              <p className="text-white/50 text-[11px] mt-1.5">{dsSummary.warningCount > 0 ? '需要及时充值!' : '全部正常'}</p>
+            </div>
+            <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl p-5 text-white card-hover" style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+              <p className="text-white/70 text-xs font-medium">平均余额</p>
+              <p className="text-2xl font-bold mt-1">¥{dsSummary.total > 0 ? (parseFloat(dsSummary.totalBalance || 0) / dsSummary.total).toFixed(2) : '0.00'}</p>
+              <p className="text-white/50 text-[11px] mt-1.5">每账号平均</p>
+            </div>
+          </div>
+        )}
+
+        {/* Add / Edit Form */}
+        {(dsShowAdd || dsEditId) && (
+          <div className="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-5 space-y-4">
+            <h3 className="font-semibold text-sm text-indigo-700">{dsEditId ? '编辑账号' : '添加 DeepSeek 账号'}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1.5">账号标签（便于区分）</label>
+                <input value={dsForm.label} onChange={e => setDsForm(f => ({ ...f, label: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none"
+                  placeholder="如：主账号 / 测试号 / 账号A" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1.5">API Key *</label>
+                <input value={dsForm.apiKey} onChange={e => setDsForm(f => ({ ...f, apiKey: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm font-mono focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none"
+                  placeholder={dsEditId ? '留空则不修改' : 'sk-xxxxxxxxxxxxxxxx'} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1.5">预警阈值 (¥)</label>
+                <input type="number" value={dsForm.warningThreshold} onChange={e => setDsForm(f => ({ ...f, warningThreshold: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none"
+                  placeholder="10" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => dsEditId ? handleDsUpdate(dsEditId) : handleDsAdd()}
+                className="px-5 py-2 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors">
+                {dsEditId ? '保存修改' : '添加并查询余额'}
+              </button>
+              <button onClick={() => { setDsShowAdd(false); setDsEditId(null); setDsForm({ label: '', apiKey: '', warningThreshold: '10' }) }}
+                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">取消</button>
+            </div>
+          </div>
+        )}
+
+        {/* Account List */}
+        {dsLoading ? (
+          <div className="text-center py-16 text-gray-400">加载中...</div>
+        ) : dsAccounts.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4">💰</div>
+            <p className="text-gray-400 text-sm">还没有添加 DeepSeek 账号</p>
+            <p className="text-gray-300 text-xs mt-1">点击上方「添加账号」开始管理多个 API Key 的余额</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {dsAccounts.map(acc => {
+              const balance = parseFloat(acc.total_balance || 0)
+              const threshold = parseFloat(acc.warning_threshold || 10)
+              const isWarning = acc.is_warning
+              const isChecking = dsCheckingId === acc.id
+              const lastCheck = acc.last_check_at ? new Date(acc.last_check_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '从未查询'
+
+              return (
+                <div key={acc.id} className={`bg-white rounded-2xl border ${isWarning ? 'border-red-200 ring-1 ring-red-100' : 'border-gray-100'} p-5 shadow-sm hover:shadow-md transition-all ${!acc.is_enabled ? 'opacity-50' : ''}`}>
+                  <div className="flex items-start gap-4">
+                    {/* Left: Balance display */}
+                    <div className="flex-shrink-0">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold ${
+                        acc.last_error ? 'bg-gray-100 text-gray-400' :
+                        isWarning ? 'bg-red-50 text-red-500' :
+                        balance > 50 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                      }`}>
+                        {acc.last_error ? '❌' : isWarning ? '⚠️' : '💰'}
+                      </div>
+                    </div>
+
+                    {/* Middle: Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-gray-800 text-sm">{acc.label || '未命名账号'}</span>
+                        {!acc.is_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">已禁用</span>}
+                        {isWarning && acc.is_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium animate-pulse">低余额</span>}
+                        {acc.is_available === 1 && !isWarning && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-600">可用</span>}
+                      </div>
+                      <div className="text-xs text-gray-400 font-mono mb-2">{acc.api_key_masked || '****'}</div>
+
+                      {acc.total_balance !== null && !acc.last_error ? (
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className={`text-lg font-bold ${isWarning ? 'text-red-600' : 'text-gray-800'}`}>¥{balance.toFixed(2)}</div>
+                            <div className="text-[10px] text-gray-400">总余额</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className="text-lg font-bold text-blue-600">¥{parseFloat(acc.topped_up_balance || 0).toFixed(2)}</div>
+                            <div className="text-[10px] text-gray-400">充值余额</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className="text-lg font-bold text-purple-600">¥{parseFloat(acc.granted_balance || 0).toFixed(2)}</div>
+                            <div className="text-[10px] text-gray-400">赠金</div>
+                          </div>
+                        </div>
+                      ) : acc.last_error ? (
+                        <div className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{acc.last_error}</div>
+                      ) : (
+                        <div className="text-xs text-gray-300">尚未查询余额，请点击右侧查询按钮</div>
+                      )}
+                      <div className="text-[10px] text-gray-300 mt-2">最近查询: {lastCheck} · 预警线: ¥{threshold.toFixed(2)}</div>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      <button onClick={() => handleDsCheckOne(acc.id)} disabled={isChecking}
+                        className={`px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all ${isChecking ? 'bg-blue-50 text-blue-500 animate-pulse' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                        {isChecking ? '查询中...' : '查余额'}
+                      </button>
+                      <button onClick={() => { setDsEditId(acc.id); setDsShowAdd(false); setDsForm({ label: acc.label || '', apiKey: '', warningThreshold: String(acc.warning_threshold || 10) }) }}
+                        className="px-3 py-1.5 text-[11px] font-medium bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-colors">编辑</button>
+                      <button onClick={() => handleDsToggle(acc.id, acc.is_enabled)}
+                        className={`px-3 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${acc.is_enabled ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                        {acc.is_enabled ? '禁用' : '启用'}
+                      </button>
+                      <button onClick={() => handleDsDelete(acc.id)}
+                        className="px-3 py-1.5 text-[11px] font-medium bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">删除</button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderSettings() {
     const general = systemConfigs.filter(c => c.config_group === 'general')
     const ai = systemConfigs.filter(c => c.config_group === 'ai')
@@ -1170,20 +1688,30 @@ export default function AdminPage() {
           ) : <div className="text-center py-16 text-gray-300 text-sm">暂无基本配置项</div>
         case 'ai':
           return ai.length > 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-blue-700">AI 配置 (DeepSeek)</h3>
-                <button onClick={async () => {
-                  showToast('正在测试 DeepSeek 连接...')
-                  try {
-                    const r = await adminFetch('/api/admin/test-deepseek', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-                    const d = await r.json()
-                    if (d.success) showToast(`✅ 连接成功！模型: ${d.model}，回复: ${d.reply}`)
-                    else showToast(`❌ 连接失败: ${d.error}`)
-                  } catch { showToast('❌ 测试请求失败') }
-                }} className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 font-medium">测试连接</button>
+            <div className="space-y-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5 text-sm">⚠️</span>
+                <div className="text-xs text-amber-700">
+                  <p className="font-semibold">API Key 请在「AI模型」Tab 中配置</p>
+                  <p className="mt-0.5 text-amber-600">此处为旧版参数（温度、倍率等），API Key 已迁移到「AI模型」面板统一管理。在此处修改 API Key 不会生效。</p>
+                  <button onClick={() => setActiveTab('ai-models')} className="mt-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium transition-colors">前往 AI模型 管理 →</button>
+                </div>
               </div>
-              <div className="divide-y divide-gray-50">{ai.map(c => <ConfigField key={c.config_key} cfg={c} idx={systemConfigs.indexOf(c)} configs={systemConfigs} setConfigs={setSystemConfigs} />)}</div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-blue-700">AI 参数配置</h3>
+                  <button onClick={async () => {
+                    showToast('正在测试 AI 连接...')
+                    try {
+                      const r = await adminFetch('/api/admin/test-deepseek', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+                      const d = await r.json()
+                      if (d.success) showToast(`✅ 连接成功！模型: ${d.model}，回复: ${d.reply}`)
+                      else showToast(`❌ 连接失败: ${d.error}`)
+                    } catch { showToast('❌ 测试请求失败') }
+                  }} className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 font-medium">测试连接</button>
+                </div>
+                <div className="divide-y divide-gray-50">{ai.map(c => <ConfigField key={c.config_key} cfg={c} idx={systemConfigs.indexOf(c)} configs={systemConfigs} setConfigs={setSystemConfigs} />)}</div>
+              </div>
             </div>
           ) : <div className="text-center py-16 text-gray-300 text-sm">暂无AI配置项</div>
         case 'rechargeConfig':
@@ -1213,6 +1741,18 @@ export default function AdminPage() {
               <div className="divide-y divide-gray-50">{ali.map(c => <ConfigField key={c.config_key} cfg={c} idx={paymentConfigs.indexOf(c)} configs={paymentConfigs} setConfigs={setPaymentConfigs} />)}</div>
             </div>
           ) : <div className="text-center py-16 text-gray-300 text-sm">暂无支付宝配置项</div>
+        case 'contact': {
+          const contactCfg = systemConfigs.filter(c => c.config_group === 'contact')
+          return contactCfg.length > 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+                <h3 className="text-sm font-semibold text-indigo-700">技术人员名片</h3>
+                <p className="text-[10px] text-indigo-400 mt-0.5">配置后用户在聊天页可查看您的联系方式，方便获客转化</p>
+              </div>
+              <div className="divide-y divide-gray-50">{contactCfg.map(c => <ConfigField key={c.config_key} cfg={c} idx={systemConfigs.indexOf(c)} configs={systemConfigs} setConfigs={setSystemConfigs} />)}</div>
+            </div>
+          ) : <div className="text-center py-16 text-gray-300 text-sm">暂无名片配置项（重启服务后自动生成）</div>
+        }
         case 'security':
           return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1240,7 +1780,7 @@ export default function AdminPage() {
     const isPaymentTab = settingsSubTab === 'wechat' || settingsSubTab === 'alipay'
 
     return (
-      <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto w-full space-y-4">
         {/* 子Tab导航 */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-gray-100/80 rounded-xl p-1">
           {SETTINGS_SUB_TABS.map(tab => (
@@ -1290,7 +1830,7 @@ export default function AdminPage() {
     const totalSpent = users.reduce((s, u) => s + parseFloat(u.total_spent || 0), 0)
     const totalMsgs = users.reduce((s, u) => s + (u.total_messages || 0), 0)
     return (
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-800">用户管理</h2>
@@ -1331,15 +1871,15 @@ export default function AdminPage() {
     const STATUS_MAP = { pending: { label: '待确认', color: 'bg-yellow-100 text-yellow-700' }, confirmed: { label: '已确认', color: 'bg-green-100 text-green-700' }, rejected: { label: '已拒绝', color: 'bg-red-100 text-red-700' } }
     const METHOD_MAP = { wechat: '微信支付', alipay: '支付宝' }
     return (
-      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-gray-800">充值订单管理</h2>
+            <h2 className="text-lg font-bold text-gray-800">充值订单管理</h2>
             <p className="text-xs text-gray-400 mt-0.5">审核用户充值请求，确认后余额自动到账</p>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
             {['', 'pending', 'confirmed', 'rejected'].map(f => (
-              <button key={f} onClick={() => { setRechargeFilter(f); setTimeout(fetchRechargeOrders, 50) }}
+              <button key={f} onClick={() => { setRechargeFilter(f); fetchRechargeOrders(f) }}
                 className={`px-2.5 sm:px-3 py-1.5 text-xs rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${rechargeFilter === f ? 'bg-wechat-green text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                 {f === '' ? '全部' : STATUS_MAP[f]?.label}
               </button>
@@ -1437,15 +1977,15 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
-        <div className="px-2 sm:px-3 py-1 flex overflow-x-auto no-scrollbar bg-gray-50/80 border-b border-gray-100">
+        <div className="px-2 sm:px-4 py-1.5 flex overflow-x-auto no-scrollbar bg-gray-50/80 border-b border-gray-100">
           {TABS.map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setMobileShowChat(false) }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-lg mx-0.5 transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap rounded-xl mx-0.5 transition-all ${
                 activeTab === tab.key
                   ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
                   : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
               }`}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
               </svg>
               <span>{tab.label}</span>
@@ -1453,7 +1993,8 @@ export default function AdminPage() {
           ))}
         </div>
       </header>
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col overflow-auto gpu-scroll">
+        <div key={activeTab} className="panel-animate flex-1">
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'sessions' && renderSessions()}
         {activeTab === 'users' && renderUsers()}
@@ -1461,9 +2002,16 @@ export default function AdminPage() {
         {activeTab === 'settings' && renderSettings()}
         {activeTab === 'recharge' && renderRechargeOrders()}
         {activeTab === 'knowledge' && renderKnowledge()}
+        {activeTab === 'ai-models' && <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"><AIModelsPanel adminFetch={adminFetch} showToast={showToast} /></div>}
         {activeTab === 'evolution' && <EvolutionPanel adminFetch={adminFetch} showToast={showToast} />}
         {activeTab === 'mall' && <MallPanel adminFetch={adminFetch} />}
+        {activeTab === 'contact-cards' && <ContactCardsPanel adminFetch={adminFetch} />}
+        {activeTab === 'ai-activity' && <AIActivityPanel adminFetch={adminFetch} />}
         {activeTab === 'tokens' && <TokenPanel adminFetch={adminFetch} />}
+        {activeTab === 'deepseek-balance' && renderDeepseekBalance()}
+        {activeTab === 'monitor' && <MonitorPanel adminFetch={adminFetch} />}
+        {activeTab === 'backup' && <BackupPanel adminFetch={adminFetch} />}
+        </div>
       </div>
       {showAdminReport && deepAnalysisResult && (
         <ReportCard collectedData={sessionCollectedData} analysisText={deepAnalysisResult} onClose={() => setShowAdminReport(false)} />

@@ -2,7 +2,7 @@
 
 ### Merchant Appeal Assistant — AI-Powered Smart Appeal Solution
 
-> 基于 **DeepSeek 大模型**的智能商户号申诉系统。像真人顾问一样对话，自动收集信息、智能生成申诉材料，帮助商户高效解决微信支付风控问题。
+> 基于 **多AI模型**的智能商户号申诉系统，具备**自我进化能力**。像真人顾问一样对话，自动收集信息、智能生成申诉材料，帮助商户高效解决微信支付风控问题。**越用越聪明、越用越精准、越用越赚钱。**
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
@@ -172,28 +172,35 @@
 ```
 用户浏览器                         服务端                           外部服务
 ┌──────────────┐              ┌─────────────────┐            ┌──────────────┐
-│  React 18    │  SSE Stream  │  Express API    │            │  DeepSeek    │
-│  TailwindCSS │◄────────────►│                 │◄──────────►│  大模型 API   │
-│  React Router│              │  ┌───────────┐  │            └──────────────┘
-└──────────────┘              │  │ 规则引擎   │  │
-                              │  │ (localAI)  │  │            ┌──────────────┐
-                              │  └───────────┘  │            │  MySQL 8.0   │
-                              │  ┌───────────┐  │◄──────────►│  数据持久化   │
-                              │  │ 知识库     │  │            └──────────────┘
-                              │  │ 30+行业    │  │
+│  React 18    │  SSE Stream  │  Express API    │            │ 多AI模型     │
+│  TailwindCSS │◄────────────►│                 │◄──────────►│ DeepSeek     │
+│  React Router│              │  ┌───────────┐  │            │ 智谱/通义/   │
+└──────────────┘              │  │ 规则引擎   │  │            │ Moonshot等   │
+                              │  │ (localAI)  │  │            └──────────────┘
+                              │  └───────────┘  │
+                              │  ┌───────────┐  │            ┌──────────────┐
+                              │  │ 进化引擎V3 │  │◄──────────►│  MySQL 8.0   │
+                              │  │ 自动学习   │  │            │  25+表       │
+                              │  └───────────┘  │            └──────────────┘
+                              │  ┌───────────┐  │
+                              │  │ 模型健康   │  │
+                              │  │ 自动切换   │  │
                               │  └───────────┘  │
                               └─────────────────┘
 ```
 
-### DeepSeek API 调用点（5 处）
+### AI 调用点（8 处）
 
-| 调用场景 | 功能 | 并行/串行 |
-|----------|------|-----------|
+| 调用场景 | 功能 | 模式 |
+|----------|------|------|
 | **对话生成** | 流式生成 AI 回复 | 立即流式输出 |
 | **字段提取** | 从用户消息中提取结构化数据 | 与对话并行 |
-| **完成度评估** | 判断信息是否充分、是否可生成报告 | 后台异步 |
+| **完成度评估** | 判断信息是否充分 | 后台异步 |
 | **报告生成** | 生成完整申诉材料 | 流式输出 |
-| **行业扩展** | 根据行业动态生成额外信息收集项 | 触发式 |
+| **行业扩展** | 动态生成额外信息收集项 | 触发式 |
+| **对话分析** | 进化引擎质量评估 | 30分钟异步 |
+| **规则生成** | 自动提炼最优规则 | 2小时异步 |
+| **知识聚合** | 跨对话模式聚合 | 每日聚合 |
 
 ---
 
@@ -270,23 +277,28 @@ merchant-appeal/
 │   │   ├── ChatMessage.jsx          # 聊天消息组件（含延迟/Token显示）
 │   │   ├── InfoPanel.jsx            # 信息收集面板
 │   │   ├── AIAnalysisPanel.jsx      # AI 分析面板
+│   │   ├── AnalysisVisualView.jsx   # 分析可视化视图
 │   │   ├── ReportCard.jsx           # 申诉报告卡片
-│   │   ├── AppealTextPanel.jsx      # 申诉文案面板
+│   │   ├── AppealTextPanel.jsx      # 申诉文案面板（含进度跟踪+反馈）
+│   │   ├── TokenPanel.jsx           # Token消耗可视化面板
 │   │   ├── UserCenter.jsx           # 用户中心（充值/用量）
 │   │   └── ErrorBoundary.jsx        # 错误边界
 │   ├── pages/
-│   │   ├── ChatPage.jsx             # 主对话页面（信息收集+AI对话）
-│   │   ├── AdminPage.jsx            # 管理后台控制台
+│   │   ├── ChatPage.jsx             # 主对话页面（含技术名片弹窗）
+│   │   ├── AdminPage.jsx            # 管理后台（仪表盘+会话+用户+设置+Token+进化）
 │   │   └── AdminLogin.jsx           # 管理员登录页
 │   ├── App.jsx                      # 路由配置
 │   ├── main.jsx                     # 入口
 │   └── index.css                    # 全局样式（TailwindCSS）
 ├── server/                          # 后端源码
-│   ├── index.js                     # Express 主入口（API路由+SSE流式聊天）
-│   ├── ai.js                        # DeepSeek API 调用（提取/评估/扩展）
+│   ├── index.js                     # Express 主入口（134K，100+API路由）
+│   ├── ai.js                        # 多模型AI调用（提取/评估/扩展）
 │   ├── localAI.js                   # 本地规则引擎（对话流程+知识库+报告）
 │   ├── knowledgeBase.js             # 行业知识库+违规类型+材料清单
-│   ├── db.js                        # MySQL 数据访问层（自动建表+迁移）
+│   ├── evolution.js                 # AI自进化引擎V3（分析/规则/打标/聚合/A|B测试）
+│   ├── modelHealth.js               # 模型健康检测+故障自动切换
+│   ├── mall.js                      # 智能商城推荐引擎
+│   ├── db.js                        # MySQL 数据访问层（25+表，自动建表+迁移）
 │   ├── tokenizer.js                 # Token 统计与计费
 │   └── crypto.js                    # AES-256 加解密
 ├── .env.example                     # 环境变量模板
@@ -306,7 +318,9 @@ merchant-appeal/
 | **构建工具** | Vite 6 | 极速构建 |
 | **后端框架** | Express 4 | REST API + SSE |
 | **数据库** | MySQL 8.0 (mysql2) | 数据持久化 |
-| **AI 引擎** | DeepSeek Chat API | 对话/提取/报告 |
+| **AI 引擎** | 多模型(DeepSeek/智谱/通义/Moonshot等15+) | 对话/提取/报告/进化 |
+| **进化引擎** | 自研 Evolution Engine V3 | 自动分析/规则生成/A|B测试 |
+| **健康检测** | 自研 Model Health Monitor | 30分钟巡检/故障自动切换 |
 | **安全** | helmet + cors + rate-limit + JWT + AES-256 | 全方位安全防护 |
 | **Token 计算** | js-tiktoken | 精确 Token 计数 |
 
@@ -323,21 +337,31 @@ merchant-appeal/
 | POST | `/api/chat/stream` | SSE 流式 AI 对话 |
 | GET | `/api/sessions/:id/info` | 获取会话收集信息 |
 | PUT | `/api/sessions/:id/field` | 修改某个字段 |
-| GET | `/api/sessions/:id/deep-analysis` | DeepSeek 深度分析 |
+| GET | `/api/sessions/:id/deep-analysis` | 深度分析报告 |
 | POST | `/api/sessions/:id/generate-appeal-text` | 生成申诉文案 |
+| POST | `/api/sessions/:id/appeal-feedback` | 标记申诉结果(通过/驳回) |
+| GET | `/api/contact-card` | 获取技术人员名片(公开) |
+| POST | `/api/recharge` | 用户充值 |
+| GET | `/api/user/:id/usage` | 个人消费明细 |
 
 ### 管理端
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/admin/login` | 管理员登录 |
+| GET | `/api/admin/stats` | 仪表盘统计(含利润/模型健康/Token) |
+| GET | `/api/admin/appeal-stats` | 申诉成功率统计(按行业/类型) |
 | GET | `/api/admin/users` | 用户列表 |
 | GET | `/api/admin/sessions` | 会话列表 |
-| GET | `/api/admin/stats` | 系统统计 |
 | PUT | `/api/admin/recharge-orders/:id/confirm` | 确认充值 |
 | POST/PUT/DELETE | `/api/admin/cases/*` | 案例库 CRUD |
+| GET | `/api/admin/token-usage` | Token消耗统计 |
+| GET/POST | `/api/admin/ai-models/*` | AI模型管理(CRUD/健康检测) |
+| GET/POST | `/api/admin/ai-rules/*` | AI规则管理(审批/编辑) |
+| GET | `/api/admin/evolution/*` | 进化引擎数据(分析/标签/聚类) |
+| PUT | `/api/admin/system-config` | 系统配置(含技术名片) |
 
-> 完整 API 文档详见源码 `server/index.js`
+> 完整 100+ API 端点详见源码 `server/index.js`
 
 ---
 
@@ -350,11 +374,22 @@ merchant-appeal/
 | `users` | 用户表 | phone(加密)、balance、api_mode |
 | `sessions` | 会话表 | collected_data(JSON)、step |
 | `messages` | 消息表 | role(user/assistant/admin)、content |
-| `token_usage` | Token用量 | input/output_tokens、cost |
+| `token_usage` | Token用量 | input/output_tokens、cost、type |
 | `recharge_orders` | 充值订单 | amount、status |
 | `success_cases` | 成功案例库 | industry、problem_type、strategy |
-| `system_config` | 系统配置 | deepseek_api_key(加密) |
-| `appeal_texts` | 申诉文案 | content(缓存) |
+| `system_config` | 系统配置 | api_key(加密)、技术名片配置 |
+| `appeal_texts` | 申诉文案 | 5段文案+appeal_status+user_feedback |
+| `ai_models` | AI模型管理 | 15+模型、健康状态、自动切换 |
+| `ai_rules` | AI进化规则库 | category、effectiveness_score |
+| `conversation_analyses` | 对话分析结果 | 20+评分维度 |
+| `conversation_tags` | 自动打标分类 | difficulty、outcome、quality |
+| `knowledge_clusters` | 知识聚合簇 | 行业模式、违规模式、成功因素 |
+| `learning_metrics` | 每日学习指标 | 完成率、满意度、规则变化 |
+| `rule_change_log` | 规则审计日志 | action、before/after |
+| `engine_health` | 引擎健康/熔断器 | 组件级监控 |
+| `exploration_experiments` | A/B测试记录 | 实验性规则 |
+| `mall_products` | 智能商城商品 | 推荐引擎 |
+| `field_change_log` | 字段变更记录 | 审计追踪 |
 
 ---
 
@@ -455,27 +490,33 @@ merchant-appeal/
 ## �🗺️ 路线图
 
 ### 已完成
-- [x] AI 智能对话引擎（DeepSeek 大模型驱动）
-- [x] DeepSeek 统一字段提取（反幻觉四重防线）
+- [x] AI 智能对话引擎（多模型驱动：DeepSeek/智谱/通义/Moonshot等15+）
+- [x] 统一字段提取（反幻觉四重防线）
 - [x] 行业自适应系统（30+ 行业 + 动态字段）
 - [x] 12种违规类型专业知识库
 - [x] 16个真实成功案例模板
 - [x] 风控逆向推演 + 驳回预案
 - [x] 95017电话策略 + 申诉渠道指南
 - [x] 智能风险评估引擎
-- [x] 个性化材料清单生成
 - [x] 申诉文案自动生成
-- [x] Token 计费系统（双模式）
-- [x] 全功能管理后台
+- [x] Token 计费系统（双模式 + 可视化面板）
+- [x] 全功能管理后台（仪表盘 + 品牌设计）
 - [x] SSE 流式响应
-- [x] 敏感行业智能检测
+- [x] **AI 自进化引擎 V3**（对话分析→规则生成→效果评估→自动升降级）
+- [x] **模型健康检测**（30分钟巡检 + 故障自动切换 + 免费模型回退）
+- [x] **申诉进度跟踪**（生成→提交→审核→通过/驳回 + 反馈闭环）
+- [x] **成功率统计面板**（按行业/按违规类型 + 7天趋势 + 进化引擎学习）
+- [x] **利润分析仪表盘**（充值收入/AI成本/毛利润/利润率）
+- [x] **Token 超细化面板**（盈亏分析/IO比例/系统vs用户/按功能分类）
+- [x] **技术人员名片系统**（管理员配置 + 用户端弹窗展示）
+- [x] **AI 自动打标系统**（难度/用户类型/结果/行为模式）
+- [x] **知识聚合簇**（行业模式/违规模式/成功因素/A|B实验）
+- [x] **智能商城推荐**（基于用户画像的增值服务推荐）
 
 ### 规划中
-- [ ] 多轮申诉跟踪（首次申诉→复审→二次申诉）
-- [ ] 申诉成功率统计与反馈闭环
 - [ ] 微信小程序端
 - [ ] 更多支付渠道对接
-- [ ] 多 AI 模型支持（GPT-4o / Claude）
+- [ ] 国际化多语言支持
 
 ---
 

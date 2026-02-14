@@ -1,4 +1,4 @@
-// ========== 本地规则引擎：信息收集 + 智能答疑（不消耗 DeepSeek） ==========
+// ========== 本地规则引擎：信息收集 + 智能答疑（不消耗 AI Token） ==========
 
 import { BUILT_IN_CASES, VIOLATION_KNOWLEDGE, matchViolation, matchBuiltInCases, assessRisk, generateMaterialChecklist } from './knowledgeBase.js'
 
@@ -6,81 +6,97 @@ import { BUILT_IN_CASES, VIOLATION_KNOWLEDGE, matchViolation, matchBuiltInCases,
 const INFO_FIELDS = [
   // ===== 第一阶段：了解客户业务 =====
   { key: 'industry', label: '业务类型', group: '业务了解', icon: '💼',
-    question: '💼 您是做什么生意的？\n\n比如：卖衣服、做餐饮、搞游戏、做陪玩、卖课程、开超市……\n\n随便说就行，我能听懂~',
-    why: '不同行业申诉方法不一样，我先了解您做什么，才能帮您选最合适的方案。' },
+    question: '您是做什么行业的？比如餐饮、电商、游戏、教育等，随便说就行~',
+    why: '不同行业申诉策略完全不同。' },
   { key: 'business_model', label: '经营模式', group: '业务了解', icon: '💼',
-    question: '🛒 您主要在哪里做生意、怎么收钱的？\n\n① 网上（小程序/公众号/网店）\n② 实体店\n③ 网上+实体店都有\n\n简单说一下就行~',
-    why: '网上和实体店的申诉材料不一样，我需要知道您的收钱方式。' },
+    question: '您主要在哪做生意？\n① 线上（小程序/公众号/网店）\n② 线下实体店\n③ 都有',
+    why: '线上线下需要的申诉材料不一样。' },
 
   // ===== 第二阶段：了解遇到的问题 =====
   { key: 'problem_type', label: '处罚类型', group: '问题信息', icon: '⚠️',
-    question: '⚠️ 您的商户号现在怎么了？\n\n① 顾客付款付不了（交易拦截）\n② 收款有限额了\n③ 不能收款了（支付关闭）\n④ 钱被冻住取不出来\n⑤ 整个商户号被封了\n\n说数字或者用自己的话说都行~',
-    why: '不同问题解决办法不一样，我先弄清楚您遇到的是哪种情况。' },
+    question: '商户号现在是什么情况？\n① 付款被拦截\n② 收款限额\n③ 不能收款了\n④ 资金冻结\n⑤ 商户号被封\n\n说编号或自己描述都行~',
+    why: '不同处罚类型的申诉方案完全不同。' },
   { key: 'violation_reason', label: '违规原因', group: '问题信息', icon: '📋',
-    question: '📋 微信说您违规的原因是什么？\n\n打开「微信支付商家助手」小程序，找到"功能限制记录"，把上面写的原因告诉我就行。\n\n不知道在哪看的话，直接告诉我微信给您发的通知里写了什么~',
-    why: '这个很关键，申诉就是要针对这个原因来写材料。' },
+    question: '微信给的违规原因是什么？\n\n在「商家助手」→ 风险处理 → 功能限制记录 里能看到。不知道的话，把收到的通知内容告诉我也行~',
+    why: '申诉材料要针对具体违规原因来写，这是核心。' },
 
   // ===== 第三阶段：商户基本信息 =====
   { key: 'merchant_id', label: '商户号', group: '商户号信息', icon: '🏪',
-    question: '🏠 您的微信商户号是多少？就是一串10位左右的数字。\n\n不知道在哪看？打开「商家助手」小程序首页就能看到~',
-    why: '商户号就是您的账号ID，申诉的时候必须填对。' },
+    question: '商户号是多少？10位数字，在「商家助手」首页能看到~',
+    why: '申诉必填项。' },
   { key: 'merchant_name', label: '商户名称', group: '商户号信息', icon: '🏪',
-    question: '🏷️ 您的商户名称叫什么？就是当初注册微信支付时填的那个名字~',
-    why: '微信会核对这个名字，得和您注册时填的一样。' },
+    question: '商户名称叫什么？就是注册微信支付时填的名字~',
+    why: '审核会核对，必须和注册时一致。' },
 
   // ===== 第四阶段：企业和法人信息 =====
   { key: 'company_name', label: '公司全称', group: '企业信息', icon: '🏢',
-    question: '🏢 您营业执照上的公司名字是什么？写全称就行~\n\n个体户的话就写个体户的名称~',
-    why: '微信会查您的公司信息，得和营业执照上写的一模一样。' },
+    question: '营业执照上的公司全称是什么？个体户就写个体户名称~',
+    why: '必须和营业执照完全一致。' },
   { key: 'license_no', label: '统一社会信用代码', group: '企业信息', icon: '🏢',
-    question: '📄 营业执照上有一串18位的编码，叫"统一社会信用代码"，能告诉我吗？\n\n就在营业执照右上角那串字母+数字，不知道的话说"不知道"也行~',
-    why: '这是您公司的"身份证号"，申诉时可能用到。' },
+    question: '营业执照上的统一社会信用代码（18位），不知道可以说"跳过"~',
+    why: '申诉时可能用到，非必填。' },
   { key: 'legal_name', label: '法人姓名', group: '法人信息', icon: '👤',
-    question: '👤 营业执照上的法人叫什么名字？',
-    why: '微信要确认是本人在申诉，所以需要法人的名字。' },
+    question: '法人姓名是什么？',
+    why: '审核需要确认申诉人身份。' },
   { key: 'legal_id_last4', label: '身份证后四位', group: '法人信息', icon: '👤',
-    question: '🔐 法人身份证号的最后4位是多少？\n\n放心，只要后4位就行，不会泄露隐私。打95017催审的时候也会问这个~',
-    why: '这是验证身份用的，只收后4位，保护您的隐私。' },
+    question: '法人身份证后4位？只要后4位，打95017催审时也要用~',
+    why: '身份验证用，只收后4位。' },
 
-  // ===== 第五阶段：投诉与售后 =====
+  // ===== 第五阶段：经营场景信息（申诉表单必填） =====
+  { key: 'business_scenario', label: '经营场景', group: '经营场景', icon: '🌐',
+    question: '申诉表单要填经营场景：\n① 线上（小程序/公众号/H5）\n② 线下（实体店）\n③ 都有',
+    why: '申诉表单必填项。' },
+  { key: 'miniprogram_name', label: '小程序/公众号名称', group: '经营场景', icon: '📱',
+    question: '小程序或公众号叫什么名字？没有就说"没有"~',
+    why: '线上经营需要填写，审核会查验。' },
+  { key: 'miniprogram_appid', label: '小程序AppID', group: '经营场景', icon: '🔑',
+    question: '小程序AppID是什么？wx开头的那串，不知道可以跳过~',
+    why: '申诉表单要填，非必须。' },
+
+  // ===== 第六阶段：投诉与售后 =====
   { key: 'complaint_status', label: '投诉情况', group: '投诉与售后', icon: '📞',
-    question: '📢 有没有顾客投诉还没处理完的？大概有几个？\n\n没有的话直接说"没有"就行~',
-    why: '投诉处理好了对申诉有帮助，我需要了解您的投诉情况。' },
-  { key: 'refund_policy', label: '退款政策', group: '投诉与售后', icon: '📞',
-    question: '🔄 顾客要退款的话，您一般怎么处理的？\n\n比如几天内可以退、怎么退。还没有退款规则也没关系，说"没有"就行，我帮您写一个~',
-    why: '微信会看您有没有退款规则，有的话申诉更容易通过。' },
+    question: '有没有未处理的消费者投诉？有的话说下大概几个、什么原因。没有就说"没有"~',
+    why: '投诉情况直接影响申诉成功率。' },
+  { key: 'refund_policy', label: '退款政策', group: '投诉与售后', icon: '🔄',
+    question: '您的退款政策是什么？比如几天内可退、怎么退。没有的话说"没有"，我帮您拟一个~',
+    why: '申诉表单有"退款机制"栏，必须填写。' },
 
-  // ===== 第六阶段：结算和联系信息 =====
+  // ===== 第七阶段：交易订单信息（申诉表单要求提供） =====
+  { key: 'order_info', label: '交易订单号', group: '交易订单', icon: '🧾',
+    question: '提供2-3个微信支付订单号+对应的商品/服务，例如：\n420000284420251129... - 代理记账服务\n\n在商户后台「交易中心→交易账单」能找到，不会查说"跳过"~',
+    why: '证明正常经营的关键证据。' },
+
+  // ===== 第八阶段：结算和联系信息 =====
   { key: 'bank_name', label: '开户银行', group: '结算账户', icon: '🏦',
-    question: '🏦 您收款用的是哪个银行？比如工商银行、招商银行~',
-    why: '打95017催审的时候会问到，资金冻结的情况更需要这个信息。' },
+    question: '收款用的哪个银行？',
+    why: '95017催审时需要提供。' },
   { key: 'bank_account_last4', label: '结算账户后四位', group: '结算账户', icon: '🏦',
-    question: '💳 收款银行卡号的最后4位是多少？\n\n也是只要后4位就行，不涉及隐私~',
-    why: '打95017催审时要验证身份用的。' },
+    question: '银行卡号后4位？',
+    why: '95017催审身份验证用。' },
   { key: 'contact_phone', label: '联系电话', group: '联系方式', icon: '📱',
-    question: '📱 留一个您的手机号，微信审核的时候可能会打电话给您~',
-    why: '微信可能会打电话确认，接不到电话的话申诉可能直接不通过。' },
+    question: '留个手机号，审核可能会电话回访~',
+    why: '接不到电话可能影响申诉结果。' },
   { key: 'appeal_history', label: '申诉历史', group: '申诉历史', icon: '📝',
-    question: '📝 之前申诉过吗？结果怎么样？\n\n第一次申诉就说"没有"~',
-    why: '申诉过的话我需要换个策略，避免重复被驳回。' },
+    question: '之前申诉过吗？结果怎样？第一次就说"没有"~',
+    why: '影响申诉策略选择。' },
 ]
 
 const TOTAL_STEPS = INFO_FIELDS.length
 
 // 期望数字输入的字段（不能把纯数字当垃圾输入）
-const NUMERIC_FIELDS = new Set(['merchant_id', 'legal_id_last4', 'bank_account_last4', 'contact_phone'])
+const NUMERIC_FIELDS = new Set(['merchant_id', 'legal_id_last4', 'bank_account_last4', 'contact_phone', 'miniprogram_appid'])
 
 // AI-First 欢迎消息（鼓励用户一次性说出多个信息）
-const LOCAL_WELCOME = `您好！我是全平台商户号申诉专家，8年实战经验，处理过1800+案件~
+const LOCAL_WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
 
-不管是交易拦截、收款限额、支付权限关闭、资金冻结还是商户号封禁，我都能帮您分析情况、制定方案、生成可直接提交的申诉材料。
+不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
 
-💼 先简单说说您的情况吧——您是做什么业务的？遇到了什么问题？
+💼 **先说说您的情况吧：**
 
-随便说就行，比如"我做餐饮的，商户号被冻结了"，我就能开始帮您分析了~
+比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
 
-💡 右侧面板会实时显示已收集的信息，方便您随时查看。
-🔒 所有数据仅用于本次咨询。`
+💡 有问题随时问我，比如"为什么要这个信息"。
+🔒 您的信息只用于本次咨询，不会泄露。`
 
 // "为什么"问题检测
 const WHY_PATTERNS = [
@@ -498,7 +514,7 @@ function isAnswerForDifferentField(msg, currentFieldKey, existingData) {
   return extracted
 }
 
-// 常见问答（本地处理，不调 DeepSeek）
+// 常见问答（本地处理，不调 AI API）
 const LOCAL_QA = [
   { patterns: [/多久/, /多长时间/, /几天/, /周期/], answer: '微信申诉审核一般需要3-5个工作日。如果材料齐全、逻辑清晰，部分案件可能更快。我们的目标是帮您一次性通过，减少反复提交的时间成本~' },
   { patterns: [/成功率/, /能成功/, /有把握/, /概率/], answer: '申诉成功率取决于多个因素：处罚类型、违规严重程度、材料完整度、整改诚意等。一般来说，首次申诉且材料专业的情况下，成功率在65%-90%之间。我们会尽力为您准备最优质的材料~' },
@@ -529,6 +545,23 @@ const LOCAL_QA = [
   { patterns: [/交易小票/, /交易凭证/, /什么.*凭证/, /凭证.*要求/], answer: '交易凭证要求：\n\n① 机打小票/电子订单（不接受手写单据）\n② 需包含：交易时间、金额、商品名称\n③ 小票上的订单号必须能在后台查到且为成功交易\n④ 至少提供3笔以上不同时间的交易凭证\n⑤ 线上订单：提供订单详情截图+发货/物流截图\n⑥ 线下订单：提供POS小票+商品照片\n\n⚠️ 照片必须清晰可辨！' },
   { patterns: [/拍照/, /照片.*要求/, /图片.*清晰/, /证件照/], answer: '申诉照片拍摄要求：\n\n① 证件类：正面拍摄，四角完整，文字清晰可辨\n② 门店照：门头要包含店名，内景要体现经营范围\n③ 手持证件：法人手持身份证，面部和证件都要清晰\n④ 格式：JPG/PNG，建议每张2MB以内\n⑤ 禁止P图：不要美化、裁剪或添加水印\n\n💡 自然光下拍摄效果最好，避免反光和阴影~' },
   { patterns: [/分销/, /一级分销/, /二级分销/, /分佣/], answer: '微信对分销模式的规定：\n\n① 只允许一级分销（只有直接推荐人获得佣金）\n② 禁止多级分销（A推荐B，B推荐C，A不能从C获利）\n③ 禁止入门费（不能要求缴费才能成为分销员）\n④ 禁止囤货要求\n\n如果被判定为多级分销，需要提供分销后台截图证明仅一级、提交分销规则文档、整改并关闭多级佣金功能~' },
+
+  // ===== 投诉处理专项QA =====
+  { patterns: [/投诉.*怎么回复/, /回复.*投诉/, /投诉.*话术/, /怎么.*回复.*客户/], answer: '投诉回复有严格的时间要求：\n\n⏰ **24小时内**必须首次回复（影响「1日回复率」指标）\n⏰ **72小时内**必须处理完毕并标记"处理完成"\n\n💡 点击顶部工具栏的 🗺️ **申诉指导** 按钮 → **投诉话术** Tab，可以直接获取5种投诉类型的专业回复模板，一键复制粘贴到商户后台！\n\n回复路径：商户平台 → 账户中心 → 消费者投诉 → 回复用户' },
+  { patterns: [/投诉.*指标/, /服务质量/, /考核/, /1日回复率/, /3日.*完成率/, /重复投诉率/], answer: '微信商家服务质量考核三大指标：\n\n① **1日回复率**：投诉产生后24h内首次回复的比例\n② **3日处理完成率**：投诉产生后72h内标记"处理完成"的比例\n③ **重复投诉率**：7日内用户多次投诉的单量/商家结单总量\n\n⚠️ 指标差的商户会被：警告、限制新功能、在支付环节提示风险、限制部分权限\n\n💡 数据取7日前一周平均值，持续保持良好指标很重要！' },
+  { patterns: [/投诉.*继续/, /处理完成.*继续/, /标记.*完成.*又/, /用户.*不满意/], answer: '标记"处理完成"后用户仍可继续投诉：\n\n① 商家标记完成 → 平台通知用户确认\n② 用户不认可 → 可选择"继续投诉"，状态回到"待处理"\n③ 商家需要继续处理\n\n💡 解决方法：\n- 标记完成前先确认用户满意\n- 退款到账后再标记\n- 引导用户在投诉页面确认"已解决"\n- 重复投诉会影响「重复投诉率」指标！' },
+  { patterns: [/投诉.*入口/, /用户.*怎么投诉/, /投诉.*从哪/, /消费者.*投诉.*哪里/], answer: '消费者投诉入口：\n\n用户端：微信 → 我 → 服务 → 钱包 → 账单 → 点击某笔订单 → "对订单有疑惑" → "投诉商家"\n\n商家端查看：\n① 商户平台 pay.weixin.qq.com → 账户中心 → 消费者投诉\n② 微信支付商家助手小程序 → 消费者投诉\n\n💡 建议每天登录查看，及时处理！' },
+
+  // ===== 95017详细QA =====
+  { patterns: [/95017.*怎么打/, /95017.*流程/, /95017.*按几/, /怎么.*转人工/], answer: '95017详细拨打流程：\n\n📞 拨打 95017\n→ 按 **2**（商户服务）\n→ 输入 **商户号** 后按 **#** 确认\n→ 等待转接人工（5-15分钟）\n→ 人工接通后说明来意\n\n⚠️ 验证身份需要：商户号、法人姓名、身份证后四位、银行卡后四位\n\n💡 点击顶部 🗺️ **申诉指导** → **95017话术** Tab，有完整的个性化话术脚本！\n\n工作时间：9:00-22:00' },
+  { patterns: [/95017.*催/, /催审/, /催.*进度/, /加快.*审核/], answer: '95017催审技巧：\n\n① 提交申诉后第2-3天致电\n② 按2→输商户号→转人工\n③ 话术："我是商户号XXX的法人XXX，已提交申诉材料，想咨询审核进度"\n④ 记录客服工号和回复内容\n⑤ 每隔2-3天跟进一次\n\n⚠️ 注意事项：\n- 语气礼貌诚恳，不要激动\n- 不要每天打，会被标记为骚扰\n- 如果客服说在审核中，问预计时间\n- 如果要求补充材料，尽快准备' },
+
+  // ===== 申诉流程QA =====
+  { patterns: [/申诉.*步骤/, /申诉.*流程/, /怎么.*申诉/, /申诉.*怎么做/], answer: '微信商户号申诉完整流程：\n\n**第1步**：处理所有消费者投诉（必须全部"已处理完成"）\n**第2步**：查看违约记录（商户平台→账户中心→违约记录）\n**第3步**：准备材料（身份证正反面+手持照、营业执照、交易凭证等）\n**第4步**：填写申诉表单并提交\n**第5步**：等待审核（1-7个工作日）+ 致电95017跟进\n**第6步**：如被驳回，补充材料后重新申诉\n\n💡 点击顶部 🗺️ **申诉指导** 按钮，可以看到根据您情况定制的详细流程！' },
+  { patterns: [/违约记录/, /怎么.*查.*违规/, /在哪.*看.*处罚/, /处罚.*记录/], answer: '查看违约记录的3种方式：\n\n① **商户平台网页**：pay.weixin.qq.com → 账户中心 → 违约记录 → 商户管理记录\n② **商家助手小程序**：微信搜索"微信支付商家助手" → 风险处理 → 违约处理记录\n③ **商家助手公众号**：关注后 → 我的账号 → 我是商家 → 风险处理\n\n通知渠道：邮件、企业微信群、站内信、公众号\n\n💡 建议截图保存违约记录页面，申诉时参考！' },
+  { patterns: [/整改/, /怎么.*整改/, /整改.*报告/, /整改.*措施/], answer: '整改报告撰写要点：\n\n① **承认问题**：正面承认存在的问题（但不要过度认错）\n② **分析原因**：说明问题产生的具体原因\n③ **已采取措施**：列出已经执行的整改动作\n④ **计划措施**：列出后续将执行的改进计划\n⑤ **防范机制**：说明如何避免再次发生\n\n💡 我们的申诉文案功能会自动帮您生成专业的整改内容，点击顶部 📄 **申诉文案** 按钮即可！' },
+  { patterns: [/手持.*身份证/, /手持照/, /怎么拍.*手持/, /手持.*要求/], answer: '手持身份证照片拍摄要求：\n\n① 法人本人手持身份证**正面**\n② 面部和证件信息都要清晰可见\n③ 自然光下拍摄，避免反光\n④ 不要遮挡证件任何信息\n⑤ 背景干净，不要有杂物\n⑥ 不要P图、不要加滤镜\n⑦ 格式JPG/PNG，建议2MB以内\n\n💡 可以让别人帮忙拍，自拍容易模糊。拍完检查证件上的字是否清晰！' },
+  { patterns: [/appid/, /AppID/, /小程序.*id/, /怎么.*查.*appid/], answer: '小程序AppID查看方法：\n\n① 登录微信公众平台 mp.weixin.qq.com\n② 左侧菜单 → 设置 → 基本设置\n③ 页面上方可以看到AppID（小程序ID）\n④ 格式：wx开头 + 16位字母数字（如wxfd87a8f24a3bc624）\n\n⚠️ 申诉表单中需要填写AppID，审核人员会核实！\n\n💡 如果是公众号，同样在公众平台→设置→基本设置中查看' },
 ]
 
 // 检测是否是"为什么"类问题
@@ -862,14 +895,14 @@ function validateField(key, value) {
 }
 
 /**
- * @deprecated AI-First 架构已废弃此函数。对话控制已统一由 DeepSeek 驱动。
+ * @deprecated AI-First 架构已废弃此函数。对话控制已统一由 AI 驱动。
  * 保留代码供参考，将在 Phase 5 清理阶段移除。
  * 
  * 本地规则引擎处理用户消息（已废弃）
  * @param {string} userMessage 用户输入
  * @param {number} step 当前收集步骤 (0-based)
  * @param {object} data 已收集的数据
- * @returns {{ response: string, nextStep: number, collectedData: object, infoUpdate: object|null, needDeepSeek: boolean, allCollected: boolean }}
+ * @returns {{ response: string, nextStep: number, collectedData: object, infoUpdate: object|null, needAI: boolean, allCollected: boolean }}
  */
 export function processLocal(userMessage, step, data) {
   const d = { ...data }
@@ -901,7 +934,7 @@ export function processLocal(userMessage, step, data) {
     }
   }
 
-  // 2.5 检测是否是对AI本身说话（而非回答业务问题）→ 交给DeepSeek自然回应
+  // 2.5 检测是否是对AI本身说话（而非回答业务问题）→ 交给AI自然回应
   if (isDirectedAtAI(msg)) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
   }
@@ -928,7 +961,7 @@ export function processLocal(userMessage, step, data) {
             const response = `✅ 已更新${fieldDef.label}：${oldValue} → ${newValue}\n\n我们继续~ 当前问题：\n\n${currentField.question}`
             return { response, nextStep: step, collectedData: d, infoUpdate: { key: fieldKey, label: fieldDef.label, value: newValue, group: fieldDef.group, icon: fieldDef.icon }, needDeepSeek: false, allCollected: false }
           } else {
-            // 值相同但消息明确匹配其他字段 → 交给DeepSeek确认，不要存入当前字段
+            // 值相同但消息明确匹配其他字段 → 交给AI确认，不要存入当前字段
             return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
           }
         }
@@ -936,18 +969,18 @@ export function processLocal(userMessage, step, data) {
     }
   }
 
-  // 3. [已移除本地regex跨字段提取] 所有字段提取统一由DeepSeek API完成
+  // 3. [已移除本地regex跨字段提取] 所有字段提取统一由AI API完成
 
   // 3.45 短消息反驳/争辩检测（"不是乱讲""你错了""我没说过""说的不对"等）→ 不是字段数据
   // 排除合法的否定回答（如"没有"用于回答"有没有投诉/申诉历史"）
   if (msg.length < 20 && !isNegativeAnswer(msg) && /^(不是|没有|我没|你错|说的不|搞错|弄错|瞎说|胡说|乱说|放屁|扯淡|骗人|忽悠)/.test(msg)) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
   }
-  // 3.5 检测是否是提问/情绪化表达/复杂消息 → 交给 DeepSeek
+  // 3.5 检测是否是提问/情绪化表达/复杂消息 → 交给 AI
   if (isQuestion(msg) && msg.length < 60) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
   }
-  // 长消息中包含情绪/求助/抱怨且不像在回答问题 → 交给 DeepSeek（DeepSeek负责提取有用数据）
+  // 长消息中包含情绪/求助/抱怨且不像在回答问题 → 交给 AI（AI负责提取有用数据）
   if (msg.length > 15 && /怎么办|急|帮帮|救|害怕|担心|气死|坑|骗|不公平|投诉你|什么意思|搞不懂|太难了/.test(msg) && !isNegativeAnswer(msg)) {
     return { response: null, nextStep: step, collectedData: d, infoUpdate: null, needDeepSeek: true, allCollected: false }
   }
@@ -1293,28 +1326,36 @@ export function processLocal(userMessage, step, data) {
     }
     // 风险评估
     const risk = assessRisk(d)
-    let riskSection = `\n\n📊 初步风险评估：\n\n难度等级：${risk.level}（评分${risk.riskScore}/100）\n预估成功率：${risk.successRate}\n`
-    if (risk.factors.length > 0) riskSection += `关键因素：${risk.factors.join('；')}\n`
-    if (risk.tips.length > 0) riskSection += `\n⚡ 重要提示：\n${risk.tips.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
+    let riskSection = `\n\n**风险评估**：难度${risk.level}（${risk.riskScore}/100），预估成功率${risk.successRate}`
+    if (risk.factors.length > 0) riskSection += `\n关键因素：${risk.factors.join('；')}`
+    if (risk.tips.length > 0) riskSection += `\n${risk.tips.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
 
     // 匹配内置成功案例
     const matchedCases = matchBuiltInCases(d.problem_type, d.industry, d.violation_reason)
     let caseSection = ''
     if (matchedCases.length > 0) {
-      caseSection = `\n\n📚 类似成功案例参考：\n${matchedCases.map(c => `📌 ${c.title} — ${c.success_summary}`).join('\n')}\n`
+      caseSection = `\n\n**类似成功案例**：\n${matchedCases.map(c => `- ${c.title}：${c.success_summary}`).join('\n')}`
     }
 
     // 材料清单
     const checklist = generateMaterialChecklist(d)
     const requiredItems = checklist.filter(c => c.required)
-    let checklistSection = `\n\n📋 您需要准备的材料清单（共${requiredItems.length}项必需）：\n`
+    let checklistSection = `\n\n**需要准备的材料**（${requiredItems.length}项）：\n`
     const groups = {}
     requiredItems.forEach(c => { if (!groups[c.category]) groups[c.category] = []; groups[c.category].push(c.item) })
     for (const [cat, items] of Object.entries(groups)) {
       checklistSection += `\n${cat}：\n${items.map(i => `☐ ${i}`).join('\n')}\n`
     }
 
-    const response = `✅ 信息收集完毕！\n\n您提供的所有信息已经记录完成（共${TOTAL_STEPS}项）：\n\n${dataSummary}${qualityNote}${riskSection}${caseSection}${checklistSection}\n🔒 以上数据仅用于本次生成申诉材料，对话结束后不会用于其他用途。\n\n⏳ 正在为您生成专业的评估报告和申诉材料，请稍候...`
+    // 工具指引
+    const toolGuide = `\n\n**接下来可以用顶部工具栏：**
+📄 **申诉文案** — 生成可直接复制到微信后台的申诉材料
+📋 **投诉材料** — 生成完整申诉文书
+🗺️ **申诉指导** — 流程 + 话术 + 材料清单 + 进度追踪
+
+建议顺序：处理投诉 → 准备材料 → 生成文案 → 提交 → 电话跟进`
+
+    const response = `信息收集完毕（共${TOTAL_STEPS}项）。\n\n${dataSummary}${qualityNote}${riskSection}${caseSection}${checklistSection}${toolGuide}\n\n数据仅用于本次咨询。正在生成评估报告，请稍候...`
     return { response, nextStep, collectedData: d, infoUpdate: allInfoUpdates, needDeepSeek: false, allCollected: true }
   }
 
@@ -1325,34 +1366,28 @@ export function processLocal(userMessage, step, data) {
   let progress = ''
 
   // ===== 特殊处理：业务了解阶段结束后，AI主动确认理解 =====
-  // 当 business_model 是当前正在回答的字段（非自动推断）时显示业务总结
   if (currentField.key === 'business_model' && d.industry) {
     const ind = matchIndustry(d.industry)
     let bizSummary = ''
     if (ind) {
-      bizSummary = `\n\n🎯 我对您业务的理解：\n\n您是做${ind.key}相关业务的，经营模式是${d.business_model}。\n${ind.appealTips ? `\n💡 ${ind.key}行业申诉要点：${ind.appealTips}` : ''}`
+      bizSummary = `\n\n了解了，${ind.key}行业、${d.business_model}。${ind.appealTips ? `这类案件的关键：${ind.appealTips}` : ''}`
     } else {
-      bizSummary = `\n\n🎯 我对您业务的理解：\n\n您的业务是：${d.industry}，经营模式是${d.business_model}。\n\n💡 我会根据您的具体业务类型来定制申诉策略。`
+      bizSummary = `\n\n了解了，${d.industry}、${d.business_model}。`
     }
 
     const confirm = generateConfirmation(currentField.key, finalValue, msg, d)
-    const response = `${confirm}${bizSummary}\n\n好的，我已经了解了您的业务情况！现在我们来看看具体遇到了什么问题。\n\n${nextField.question}`
+    const response = `${confirm}${bizSummary}\n\n业务情况清楚了，看看具体遇到了什么问题。\n\n${nextField.question}`
     return { response, nextStep, collectedData: d, infoUpdate: allInfoUpdates, needDeepSeek: false, allCollected: false }
   }
 
   // ===== 特殊处理：industry 回答后如果 business_model 被自动推断，显示业务总结 =====
   if (currentField.key === 'industry' && d.business_model && autoFilledFields.some(f => f.key === 'business_model')) {
     const ind = matchIndustry(d.industry)
-    let bizSummary = ''
-    const autoFillNote = `\n\n🤖 已自动识别：经营模式 → ${d.business_model}（${reasons.business_model || '根据行业判断'}）\n如果不对，可以在右侧面板点击修改~`
-    if (ind) {
-      bizSummary = `\n\n🎯 我对您业务的理解：\n\n您是做${ind.key}相关业务的。\n${ind.appealTips ? `💡 ${ind.key}行业申诉要点：${ind.appealTips}` : ''}`
-    } else {
-      bizSummary = `\n\n💡 我会根据您的具体业务类型来定制申诉策略。`
-    }
+    const autoFillNote = `\n\n已自动识别经营模式：${d.business_model}（不对的话右侧面板可改）`
+    let bizSummary = ind ? `\n\n${ind.key}行业，${ind.appealTips ? `关键：${ind.appealTips}` : '了解了。'}` : ''
 
     const confirm = generateConfirmation(currentField.key, finalValue, msg, d)
-    const response = `${confirm}${autoFillNote}${bizSummary}\n\n好的，业务情况已了解！接下来看看遇到了什么问题。\n\n${nextField.question}`
+    const response = `${confirm}${autoFillNote}${bizSummary}\n\n业务清楚了，看看遇到了什么问题。\n\n${nextField.question}`
     return { response, nextStep, collectedData: d, infoUpdate: allInfoUpdates, needDeepSeek: false, allCollected: false }
   }
 
@@ -1360,51 +1395,55 @@ export function processLocal(userMessage, step, data) {
   let confirm = generateConfirmation(currentField.key, finalValue, msg, d)
   let nextQuestion = nextField.question
 
-  // 根据已知信息定制后续问题措辞（让用户感觉AI真正理解了情况）
+  // 根据已知信息定制后续问题措辞
   if (d.industry && nextField.key === 'complaint_status') {
     const ind = matchIndustry(d.industry)
     if (ind && ind.commonViolations.length > 0) {
-      nextQuestion = `📢 目前有没有未处理的消费者投诉？\n\n${ind.key}行业常见的投诉类型有：${ind.commonViolations.join('、')}。\n\n没有的话直接说"没有"即可。`
+      nextQuestion = `有没有未处理的消费者投诉？${ind.key}行业常见的有：${ind.commonViolations.join('、')}。没有就说"没有"~`
     }
   }
   if (d.industry && nextField.key === 'violation_reason') {
     const ind = matchIndustry(d.industry)
     if (ind && ind.commonViolations.length > 0) {
-      nextQuestion = `📋 微信官方给出的具体违规原因是什么？\n\n💡 ${ind.key}行业常见违规包括：${ind.commonViolations.join('、')}\n\n请打开「微信支付商家助手」→ 风险处理 → 功能限制记录，把原因复制给我~`
+      nextQuestion = `微信给的违规原因是什么？${ind.key}行业常见：${ind.commonViolations.join('、')}\n\n在「商家助手」→ 风险处理 → 功能限制记录 里看~`
     }
   }
   if (d.problem_type && /冻结/.test(d.problem_type) && nextField.key === 'bank_name') {
-    nextQuestion = `🏦 请提供您的结算账户开户银行名称（如：工商银行、招商银行等）~\n\n⚠️ 资金冻结案件特别重要：拨打95017转3时需要提供商户号+结算账户后四位进行身份验证和催审。`
+    nextQuestion = `收款用的哪个银行？资金冻结案件打95017催审时必须提供~`
   }
   if (d.problem_type && /冻结/.test(d.problem_type) && nextField.key === 'bank_account_last4') {
-    nextQuestion = `💳 请提供您的结算账户号后四位~\n\n⚠️ 资金冻结案件：这个信息是拨打95017催审的必备验证信息！`
+    nextQuestion = `银行卡号后4位？资金冻结打95017催审的必备验证信息~`
   }
 
-  // 自然过渡语 + 阶段性分析（像顾问一样给反馈）
+  // 自然过渡语 + 阶段性分析
   let encouragement = ''
   if (nextStep === 4) {
-    const ptTip = d.problem_type ? `根据您的情况（${d.problem_type}），` : ''
-    encouragement = `\n\n${ptTip}接下来我需要您的一些基本证件信息，这些在申诉材料中是必需的。`
+    encouragement = `\n\n接下来需要几个证件信息，申诉材料必需的。`
   } else if (nextStep === 8) {
-    // 过半时给阶段性分析
     const risk = assessRisk(d)
     let midAnalysis = ''
     if (risk && d.problem_type) {
-      midAnalysis = `\n\n📊 阶段分析：基于目前信息，您的案件难度${risk.level}，预估成功率${risk.successRate}。我们继续完善信息，最终报告会更精准。`
+      midAnalysis = `\n\n目前看，案件难度${risk.level}，预估成功率${risk.successRate}。继续完善信息，最终报告会更精准。`
+      if (risk.riskScore >= 65) {
+        midAnalysis += `\n\n案件难度较高，自己操作有困难的话，也有专业团队可以协助~`
+      }
     }
-    encouragement = midAnalysis || '\n\n基本信息差不多了，再了解几个经营细节就可以为您生成报告了。'
+    const cs = (d.complaint_status || '').toLowerCase()
+    if (cs && !cs.includes('没有') && !cs.includes('无') && !cs.includes('已处理') && !cs.includes('0')) {
+      midAnalysis += `\n\n注意：有未处理投诉是驳回第一大原因。顶部 **申诉指导** → **投诉话术** 有回复模板~`
+    }
+    encouragement = midAnalysis || '\n\n基本信息差不多了，再几个问题就能生成报告。'
   } else if (nextStep === 12) {
-    const remaining = TOTAL_STEPS - nextStep
-    encouragement = `\n\n快要完成了，还有${remaining}个问题~`
+    encouragement = `\n\n快完成了，还剩${TOTAL_STEPS - nextStep}个~`
   } else if (nextStep === 15) {
-    encouragement = '\n\n最后一个问题！之后我就可以为您生成专业的申诉报告了。'
+    encouragement = '\n\n最后一个问题了。'
   }
 
   // 如果有自动推断/提取的字段，在确认消息中提示
   let autoFillNote = ''
   if (allAutoFields.length > 0) {
-    const parts = allAutoFields.map(f => `${f.label} → ${f.value}（${f.reason}）`)
-    autoFillNote = `\n\n🤖 已自动识别：${parts.join('、')}\n如果不对，可以在右侧面板修改~`
+    const parts = allAutoFields.map(f => `${f.label}→${f.value}`)
+    autoFillNote = `\n\n自动识别：${parts.join('、')}（不对可在右侧面板改）`
   }
 
   const response = `${confirm}${autoFillNote}${encouragement}\n\n${nextQuestion}`
@@ -1422,66 +1461,69 @@ function generateConfirmation(key, value, rawInput, data = {}) {
     case 'problem_type': {
       const vl = v.toLowerCase()
       let tip = ''
-      if (vl.includes('冻结')) tip = '资金冻结是较严重的处罚，但通过专业申诉仍有很大恢复空间。建议同时拨打95017转3催审。'
-      else if (vl.includes('关闭') || vl.includes('无法收款')) tip = '支付权限关闭影响较大，但这类案件申诉恢复成功率较高。'
-      else if (vl.includes('限额') || vl.includes('限制')) tip = '收款限额是常见处罚，通常是风控自动触发，申诉相对好处理。'
-      else if (vl.includes('拦截')) tip = '交易拦截通常是阶段性风控措施，及时申诉一般都能解决。'
-      else if (vl.includes('封禁')) tip = '商户号封禁是最严重的处罚，需要准备非常充分的材料，可能需要法人视频认证。'
-      const normalized = wasNormalized ? `（已识别为：${v}）` : ''
-      return `✅ 处罚类型已记录：${v} ${normalized}\n${tip ? `\n💡 ${tip}` : ''}`
+      if (vl.includes('冻结')) tip = '资金冻结比较严重，但专业申诉恢复空间很大，建议同步拨打95017转3催审。'
+      else if (vl.includes('关闭') || vl.includes('无法收款')) tip = '支付关闭影响大，但这类申诉成功率较高。'
+      else if (vl.includes('限额') || vl.includes('限制')) tip = '限额通常是风控自动触发，申诉相对好处理。'
+      else if (vl.includes('拦截')) tip = '交易拦截一般是阶段性风控，及时申诉都能解决。'
+      else if (vl.includes('封禁')) tip = '封禁是最严重的处罚，需要非常充分的材料。'
+      const normalized = wasNormalized ? `（识别为：${v}）` : ''
+      return `收到，${v}${normalized}。${tip ? `\n\n${tip}` : ''}`
     }
     case 'violation_reason': {
       const viol = matchViolation(v)
       const ind = data.industry ? matchIndustry(data.industry) : null
-      let response = `✅ 已记录违规原因：「${v.slice(0, 30)}${v.length > 30 ? '...' : ''}」`
+      let response = `收到，违规原因：「${v.slice(0, 30)}${v.length > 30 ? '...' : ''}」`
       if (viol) {
-        response += `\n\n💡 专业分析：${viol.description}\n📊 预估成功率：${viol.estimated_success_rate}\n🔑 申诉关键：${viol.success_key}`
+        response += `\n\n${viol.description}\n预估成功率：${viol.estimated_success_rate}，关键：${viol.success_key}`
+        if (viol.severity >= 4) {
+          response += `\n\n可以点顶部 **申诉指导** 查看针对性的申诉流程。`
+        }
       }
       if (ind) {
-        response += `\n\nℹ️ ${ind.key}行业申诉要点：${ind.appealTips}`
+        response += `\n\n${ind.key}行业要点：${ind.appealTips}`
       }
       return response
     }
     case 'merchant_id':
-      return `✅ 商户号已记录：${v}${wasNormalized ? '（已自动提取）' : ''}`
+      return `收到，商户号：${v}`
     case 'merchant_name':
-      return `✅ 商户名称已记录：${v}`
+      return `好的，${v}。`
     case 'company_name':
-      return `✅ 公司名称已记录：${v}`
+      return `好的，${v}。`
     case 'license_no':
-      return `✅ 信用代码已记录${v.length === 18 ? '（18位统一社会信用代码）' : ''}。`
+      return `收到${v.length === 18 ? '，18位信用代码' : ''}。`
     case 'legal_name':
-      return `✅ 法人姓名已记录：${v}`
+      return `好的，${v}。`
     case 'legal_id_last4':
-      return `✅ 身份证后四位已记录（****${v}）。${wasNormalized ? '（已自动提取后四位）' : ''}`
+      return `收到，****${v}。`
     case 'industry': {
       const ind = matchIndustry(v)
-      if (ind) return `👍 明白了，您是做${ind.key}相关业务的！我对这个行业的申诉案例比较熟悉~`
-      return `👍 明白了，您的业务是：${v}。我会根据您的具体情况来制定申诉方案。`
+      if (ind) return `${ind.key}行业，了解了，这类案件我比较熟悉~`
+      return `${v}，了解了。`
     }
     case 'business_model':
-      return `✅ 经营模式已记录。`
+      return `好的。`
     case 'complaint_status': {
-      if (/没有|无|暂无/.test(v)) return `✅ 好的，当前没有未处理投诉。\n\n💡 这对申诉非常有利！投诉清零是申诉通过的重要条件之一。`
-      return `✅ 投诉情况已记录。\n\n⚠️ 建议：如果有未处理投诉，请优先处理完再提交申诉，投诉率过高会直接影响申诉结果。`
+      if (/没有|无|暂无/.test(v)) return `没有投诉，这对申诉很有利。`
+      return `收到。有未处理投诉的话，建议优先处理完再提交申诉。\n\n顶部 **申诉指导** → **投诉话术** 有专业回复模板可以直接用~`
     }
     case 'refund_policy': {
-      if (/没有|暂无/.test(v)) return `✅ 已记录。\n\n💡 没关系！我会在申诉材料中帮您拟定一份专业的退款政策，这是申诉材料的重要组成部分。`
-      return `✅ 退款政策已记录。`
+      if (/没有|暂无/.test(v)) return `没关系，我会在申诉材料里帮您拟一份退款政策。`
+      return `好的。`
     }
     case 'contact_phone':
-      return `✅ 联系电话已记录：${v}${wasNormalized ? '（已自动提取）' : ''}\n\n💡 请保持电话畅通，微信审核可能会电话回访。`
+      return `收到，${v}。保持畅通，审核可能会电话回访。`
     case 'bank_name':
-      return `✅ 开户银行已记录：${v}`
+      return `好的，${v}。`
     case 'bank_account_last4':
-      return `✅ 结算账户后四位已记录（****${v}）。${wasNormalized ? '（已自动提取后四位）' : ''}`
+      return `收到，****${v}。`
     case 'appeal_history': {
-      if (/首次|没有|无|没/.test(v)) return `✅ 首次申诉。\n\n💡 首次申诉通常成功率更高，关键是一次性把材料准备充分！`
-      if (/驳回|拒绝|失败|不通过/.test(v)) return `✅ 有被驳回记录。\n\n⚠️ 注意：二次申诉需要比首次更充分的材料。建议先拨打95017转3查询具体驳回原因，我们会针对性优化材料。`
-      return `✅ 申诉历史已记录。`
+      if (/首次|没有|无|没/.test(v)) return `首次申诉，成功率相对更高，关键是一次性把材料备齐。`
+      if (/驳回|拒绝|失败|不通过/.test(v)) return `有驳回记录。二次申诉需要更充分的材料，建议先打95017转3问清驳回原因。\n\n顶部 **申诉指导** → **95017话术** 有完整话术脚本~`
+      return `好的。`
     }
     default:
-      return `✅ 已记录。`
+      return `好的。`
   }
 }
 
@@ -1593,7 +1635,7 @@ export function buildCollectionContext(data, currentStep) {
 }
 
 /**
- * 构建 DeepSeek 生成报告所需的上下文 prompt
+ * 构建 AI 生成报告所需的上下文 prompt
  * @param {object} collectedData 收集的商户信息
  * @param {Array} successCases 相关成功案例（从知识库查询）
  */

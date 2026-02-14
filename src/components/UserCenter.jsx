@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import UserAvatar from './UserAvatar'
 
 const TYPE_LABELS = {
   chat: '对话',
@@ -7,6 +8,9 @@ const TYPE_LABELS = {
   report: '报告生成',
   report_retry: '报告重试',
   appeal_text: '申诉文案',
+  complaint_doc: '投诉材料整理',
+  complaint_reply: '投诉回复话术',
+  appeal_guide: '申诉流程指导',
   deep_analysis: '深度分析',
 }
 
@@ -14,6 +18,7 @@ export default function UserCenter({ user, onClose, onRecharge, getAuthHeaders }
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('usage')
+  const [appealRecords, setAppealRecords] = useState(null)
 
   useEffect(() => {
     if (user?.id) loadData()
@@ -27,6 +32,15 @@ export default function UserCenter({ user, onClose, onRecharge, getAuthHeaders }
       setData(d)
     } catch {}
     finally { setLoading(false) }
+  }
+
+  async function loadAppealRecords() {
+    if (appealRecords) return
+    try {
+      const res = await fetch(`/api/user/${user.id}/appeal-records`, { headers: getAuthHeaders() })
+      const d = await res.json()
+      setAppealRecords(d.records || [])
+    } catch { setAppealRecords([]) }
   }
 
   function fmtTime(d) {
@@ -55,11 +69,7 @@ export default function UserCenter({ user, onClose, onRecharge, getAuthHeaders }
         {/* Header */}
         <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
+            <UserAvatar name={user?.nickname || '用户'} size={40} style={{ borderRadius: 12 }} />
             <div>
               <h2 className="text-[15px] font-semibold text-gray-900">{user?.nickname || '用户中心'}</h2>
               <p className="text-[10px] text-gray-400">{user?.phone}</p>
@@ -112,11 +122,56 @@ export default function UserCenter({ user, onClose, onRecharge, getAuthHeaders }
             className={`flex-1 py-2.5 text-xs font-medium transition-all ${tab === 'recharge' ? 'text-[#07C160] border-b-2 border-[#07C160]' : 'text-gray-400'}`}>
             充值记录
           </button>
+          <button onClick={() => { setTab('appeals'); loadAppealRecords() }}
+            className={`flex-1 py-2.5 text-xs font-medium transition-all ${tab === 'appeals' ? 'text-[#07C160] border-b-2 border-[#07C160]' : 'text-gray-400'}`}>
+            申诉记录
+          </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {tab === 'usage' ? (
+          {tab === 'appeals' ? (
+            <div className="px-4 py-3">
+              {!appealRecords ? (
+                <div className="text-center py-10"><svg className="w-6 h-6 mx-auto animate-spin text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+              ) : appealRecords.length === 0 ? (
+                <p className="text-center text-xs text-gray-400 py-10">暂无申诉记录</p>
+              ) : (
+                <div className="space-y-2">
+                  {appealRecords.map((r, i) => {
+                    const statusColors = {
+                      generated: 'bg-gray-50 text-gray-500', submitted: 'bg-blue-50 text-blue-600',
+                      under_review: 'bg-amber-50 text-amber-600', approved: 'bg-green-50 text-green-600',
+                      rejected: 'bg-red-50 text-red-500', resubmitted: 'bg-indigo-50 text-indigo-600',
+                    }
+                    return (
+                      <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${statusColors[r.status] || statusColors.generated}`}>{r.label}</span>
+                            {r.merchant_name && <span className="text-[11px] font-medium text-gray-700 truncate">{r.merchant_name}</span>}
+                          </div>
+                          <span className="text-[10px] text-gray-300 flex-shrink-0 ml-2">{fmtTime(r.created_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                          {r.problem_type && <span>{r.problem_type}</span>}
+                          {r.problem_type && r.violation_reason && <span>·</span>}
+                          {r.violation_reason && <span className="truncate">{r.violation_reason}</span>}
+                        </div>
+                        {r.rejection_reason && (
+                          <p className="text-[10px] text-red-500 mt-1 bg-red-50 rounded px-2 py-1">驳回: {r.rejection_reason}</p>
+                        )}
+                        {r.resubmit_count > 0 && (
+                          <p className="text-[10px] text-amber-500 mt-0.5">已重新提交 {r.resubmit_count} 次</p>
+                        )}
+                        {r.submitted_at && <p className="text-[9px] text-gray-300 mt-0.5">提交: {fmtTime(r.submitted_at)}{r.result_at ? ` · 结果: ${fmtTime(r.result_at)}` : ''}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : tab === 'usage' ? (
             <div className="px-4 py-3">
               {(!data?.usage || data.usage.length === 0) ? (
                 <p className="text-center text-xs text-gray-400 py-10">暂无消费记录</p>

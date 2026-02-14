@@ -25,18 +25,25 @@ import {
   confirmRechargeOrder, rejectRechargeOrder, getPendingRechargeCount,
   createSuccessCase, getSuccessCases, getSuccessCaseById, updateSuccessCase, deleteSuccessCase, findSimilarCases,
   recordTokenUsage, getUserTokenUsage, getUserTokenStats, getAllTokenUsage, getTokenUsageStats,
-  saveAppealText, getAppealText,
+  saveAppealText, getAppealText, updateAppealStatus, getAppealStats,
   getAllAIRules, getAIRuleById, createAIRule, updateAIRuleStatus, updateAIRuleContent, deleteAIRule, getAIRuleStats,
   getConversationAnalyses, getConversationAnalysisById, getAnalysisStats, getQualityTopAndLow,
   logFieldChange, getFieldChangeLog,
+  getAIModels, getAIModelById, getActiveAIModel, createAIModel, updateAIModel, setActiveAIModel, deleteAIModel as deleteAIModelDB, updateModelHealth, getAIModelsWithHealth,
   getRuleChangeLog, getLearningMetrics, getUnanalyzedSessions,
   getTagStats, getConversationTags,
   getKnowledgeClusters, getClusterStats,
   getEngineHealth, getExperiments,
   createProduct, updateProduct, deleteProduct, getProductById, getProducts, getProductStats,
   incrementProductMetric, getRecommendations, updateRecommendationStatus, getRecommendationStats,
+  getDeepseekAccounts, getDeepseekAccountById, createDeepseekAccount, updateDeepseekAccount, deleteDeepseekAccount, updateDeepseekBalance,
+  createContactCard, updateContactCard, deleteContactCard, getContactCardById, getContactCards, getActiveContactCards, incrementCardMetric,
+  logAIActivity, getAIActivityLog, getAIActivityStats,
+  createOrder, getOrderByNo, getOrderById, getUserOrders, updateOrderStatus, appendServiceMessage, getOrderServiceMessages,
+  fixEncryptedData,
+  saveComplaintDoc, getComplaintDoc,
 } from './db.js'
-import { getWelcomeMessage, chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction } from './ai.js'
+import { getWelcomeMessage, chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction, getAIConfig } from './ai.js'
 import { buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep } from './localAI.js'
 import { calculateCost } from './tokenizer.js'
 import {
@@ -50,7 +57,14 @@ import {
   loadProductCatalogForPrompt, invalidateProductCache,
   aiOptimizeProduct, batchOptimizeProducts,
   getSmartRecommendations, updateUserInterestFromConversation, parseProductRecommendations,
+  aiAutoCreateProducts, aiSuggestNewProducts, aiRecommendContactCard,
+  aiAssessRisk, aiGenerateContactCard,
+  aiBargain, aiGenerateVirtualPersona,
 } from './mall.js'
+import { checkAllModels, checkSingleModel, autoSwitchIfNeeded, startHealthScheduler, callWithFallback } from './modelHealth.js'
+import { apiMetricsMiddleware, startMonitorScheduler, stopMonitorScheduler, getMonitorStatus, getHealthSummary, getAlerts, acknowledgeAlert, clearAlerts, triggerHealthCheck, resetApiMetrics } from './monitor.js'
+import { runBackup, startBackupScheduler, stopBackupScheduler, getBackupStatus, deleteBackupFile } from './backup.js'
+import { createPayment, handleWechatNotify, handleAlipayNotify, handleEpayNotify, handleCodePayNotify, queryPaymentStatus, getPaymentChannels, generateOutTradeNo } from './payment.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -83,7 +97,7 @@ app.use(cors({
   credentials: true,
 }))
 
-// 全局速率限制
+// 全局速率限制（管理员跳过：后台并行请求多，不应被限速）
 app.use(rateLimit({
   windowMs: 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX || '100'),
@@ -91,6 +105,22 @@ app.use(rateLimit({
   legacyHeaders: false,
   message: { error: '请求过于频繁，请稍后再试' },
   validate: { xForwardedForHeader: false },
+  skip: (req) => {
+    // 管理后台路由已有 requireAdmin 中间件保护，无需全局限速
+    // 避免 JWT 过期/密钥变更导致管理员被误限速的死锁
+    if (req.path.startsWith('/api/admin/') && req.path !== '/api/admin/login') {
+      return true
+    }
+    // 管理员浏览前台页面时也跳过限速
+    try {
+      const auth = req.headers.authorization
+      if (auth && auth.startsWith('Bearer ')) {
+        const decoded = jwt.verify(auth.slice(7), JWT_SECRET)
+        return decoded.role === 'admin'
+      }
+    } catch {}
+    return false
+  },
 }))
 
 // 聊天接口单独限速
@@ -111,7 +141,17 @@ const authLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
 })
 
+// 微信支付回调需要原始body，必须在json解析之前注册
+app.use('/api/payment/wechat/notify', express.raw({ type: 'application/json' }))
+// 支付宝/易支付/码支付回调使用表单格式
+app.use('/api/payment/alipay/notify', express.urlencoded({ extended: true }))
+app.use('/api/payment/epay/notify', express.urlencoded({ extended: true }))
+app.use('/api/payment/codepay/notify', express.urlencoded({ extended: true }))
+
 app.use(express.json({ limit: '1mb' }))
+
+// API 响应时间监控中间件
+app.use(apiMetricsMiddleware)
 
 // 静态文件
 const distPath = path.join(__dirname, '..', 'dist')
@@ -257,24 +297,27 @@ app.put('/api/user/:id/api-mode', requireUser, async (req, res) => {
 
 // ========== 聊天 API ==========
 
-app.post('/api/chat', chatLimiter, async (req, res) => {
+app.post('/api/chat', chatLimiter, optionalUser, async (req, res) => {
   try {
-    let { sessionId, content, userId } = req.body
+    let { sessionId, content, userId: bodyUserId } = req.body
     if (!content || !content.trim()) {
       return res.status(400).json({ error: '消息内容不能为空' })
     }
 
-    // 获取用户信息（如果已登录）
+    // 优先使用JWT验证的userId，兜底用body参数（向后兼容）
+    const userId = req.userId || bodyUserId
     let user = null
     if (userId) {
       user = await getUserById(userId)
     }
 
-    // ===== 强制付费校验：没有付费能力不允许使用任何聊天功能 =====
+    // ===== 付费校验：免费模型跳过余额检查 =====
     if (!user) {
       return res.status(401).json({ error: '请先登录后再使用', needLogin: true })
     }
-    const hasPayment = (user.api_mode === 'custom' && user.custom_api_key) || (user.api_mode === 'official' && parseFloat(user.balance) > 0)
+    const activeModel = await getActiveAIModel()
+    const isModelFree = activeModel?.is_free === 1
+    const hasPayment = (user.api_mode === 'custom' && user.custom_api_key) || (user.api_mode === 'official' && (parseFloat(user.balance) > 0 || isModelFree))
     if (!hasPayment) {
       return res.status(402).json({
         error: '⚠️ 您的账户余额不足，无法使用咨询服务。\n\n请先充值后再继续对话。',
@@ -287,9 +330,9 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
     let isOfficialMode = false
     if (user.api_mode === 'custom' && user.custom_api_key) {
       apiKeyToUse = user.custom_api_key
-    } else if (user.api_mode === 'official' && parseFloat(user.balance) > 0) {
+    } else if (user.api_mode === 'official' && (parseFloat(user.balance) > 0 || isModelFree)) {
       apiKeyToUse = null
-      isOfficialMode = true
+      isOfficialMode = !isModelFree // 免费模型不扣费
     }
 
     let isNew = false
@@ -325,8 +368,8 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
     if (aiResult && aiResult.error) {
       // AI 调用返回了具体错误
       const errMap = {
-        'API_KEY_INVALID': '⚠️ **AI 服务配置异常（API Key 无效）**\n\n请联系管理员在后台「系统配置 → AI配置」中更新有效的 DeepSeek API Key。\n\n如果您使用的是自定义 API Key，请在「API设置」中检查您的 Key 是否正确。',
-        'API_BALANCE_INSUFFICIENT': '⚠️ **DeepSeek API 余额不足**\n\n平台的 AI 服务额度已用完，请联系管理员充值 DeepSeek API 额度。',
+        'API_KEY_INVALID': '⚠️ **AI 服务配置异常（API Key 无效）**\n\n请联系管理员在后台「系统配置 → AI配置」中更新有效的 API Key。\n\n如果您使用的是自定义 API Key，请在「API设置」中检查您的 Key 是否正确。',
+        'API_BALANCE_INSUFFICIENT': '⚠️ **AI API 余额不足**\n\n平台的 AI 服务额度已用完，请联系管理员充值 API 额度。',
         'API_RATE_LIMIT': '⚠️ **请求过于频繁**\n\n当前 AI 服务请求量较大，请稍等几秒后重新发送消息。',
         'NETWORK_ERROR': '⚠️ **网络连接超时**\n\n无法连接到 AI 服务器，请稍后重试。如果持续超时，请联系管理员检查服务器网络。',
       }
@@ -347,7 +390,7 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
       }
     } else {
       // AI 返回 null（无 API Key 配置或网络彻底断开）
-      responseText = `⚠️ **AI 服务未配置**\n\n系统尚未配置 DeepSeek API Key，请联系管理员在后台「系统配置」中完成配置。`
+      responseText = `⚠️ **AI 服务未配置**\n\n系统尚未配置 AI API Key，请联系管理员在后台「系统配置 → AI配置」中配置服务商和API Key。`
     }
 
     await addMessage(sessionId, 'assistant', responseText)
@@ -431,7 +474,7 @@ app.get('/api/sessions/:id/field-history', optionalUser, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: '获取变更历史失败' }) }
 })
 
-// ========== 获取AI分析摘要（基于已收集数据本地生成，不消耗DeepSeek） ==========
+// ========== 获取AI分析摘要（基于已收集数据本地生成，不消耗AI Token） ==========
 app.get('/api/sessions/:id/analysis', optionalUser, async (req, res) => {
   try {
     const session = await getSession(req.params.id)
@@ -490,7 +533,7 @@ app.get('/api/sessions/:id/analysis', optionalUser, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: '分析失败' }) }
 })
 
-// ========== DeepSeek 智能分析（基于收集数据 + 聊天记录，统一输出全部分析） ==========
+// ========== AI 智能深度分析（基于收集数据 + 聊天记录，统一输出全部分析） ==========
 app.get('/api/sessions/:id/deep-analysis', optionalUser, async (req, res) => {
   try {
     const session = await getSession(req.params.id)
@@ -541,19 +584,21 @@ app.get('/api/sessions/:id/deep-analysis', optionalUser, async (req, res) => {
         const quota = await checkDeepAnalysisQuota(user.id)
         isMemberFree = quota.isMember && quota.allowed
       } else if (user?.api_mode === 'official') {
+        const activeModelDA = await getActiveAIModel()
+        const isModelFreeDA = activeModelDA?.is_free === 1
         const quota = await checkDeepAnalysisQuota(user.id)
         if (quota.isMember && quota.allowed) {
           // 会员用户且未超月限额：免费
-          apiKey = await getSystemConfig('deepseek_api_key')
+          apiKey = (await getAIConfig()).apiKey
           isMemberFree = true
           isOfficialMode = true
         } else if (quota.isMember && !quota.allowed) {
           // 会员但已用完本月额度
           return res.json({ deepAnalysis: null, localAnalysis, reason: 'quota_exceeded', quota: { used: quota.used, limit: quota.limit } })
-        } else if (parseFloat(user.balance) > 0) {
-          // 非会员但有余额：按token收费
-          apiKey = await getSystemConfig('deepseek_api_key')
-          isOfficialMode = true
+        } else if (parseFloat(user.balance) > 0 || isModelFreeDA) {
+          // 非会员但有余额 或 使用免费模型：允许
+          apiKey = (await getAIConfig()).apiKey
+          isOfficialMode = !isModelFreeDA // 免费模型不扣费
         } else {
           return res.json({ deepAnalysis: null, localAnalysis, reason: 'no_balance' })
         }
@@ -562,7 +607,11 @@ app.get('/api/sessions/:id/deep-analysis', optionalUser, async (req, res) => {
     if (!apiKey) {
       // 没有用户或用户无付费能力 → 不允许使用系统key白嫖
       if (!chargeUser) return res.json({ deepAnalysis: null, localAnalysis, reason: 'login_required' })
-      apiKey = await getSystemConfig('deepseek_api_key')
+      // 自定义Key用户但未配置Key → 不应回退到系统Key
+      if (chargeUser.api_mode === 'custom' && !chargeUser.custom_api_key) {
+        return res.json({ deepAnalysis: null, localAnalysis, reason: 'no_custom_key' })
+      }
+      apiKey = (await getAIConfig()).apiKey
     }
     if (!apiKey) return res.json({ deepAnalysis: null, localAnalysis, reason: 'no_api_key' })
 
@@ -826,26 +875,26 @@ ${(d.problem_type || '').includes('冻结') || (d.problem_type || '').includes('
     // 先发送本地分析（立即可用）
     res.write(`data: ${JSON.stringify({ type: 'local', localAnalysis })}\n\n`)
 
-    const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
+    const aiCfg = await getAIConfig()
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 60000)
 
-    const apiRes = await fetch('https://api.deepseek.com/chat/completions', {
+    const apiRes = await fetch(aiCfg.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: analysisPrompt }], temperature: 0.5, max_tokens: 6000, stream: true }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey || aiCfg.apiKey}` },
+      body: JSON.stringify({ model: aiCfg.model, messages: [{ role: 'user', content: analysisPrompt }], temperature: 0.5, max_tokens: 6000, stream: true, stream_options: { include_usage: true } }),
       signal: controller.signal,
     })
     clearTimeout(timeout)
 
     if (!apiRes.ok) {
-      console.error('DeepSeek analysis stream error:', apiRes.status)
+      console.error(`[${aiCfg.provider}] analysis stream error:`, apiRes.status)
       res.write(`data: ${JSON.stringify({ type: 'error', reason: `api_error_${apiRes.status}` })}\n\n`)
       res.write('data: [DONE]\n\n')
       return res.end()
     }
 
-    // 流式读取 DeepSeek 响应
+    // 流式读取 AI 响应
     let fullContent = ''
     let inputTokens = 0, outputTokens = 0
     const reader = apiRes.body.getReader()
@@ -992,8 +1041,8 @@ async function simulateTypingSSE(res, text, chunkSize = 3, delayMs = 18) {
   }
 }
 
-// ========== DeepSeek 流式转发工具函数 ==========
-async function pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType }) {
+// ========== AI 流式转发工具函数 ==========
+async function pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType }) {
   const reader = streamResult.body.getReader()
   const decoder = new TextDecoder()
   let fullContent = ''
@@ -1057,19 +1106,23 @@ async function pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, ses
 }
 
 // ========== 流式聊天 SSE ==========
-app.post('/api/chat/stream', async (req, res) => {
+app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
   try {
-    const { content, sessionId: inSessionId, userId } = req.body
+    const { content, sessionId: inSessionId, userId: bodyUserId } = req.body
     if (!content?.trim()) return res.status(400).json({ error: '消息不能为空' })
     if (content.length > 5000) return res.status(400).json({ error: '消息过长，请缩短后重试' })
 
+    // 优先使用JWT验证的userId，兜底用body参数（向后兼容）
+    const userId = req.userId || bodyUserId
     const user = userId ? await getUserById(userId) : null
 
-    // ===== 强制付费校验：没有付费能力不允许使用任何聊天功能 =====
+    // ===== 付费校验：免费模型跳过余额检查 =====
     if (!user) {
       return res.status(401).json({ error: '请先登录后再使用', needLogin: true })
     }
-    const hasPayment = (user.api_mode === 'custom' && user.custom_api_key) || (user.api_mode === 'official' && parseFloat(user.balance) > 0)
+    const activeModelStream = await getActiveAIModel()
+    const isModelFreeStream = activeModelStream?.is_free === 1
+    const hasPayment = (user.api_mode === 'custom' && user.custom_api_key) || (user.api_mode === 'official' && (parseFloat(user.balance) > 0 || isModelFreeStream))
     if (!hasPayment) {
       return res.status(402).json({
         error: '⚠️ 您的账户余额不足，无法使用咨询服务。\n\n请先充值后再继续对话。',
@@ -1116,7 +1169,7 @@ app.post('/api/chat/stream', async (req, res) => {
     const currentStep = session?.step || 0
     const collectedData = session?.collected_data || {}
 
-    // 检查付费能力（DeepSeek 报告阶段需要）
+    // 检查付费能力（AI报告阶段需要）
     let apiKeyToUse = null
     let canUseAI = false
     let isOfficialMode = false
@@ -1125,10 +1178,10 @@ app.post('/api/chat/stream', async (req, res) => {
         apiKeyToUse = user.custom_api_key
         canUseAI = true
       } else if (user.api_mode === 'official') {
-        if (parseFloat(user.balance) > 0) {
+        if (parseFloat(user.balance) > 0 || isModelFreeStream) {
           apiKeyToUse = null
           canUseAI = true
-          isOfficialMode = true
+          isOfficialMode = !isModelFreeStream // 免费模型不扣费
         }
       }
     }
@@ -1151,7 +1204,7 @@ app.post('/api/chat/stream', async (req, res) => {
     // ===== AI-First: 用 _collection_complete 标记判断阶段 =====
     const isCollectionDone = collectedData._collection_complete === true
     if (!isCollectionDone) {
-      // ===== AI-First: 所有消息统一由 DeepSeek 驱动对话 + 并行字段提取 =====
+      // ===== AI-First: 所有消息统一由 AI 驱动对话 + 并行字段提取 =====
       if (!canUseAI) {
         const errMsg = '⚠️ 余额不足，无法使用AI咨询服务。请充值后继续。'
         safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg, needRecharge: true })}\n\n`)
@@ -1188,7 +1241,7 @@ app.post('/api/chat/stream', async (req, res) => {
           const firstByteMs = Date.now() - stepStartTime
           safeSend(`data: ${JSON.stringify({ type: 'timing', firstByteMs })}\n\n`)
 
-          const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat_collection' })
+          const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat_collection' })
           if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
 
           const totalMs = Date.now() - stepStartTime
@@ -1314,20 +1367,35 @@ app.post('/api/chat/stream', async (req, res) => {
             } catch (e) { console.error('Completeness check error (non-fatal):', e.message) }
           }
         } catch (err) {
-          console.error('DeepSeek collection error:', err.message)
-          const errMap = {
-            'API_KEY_INVALID': '⚠️ AI 服务配置异常（API Key 无效）',
-            'API_BALANCE_INSUFFICIENT': '⚠️ DeepSeek API 余额不足',
-            'API_RATE_LIMIT': '⚠️ 请求过于频繁，请稍后重试',
-            'NETWORK_ERROR': '⚠️ 网络连接超时',
-            'NO_API_KEY': '⚠️ AI 服务未配置 API Key',
+          console.error('AI collection error:', err.message)
+          // 实时fallback：标记故障+尝试自动切换+重试
+          if (!apiKeyToUse) { // 官方模式才fallback，自定义Key用户不管
+            const active = await getActiveAIModel()
+            if (active) await updateModelHealth(active.id, { status: 'error', error: err.message })
+            const sw = await autoSwitchIfNeeded()
+            if (sw?.switched) {
+              safeSend(`data: ${JSON.stringify({ type: 'chunk', content: `\n\n⚡ 模型故障，已自动切换到 ${sw.model}，正在重试...\n\n` })}\n\n`)
+              try {
+                const retryMessages = await getMessages(sessionId)
+                const retryStream = await streamChatWithAI(retryMessages, null, collectedData)
+                const retryContent = await pipeAIStream(res, retryStream, { isOfficialMode: !isModelFreeStream, user, sessionId, usageType: 'chat_collection' })
+                if (retryContent) await addMessage(sessionId, 'assistant', retryContent)
+              } catch (retryErr) {
+                console.error('Fallback retry also failed:', retryErr.message)
+                safeSend(`data: ${JSON.stringify({ type: 'error', content: '⚠️ 所有AI模型暂时不可用，请稍后重试' })}\n\n`)
+              }
+            } else {
+              const errMap = { 'API_KEY_INVALID': '⚠️ AI 服务配置异常', 'API_BALANCE_INSUFFICIENT': '⚠️ AI API 余额不足', 'API_RATE_LIMIT': '⚠️ 请求过于频繁', 'NETWORK_ERROR': '⚠️ 网络连接超时', 'NO_API_KEY': '⚠️ AI 服务未配置' }
+              safeSend(`data: ${JSON.stringify({ type: 'error', content: errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）` })}\n\n`)
+            }
+          } else {
+            const errMap = { 'API_KEY_INVALID': '⚠️ AI 服务配置异常（API Key 无效）', 'API_BALANCE_INSUFFICIENT': '⚠️ AI API 余额不足', 'API_RATE_LIMIT': '⚠️ 请求过于频繁，请稍后重试', 'NETWORK_ERROR': '⚠️ 网络连接超时', 'NO_API_KEY': '⚠️ AI 服务未配置 API Key' }
+            safeSend(`data: ${JSON.stringify({ type: 'error', content: errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）` })}\n\n`)
           }
-          const errMsg = errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）`
-          safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
         }
       }
     } else {
-      // ===== 报告已生成阶段：后续对话全部走 DeepSeek =====
+      // ===== 报告已生成阶段：后续对话全部走 AI =====
       if (!canUseAI) {
         const errMsg = '⚠️ **余额不足，无法继续AI对话。** 请先充值后再继续。'
         await addMessage(sessionId, 'assistant', errMsg)
@@ -1341,26 +1409,44 @@ app.post('/api/chat/stream', async (req, res) => {
             const reportPrompt = buildReportPrompt(collectedData, similarCases)
             const reportMessages = [{ role: 'user', content: reportPrompt }]
             const streamResult = await streamChatWithAI(reportMessages, apiKeyToUse)
-            const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'report_retry' })
+            const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'report_retry' })
             if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
           } else {
             const allMessages = await getMessages(sessionId)
             const streamResult = await streamChatWithAI(allMessages, apiKeyToUse, collectedData)
-            const fullContent = await pipeDeepSeekStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat' })
+            const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat' })
             if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
           }
         } catch (err) {
-          console.error('DeepSeek post-report error:', err.message)
-          const errMap = {
-            'API_KEY_INVALID': '⚠️ AI 服务配置异常（API Key 无效）',
-            'API_BALANCE_INSUFFICIENT': '⚠️ DeepSeek API 余额不足',
-            'API_RATE_LIMIT': '⚠️ 请求过于频繁，请稍后重试',
-            'NETWORK_ERROR': '⚠️ 网络连接超时',
-            'NO_API_KEY': '⚠️ AI 服务未配置 API Key',
+          console.error('AI post-report error:', err.message)
+          // 实时fallback
+          if (!apiKeyToUse) {
+            const active = await getActiveAIModel()
+            if (active) await updateModelHealth(active.id, { status: 'error', error: err.message })
+            const sw = await autoSwitchIfNeeded()
+            if (sw?.switched) {
+              safeSend(`data: ${JSON.stringify({ type: 'chunk', content: `\n\n⚡ 已自动切换到 ${sw.model}，重试中...\n\n` })}\n\n`)
+              try {
+                const retryMsgs = await getMessages(sessionId)
+                const retryStream = await streamChatWithAI(retryMsgs, null, collectedData)
+                const retryContent = await pipeAIStream(res, retryStream, { isOfficialMode: !isModelFreeStream, user, sessionId, usageType: 'chat' })
+                if (retryContent) await addMessage(sessionId, 'assistant', retryContent)
+              } catch (retryErr) {
+                const errMsg = '⚠️ 所有AI模型暂时不可用，请稍后重试'
+                await addMessage(sessionId, 'assistant', errMsg)
+                safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
+              }
+            } else {
+              const errMsg = `⚠️ AI 服务暂时不可用（${err.message}）`
+              await addMessage(sessionId, 'assistant', errMsg)
+              safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
+            }
+          } else {
+            const errMap = { 'API_KEY_INVALID': '⚠️ API Key 无效', 'API_BALANCE_INSUFFICIENT': '⚠️ API 余额不足', 'API_RATE_LIMIT': '⚠️ 请求过于频繁', 'NETWORK_ERROR': '⚠️ 网络超时', 'NO_API_KEY': '⚠️ 未配置 API Key' }
+            const errMsg = errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）`
+            await addMessage(sessionId, 'assistant', errMsg)
+            safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
           }
-          const errMsg = errMap[err.message] || `⚠️ AI 服务暂时不可用（${err.message}）`
-          await addMessage(sessionId, 'assistant', errMsg)
-          safeSend(`data: ${JSON.stringify({ type: 'error', content: errMsg })}\n\n`)
         }
       }
     }
@@ -1435,14 +1521,16 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
     const user = await getUserById(userId)
     if (!user) return res.status(404).json({ error: '用户不存在' })
 
-    // 检查付费能力
+    // 检查付费能力（免费模型跳过余额检查）
     let apiKeyToUse = null
     let isOfficialMode = false
+    const activeModelAppeal = await getActiveAIModel()
+    const isModelFreeAppeal = activeModelAppeal?.is_free === 1
     if (user.api_mode === 'custom' && user.custom_api_key) {
       apiKeyToUse = user.custom_api_key
-    } else if (user.api_mode === 'official' && parseFloat(user.balance) > 0) {
+    } else if (user.api_mode === 'official' && (parseFloat(user.balance) > 0 || isModelFreeAppeal)) {
       apiKeyToUse = null
-      isOfficialMode = true
+      isOfficialMode = !isModelFreeAppeal
     } else {
       return res.status(402).json({ error: '余额不足，请先充值后再生成申诉文案', needRecharge: true })
     }
@@ -1459,10 +1547,9 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
       if (existing) return res.json({ appealText: existing, cached: true })
     }
 
-    const apiKey = apiKeyToUse || await getSystemConfig('deepseek_api_key')
+    const appealAiCfg = await getAIConfig()
+    const apiKey = apiKeyToUse || appealAiCfg.apiKey
     if (!apiKey) return res.status(500).json({ error: 'AI服务未配置' })
-
-    const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
 
     // 构建违规类型专项辩护策略
     const violationStrategies = {
@@ -1473,6 +1560,8 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
       '欺诈': '辩护要点：①展示商品/服务真实交付证据 ②如宣传有偏差，承认并已修正所有宣传材料 ③主动为不满客户全额退款 ④更新服务协议增加消费者知情权条款',
       '洗钱': '辩护要点：①提供完整业务合同+海关报关单+外汇许可 ②说明资金流向清晰可追溯、与真实贸易匹配 ③公司已通过反洗钱合规审查 ④大额交易有合同支撑',
       '交易异常': '辩护要点：①解释交易波动原因（季节性/促销/新品上市） ②提供交易对手方信息证明真实性 ③展示历史交易数据佐证业务正常增长',
+      '交易纠纷': '辩护要点：①列出所有投诉并说明已全部处理完成 ②分析投诉根因（如沟通不足/服务进度误解）③强调不构成恶意交易纠纷 ④展示整改措施（强化服务前说明、缩短响应时效、建立跟进机制）⑤提供退款凭证和投诉处理记录',
+      '投诉': '辩护要点：①正面承认投诉存在并说明处理进展 ②分析投诉产生的客观原因 ③展示已落实的整改措施 ④提供投诉处理完成凭证和客户满意度反馈',
     }
     const reason = d.violation_reason || ''
     let matchedStrategy = ''
@@ -1511,11 +1600,22 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
       complaintStrategy = '【注意】客户有投诉记录，文案中必须正面承认投诉存在并说明处理进展，绝不能说"无投诉"或回避投诉事实'
     }
 
+    // 经营场景信息
+    const scenario = d.business_scenario || d.business_model || '未提供'
+    const mpName = d.miniprogram_name || ''
+    const mpAppid = d.miniprogram_appid || ''
+    const orderInfo = d.order_info || ''
+
     const prompt = `你是微信商户号申诉实战专家，有10年帮助商户成功申诉的经验。你深谙微信审核人员的关注重点。
+
+以下是用户需要填写的【微信商户后台真实申诉表单】，你需要帮用户生成每一栏可以直接复制粘贴提交的专业内容。
 
 ═══════════ 客户信息 ═══════════
 - 行业：${d.industry || '未提供'}
 - 经营模式：${d.business_model || '未提供'}
+- 经营场景：${scenario}
+- 小程序/公众号名称：${mpName || '未提供'}
+- 小程序AppID：${mpAppid || '未提供'}
 - 商户名称：${d.merchant_name || '未提供'}
 - 公司全称：${d.company_name || '未提供'}
 - 商户号：${d.merchant_id || '未提供'}
@@ -1523,6 +1623,7 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
 - 违规原因：${d.violation_reason || '未提供'}
 - 投诉情况：${complaintStatus || '无投诉'}
 - 退款政策：${d.refund_policy || '未提供'}
+- 交易订单信息：${orderInfo || '未提供'}
 - 联系人：${d.legal_name || '未提供'}
 - 联系电话：${d.contact_phone || '未提供'}
 - 申诉历史：${appealHistory || '首次申诉'}
@@ -1533,27 +1634,27 @@ ${complaintStrategy ? `\n${complaintStrategy}` : ''}
 
 ═══════════ 输出要求 ═══════════
 
-请输出JSON，5个字段，每个字段200-300字符（尽量接近300字，充分利用空间）：
+请输出JSON，5个字段。这5个字段对应微信商户后台申诉表单的真实填写栏，生成内容可直接复制粘贴提交。每个字段200-300字符（尽量接近300字，充分利用空间）：
 
 {
-  "business_model": "说明经营模式。包含：①基于客户信息描述主营业务和服务对象 ②盈利模式 ③解释为何本业务与被指控的违规行为有本质区别。对于客户未提供的数据，用'我方可提供XXX证明'的表述引导客户补充，不要编造数字。",
-  "refund_rules": "展示消费者保护体系。包含：①基于客户提供的退款政策展开说明 ②描述退款处理流程框架（申请→审核→退款） ③给出响应时效承诺。退款政策要与行业匹配（B2B按合同、虚拟商品可替换等）。如客户原有政策不完善，用'现已优化为...'的措辞建议改进方案。",
-  "complaint_cause": "诚恳分析投诉原因。包含：①基于客户提供的投诉情况如实描述 ②分析根本原因 ③如有投诉必须正面承认并说明处理进展 ④解释为何不构成所指控的违规，或承认不足并说明整改方向。绝不回避负面信息。",
-  "complaint_resolution": "展示解决方案框架。包含：①针对本次违规类型的具体整改方向 ②建议改进的流程和新增的预防机制 ③用'已/将'区分已完成和计划中的措施 ④列出建议准备的证据材料清单。不要替客户声称已完成未确认的整改。",
-  "supplementary": "补充有利信息。包含：①提醒客户准备哪些资质证明（营业执照、行业许可等） ②建议附上的具体证据材料清单（根据违规类型定制） ③恢复后的合规承诺 ④联系方式表达配合意愿。这段是帮客户理清'需要准备什么材料'。"
+  "business_model": "【业务模式说明】对应微信申诉表单「业务模式说明」栏。内容包含：①我司为XX行业，通过XX方式经营 ②主营业务为XX ③盈利模式为XX ④解释为何本业务与被指控的违规行为有本质区别。写成第一人称「我司/我方」的正式陈述，可直接复制到表单。",
+  "refund_rules": "【退款机制与退款方式】对应微信申诉表单「退款机制与退款方式」栏。内容包含：①基于客户提供的退款政策优化展开 ②描述退款处理流程（申请→审核→退款） ③响应时效承诺（如24小时内审核、N个工作日退款） ④如客户原有政策不完善，用'现已优化为...'改进。写成可直接提交的正式内容。",
+  "complaint_cause": "【投诉产生原因及详细说明】对应微信申诉表单「投诉产生原因及详细说明」栏。内容包含：①如实描述投诉现状（已处理/未处理） ②分析投诉根本原因 ③如有投诉必须正面承认并说明处理结果 ④说明这不构成恶意行为的理由。绝不回避负面信息，语气诚恳。",
+  "complaint_resolution": "【妥善处理消费者投诉/投诉处理方法】对应微信申诉表单「投诉处理方法」栏。内容包含：①已落实的具体整改措施（用'已'表述） ②计划中的预防机制（用'将/现已着手'表述） ③投诉响应时效承诺 ④建议准备的证据材料（退款凭证、处理记录等）。",
+  "supplementary": "【补充文字说明】对应微信申诉表单「补充文字说明」栏。内容包含：①恢复支付权限后的合规承诺 ②联系人+联系电话表达配合意愿 ③如有腾讯文档等补充资料链接可提及 ④提醒客户需要上传的证件照片和补充材料清单。"
 }
 
 ═══════════ 铁律（违反则文案无效）═══════════
-1. 【禁止编造数据】绝对不能编造客户未提供的任何具体数字、统计、日期、编号！不能编造注册用户数、好评率、退款成功率、订单量、评分、信用代码、ICP备案号等。如需引用数据，用"我方可提供XX数据证明"代替。
+1. 【禁止编造数据】绝对不能编造客户未提供的任何具体数字、统计、日期、编号！如需引用数据，用"我方可提供XX数据证明"代替。
 2. 【禁止占位符】不能出现[具体版号]、[具体日期]等方括号占位符。如需客户填入信息，用"（附：您的XX证书编号）"的格式。
-3. 【禁止虚假声明】不能替客户声称已完成未确认的整改（如"已上线自动化退款系统"）。对于建议做的整改，用"现已着手/将"表述，对于客户确认的事实才用"已"。
+3. 【禁止虚假声明】不能替客户声称已完成未确认的整改。建议做的整改用"现已着手/将"表述，客户确认的事实才用"已"。
 4. 【禁止回避】有投诉就必须正面回应，不能假装没有。
 5. 【禁止套话】禁用"高度重视""积极配合""竭诚服务"等空洞表述。
-6. 【充分利用】每段200-300字符，信息密度要高。
-7. 【诚恳务实】语气诚恳、立场坚定。承认不足是诚意，提供可验证的信息是实力。引导客户用真实证据说话，而非靠文字包装。
-8. 【审核视角】微信审核员能看到商户的真实交易数据，所以文案中的任何数字都必须是客户能验证的真实数据，或者用"可提供XX证明"让客户自己填充。`
+6. 【充分利用】每段200-300字符，信息密度要高，可直接复制到微信商户后台申诉表单提交。
+7. 【第一人称】必须用"我司/我方/本公司"等第一人称撰写，这是用户直接复制提交的内容。
+8. 【审核视角】微信审核员能看到商户真实交易数据，文案中的数字必须可验证，或用"可提供XX证明"。`
 
-    // 调用 DeepSeek API（带重试）
+    // 调用 AI API（带重试）
     let content = ''
     let inputTokens = 0
     let outputTokens = 0
@@ -1562,26 +1663,28 @@ ${complaintStrategy ? `\n${complaintStrategy}` : ''}
       try {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 90000)
-        const apiRes = await fetch('https://api.deepseek.com/chat/completions', {
+        const appealBody = {
+          model: appealAiCfg.model,
+          messages: [
+            { role: 'system', content: '你是全平台商户号申诉实战专家，覆盖微信支付、支付宝、抖音、快手、美团等平台。请严格按JSON格式输出，不要输出任何其他内容。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.6,
+          max_tokens: 3000,
+        }
+        appealBody.response_format = { type: 'json_object' }
+
+        const apiRes = await fetch(appealAiCfg.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: '你是微信商户号申诉实战专家。请严格按JSON格式输出，不要输出任何其他内容。' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.6,
-            max_tokens: 3000,
-            response_format: { type: 'json_object' },
-          }),
+          body: JSON.stringify(appealBody),
           signal: controller.signal,
         })
         clearTimeout(timeout)
 
         if (!apiRes.ok) {
           const errText = await apiRes.text().catch(() => '')
-          console.error(`DeepSeek appeal API error (attempt ${attempt + 1}):`, apiRes.status, errText)
+          console.error(`[${appealAiCfg.provider}] appeal API error (attempt ${attempt + 1}):`, apiRes.status, errText)
           if (attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 2000)); continue }
           return res.status(500).json({ error: `AI服务请求失败(${apiRes.status})` })
         }
@@ -1591,7 +1694,7 @@ ${complaintStrategy ? `\n${complaintStrategy}` : ''}
         outputTokens = apiData.usage?.completion_tokens || 0
         break // 成功，退出重试循环
       } catch (fetchErr) {
-        console.error(`DeepSeek appeal fetch error (attempt ${attempt + 1}):`, fetchErr.message)
+        console.error(`[${appealAiCfg.provider}] appeal fetch error (attempt ${attempt + 1}):`, fetchErr.message)
         if (attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 2000)); continue }
         return res.status(500).json({ error: `AI服务连接失败：${fetchErr.name === 'AbortError' ? '请求超时(90s)' : fetchErr.message}` })
       }
@@ -1601,7 +1704,7 @@ ${complaintStrategy ? `\n${complaintStrategy}` : ''}
       return res.status(500).json({ error: 'AI返回内容为空，请重试' })
     }
 
-    // 解析JSON（兼容DeepSeek返回 markdown 代码块包裹的情况）
+    // 解析JSON（兼容AI返回 markdown 代码块包裹的情况）
     let parsed
     try {
       let cleanContent = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
@@ -1664,6 +1767,733 @@ app.get('/api/sessions/:id/appeal-text', optionalUser, async (req, res) => {
   } catch (err) { res.status(500).json({ error: '获取失败' }) }
 })
 
+// ========== 申诉进度反馈 ==========
+
+app.post('/api/sessions/:id/appeal-feedback', requireUser, async (req, res) => {
+  try {
+    const { status, feedback, rejectionReason } = req.body
+    const valid = ['submitted', 'under_review', 'approved', 'rejected', 'resubmitted']
+    if (!valid.includes(status)) return res.status(400).json({ error: '无效的状态' })
+    await updateAppealStatus(req.params.id, req.userId, { status, feedback, rejectionReason })
+
+    // 进化引擎学习：真实结果反馈
+    if (status === 'approved' || status === 'rejected') {
+      try {
+        const { upsertKnowledgeCluster } = await import('./db.js')
+        const session = await getSession(req.params.id)
+        const d = session?.collected_data || {}
+        const industry = d.industry || 'unknown'
+        const violation = d.problem_type || 'unknown'
+        // 更新行业成功率知识簇
+        await upsertKnowledgeCluster({
+          clusterType: 'success_factor',
+          clusterKey: `real_result:${industry}:${violation}`,
+          clusterData: { industry, violation, result: status, feedback, rejectionReason, sessionId: req.params.id, timestamp: new Date().toISOString() },
+          sampleCount: 1,
+          confidenceScore: status === 'approved' ? 80 : 30,
+        })
+      } catch (evoErr) { console.error('[Evolution] 反馈学习失败:', evoErr.message) }
+    }
+
+    const updated = await getAppealText(req.params.id)
+    res.json({ success: true, appealText: updated })
+  } catch (err) {
+    console.error('Appeal feedback error:', err)
+    res.status(500).json({ error: '更新失败' })
+  }
+})
+
+app.get('/api/admin/appeal-stats', requireAdmin, async (req, res) => {
+  try { res.json(await getAppealStats()) }
+  catch (err) { console.error(err); res.status(500).json({ error: '获取申诉统计失败' }) }
+})
+
+// ========== 投诉材料整理 ==========
+
+app.post('/api/sessions/:id/generate-complaint-doc', requireUser, async (req, res) => {
+  try {
+    const userId = req.userId
+    const user = await getUserById(userId)
+    if (!user) return res.status(404).json({ error: '用户不存在' })
+
+    let apiKeyToUse = null
+    let isOfficialMode = false
+    const activeModel = await getActiveAIModel()
+    const isModelFree = activeModel?.is_free === 1
+    if (user.api_mode === 'custom' && user.custom_api_key) {
+      apiKeyToUse = user.custom_api_key
+    } else if (user.api_mode === 'official' && (parseFloat(user.balance) > 0 || isModelFree)) {
+      apiKeyToUse = null
+      isOfficialMode = !isModelFree
+    } else {
+      return res.status(402).json({ error: '余额不足，请先充值', needRecharge: true })
+    }
+
+    const { force } = req.body
+    const session = await getSession(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = session.collected_data || {}
+    if (!d.industry && !d.violation_reason && !d.problem_type) {
+      return res.status(400).json({ error: '请先通过对话提供基本信息（行业、违规原因等）' })
+    }
+
+    if (!force) {
+      const existing = await getComplaintDoc(req.params.id)
+      if (existing) return res.json({ doc: existing, cached: true })
+    }
+
+    const aiCfg = await getAIConfig()
+    const apiKey = apiKeyToUse || aiCfg.apiKey
+    if (!apiKey) return res.status(500).json({ error: 'AI服务未配置' })
+
+    // 构建收集到的所有信息摘要（使用中文标签）
+    const fieldLabels = {
+      industry: '行业', business_model: '经营模式', business_scenario: '经营场景',
+      miniprogram_name: '小程序/公众号名称', miniprogram_appid: '小程序AppID',
+      problem_type: '处罚类型', violation_reason: '违规原因',
+      merchant_id: '商户号', merchant_name: '商户名称',
+      company_name: '公司全称', license_no: '统一社会信用代码',
+      legal_name: '法人姓名', legal_id_last4: '身份证后四位',
+      complaint_status: '投诉情况', refund_policy: '退款政策',
+      order_info: '交易订单信息', bank_name: '开户银行',
+      bank_account_last4: '结算账户后四位', contact_phone: '联系电话',
+      appeal_history: '申诉历史',
+    }
+    const infoLines = Object.entries(d)
+      .filter(([k, v]) => v && !k.startsWith('_'))
+      .map(([k, v]) => `- ${fieldLabels[k] || k}: ${v}`)
+      .join('\n')
+
+    const prompt = `你是一位专业的商户申诉材料整理专家。请根据以下客户信息，生成一份完整的、可直接使用的投诉/申诉材料整理文档。
+
+参考微信商户号申诉的真实流程，申诉材料需要包含：身份证件照片、业务模式说明、经营场景、交易订单凭证、投诉原因说明、投诉处理方法、退款机制、补充说明等。
+
+═══════════ 客户已提供的信息 ═══════════
+${infoLines || '（信息较少，请基于已有内容尽可能整理）'}
+
+═══════════ 输出要求 ═══════════
+
+请输出JSON，包含以下字段：
+
+{
+  "doc_title": "文档标题，如：关于XXX商户号涉嫌XXX申诉材料整理",
+  "complaint_summary": "案件概述（200-400字）：用专业简洁的第一人称语言概述整个事件。包括：商户基本情况、遭遇的处罚类型和原因、当前状态、核心诉求（恢复支付权限）。",
+  "merchant_info": "商户与经营信息整理：结构化格式，每项一行。必须包含：\\n商户名称：XX\\n商户号：XX\\n公司全称：XX\\n统一社会信用代码：XX\\n法人/经营者：XX\\n行业类型：XX\\n经营场景：线上/线下/线上+线下\\n线上经营平台：小程序/公众号/H5\\n小程序名称：XX\\n小程序AppID：XX\\n联系电话：XX\\n（未提供的标注「待补充」）",
+  "violation_detail": "违规/处罚详情+交易订单信息（300-500字）：①处罚类型和平台给出的违规原因 ②如有交易订单号，逐笔列出（格式：微信交易订单号：XXXX / 订单商品/服务内容：XXXX） ③说明这些交易的真实性 ④处罚的影响范围",
+  "evidence_list": "申诉需准备的证据材料清单：根据真实申诉表单要求，编号列出所有需要准备的材料。必须包含：\\n1. 法人/经营者身份证正面照片 — 申诉表单必传\\n2. 法人/经营者身份证反面照片 — 申诉表单必传\\n3. 法人/经营者手持身份证正面照片 — 申诉表单必传\\n4. 营业执照照片 — 证明经营资质\\n5. 小程序/公众号截图或门店照片 — 证明经营场景\\n6. 微信支付交易订单截图（2-3笔） — 证明真实交易\\n7. 投诉处理完成截图 — 证明投诉已妥善处理\\n8. 退款凭证截图 — 证明退款已执行\\n然后根据行业和违规类型补充更多（如行业许可证、服务合同、客户好评等），至少列12项。每项标注获取方式。",
+  "timeline": "事件时间线：按时间顺序整理事件经过。格式为：日期/时间段 → 事件。未提供具体日期的用（具体日期待确认）标注。必须包含：注册商户号时间、正常经营期间、收到处罚通知、处理投诉/整改、提交申诉等关键节点。",
+  "appeal_points": "申诉要点与策略梳理（300-500字）：①核心策略概述 ②逐条要点，每条包含论点+证据支撑 ③需要特别注意的事项 ④建议的申诉提交顺序和注意事项 ⑤如被驳回的应对预案",
+  "full_document": "完整申诉文书（1000-2000字）：这是用户可以直接复制到Word打印的完整版本。格式要求：\\n\\n标题居中\\n\\n致：微信支付团队\\n\\n一、商户基本情况（简介+经营场景）\\n\\n二、关于涉嫌XX的情况说明（处罚原因+我方解释）\\n\\n三、交易真实性说明（列出订单号和内容）\\n\\n四、投诉处理情况（投诉已处理+具体措施）\\n\\n五、整改措施（已落实+计划中）\\n\\n六、退款保障机制\\n\\n七、附件清单（编号列出所有附件材料）\\n\\n恳请贵团队审核并恢复我司支付权限。\\n\\n联系人：XX 联系电话：XX\\n\\n日期：XXXX年XX月XX日\\n\\n注意使用换行分段，格式清晰专业。"
+}
+
+═══════════ 重要规则 ═══════════
+1. 【禁止编造】不能编造客户未提供的具体数字、日期、编号。未知信息用（待补充：XXX）标注。
+2. 【实事求是】基于客户提供的信息整理，不夸大不缩小。
+3. 【专业格式】使用正式文书语言，第一人称撰写，条理清晰，可直接使用。
+4. 【可操作性】证据清单要具体可执行，告诉客户每项材料在哪里获取。
+5. 【真实表单对齐】必须覆盖微信真实申诉表单的所有必填项（身份证照片、业务模式、经营场景、订单凭证、投诉说明、处理方法、退款机制、补充说明）。`
+
+    let content = ''
+    let inputTokens = 0
+    let outputTokens = 0
+    const maxRetries = 2
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 120000)
+        const body = {
+          model: aiCfg.model,
+          messages: [
+            { role: 'system', content: '你是专业的商户申诉材料整理专家。请严格按JSON格式输出，不要输出任何其他内容。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.5,
+          max_tokens: 6000,
+          response_format: { type: 'json_object' },
+        }
+        const apiRes = await fetch(aiCfg.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        if (!apiRes.ok) {
+          const errText = await apiRes.text().catch(() => '')
+          console.error(`[ComplaintDoc] API error (attempt ${attempt + 1}):`, apiRes.status, errText)
+          if (attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 2000)); continue }
+          return res.status(500).json({ error: `AI服务请求失败(${apiRes.status})` })
+        }
+        const apiData = await apiRes.json()
+        content = apiData.choices?.[0]?.message?.content || ''
+        inputTokens = apiData.usage?.prompt_tokens || 0
+        outputTokens = apiData.usage?.completion_tokens || 0
+        break
+      } catch (fetchErr) {
+        console.error(`[ComplaintDoc] fetch error (attempt ${attempt + 1}):`, fetchErr.message)
+        if (attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 2000)); continue }
+        return res.status(500).json({ error: `AI服务连接失败：${fetchErr.name === 'AbortError' ? '请求超时' : fetchErr.message}` })
+      }
+    }
+
+    if (!content) return res.status(500).json({ error: 'AI返回内容为空，请重试' })
+
+    let parsed
+    try {
+      let clean = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+      const jsonMatch = clean.match(/\{[\s\S]*\}/)
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : clean)
+    } catch {
+      return res.status(500).json({ error: '材料解析失败，请重试' })
+    }
+
+    let cost = 0
+    if (isOfficialMode) {
+      const multiplierStr = await getSystemConfig('cost_multiplier')
+      const multiplier = parseFloat(multiplierStr || '2')
+      const tokenInfo = calculateCost(inputTokens, outputTokens, multiplier)
+      cost = tokenInfo.cost
+      const deductResult = await deductBalance(user.id, cost)
+      if (deductResult.success) await incrementUserSpent(user.id, cost)
+      await recordTokenUsage({ userId: user.id, sessionId: req.params.id, type: 'complaint_doc', inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, cost, multiplier, apiMode: 'official' })
+    }
+
+    await saveComplaintDoc({
+      sessionId: req.params.id, userId: user.id,
+      docTitle: parsed.doc_title || '',
+      complaintSummary: parsed.complaint_summary || '',
+      merchantInfo: parsed.merchant_info || '',
+      violationDetail: parsed.violation_detail || '',
+      evidenceList: parsed.evidence_list || '',
+      timeline: parsed.timeline || '',
+      appealPoints: parsed.appeal_points || '',
+      fullDocument: parsed.full_document || '',
+      inputTokens, outputTokens, cost,
+    })
+
+    const saved = await getComplaintDoc(req.params.id)
+    const updatedUser = await getUserById(user.id)
+    res.json({ doc: saved, cached: false, cost, balance: updatedUser?.balance, isOfficialMode, inputTokens, outputTokens })
+  } catch (err) {
+    console.error('Generate complaint doc error:', err)
+    res.status(500).json({ error: '生成投诉材料失败' })
+  }
+})
+
+app.get('/api/sessions/:id/complaint-doc', optionalUser, async (req, res) => {
+  try {
+    const doc = await getComplaintDoc(req.params.id)
+    res.json({ doc })
+  } catch (err) { res.status(500).json({ error: '获取失败' }) }
+})
+
+// ========== 投诉回复话术生成（免费·本地规则） ==========
+
+app.post('/api/sessions/:id/generate-complaint-reply', requireUser, async (req, res) => {
+  try {
+    const session = await getSessionById(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = typeof session.collected_info === 'string' ? JSON.parse(session.collected_info || '{}') : (session.collected_info || {})
+    const { complaint_type, complaint_content } = req.body || {}
+
+    const industry = d.industry || '通用'
+    const merchantName = d.merchant_name || d.company_name || '我司'
+    const refundPolicy = d.refund_policy || ''
+
+    // 根据投诉类型生成不同话术
+    const replyTemplates = {
+      '退款': {
+        first_reply: `您好，非常抱歉给您带来不好的体验。您的退款申请我们已收到并高度关注，正在为您加急处理中。我们的退款政策是：${refundPolicy || '收到申请后24小时内审核，审核通过后1个工作日内原路退回'}。请您放心，我们会尽快为您处理。如需沟通请随时留言，我们会第一时间回复。`,
+        resolution: `您好，关于您的退款申请，我们已经完成审核。退款已通过原支付渠道发起，预计1-3个工作日到账，请您留意查收。如到账有任何问题，请随时联系我们。再次对给您造成的不便表示歉意，感谢您的理解与支持。`,
+        close: `尊敬的客户，您的退款已于{日期}成功退回，请确认查收。如您对处理结果满意，恳请在投诉页面确认"已解决"。如仍有任何问题，我们随时为您服务。祝您生活愉快！`
+      },
+      '服务不满意': {
+        first_reply: `您好，非常感谢您的反馈，对于您不满意的体验我们深表歉意。您的意见对我们非常重要，我们已安排专人跟进您的问题。请问方便详细说明一下具体是哪方面让您不满意吗？我们会认真对待并尽快给您满意的解决方案。`,
+        resolution: `您好，针对您反馈的问题，我们已进行了内部核实和整改。具体解决方案如下：{根据实际情况填写}。同时我们也已优化了相关服务流程，避免类似情况再次发生。如果您对以上方案有任何意见，请随时告知。`,
+        close: `尊敬的客户，感谢您给我们改进的机会。我们已对您反馈的问题进行了整改，并将持续优化服务质量。如处理结果让您满意，恳请在投诉页面确认"已解决"。后续如有任何需要，随时联系我们。`
+      },
+      '商品问题': {
+        first_reply: `您好，非常抱歉我们的商品/服务未能达到您的期望。您反馈的问题我们已经记录并安排核实，会在24小时内给您明确的处理方案。如涉及退款或补偿，我们会按照售后政策第一时间为您处理。请您稍候，感谢您的耐心。`,
+        resolution: `您好，经过核实，您反馈的问题属实。我们愿意为您提供以下解决方案：{1.全额退款 / 2.补发商品 / 3.折扣补偿}。请您选择最合适的方案，我们将立即执行。再次为给您带来的不便致歉。`,
+        close: `尊敬的客户，您的问题已按{方案}处理完成。感谢您的理解与配合。如对处理结果满意，恳请在投诉页面确认"已解决"。我们会持续提升产品和服务质量。`
+      },
+      '未收到货': {
+        first_reply: `您好，非常抱歉让您久等了。我们已经在核实您的订单物流情况，会尽快查明原因。如确认物流异常，我们将立即为您安排补发或退款。请您稍候，预计24小时内给您明确答复。`,
+        resolution: `您好，经查询您的订单{订单号}，{物流情况说明}。我们已为您安排{补发/退款}，{预计到达时间/退款预计到账时间}。再次对延误表示歉意。`,
+        close: `尊敬的客户，您的问题已妥善处理（{补发已签收/退款已到账}）。如对处理结果满意，恳请在投诉页面确认"已解决"。感谢您的耐心等待！`
+      },
+      '其他': {
+        first_reply: `您好，感谢您的反馈。您提出的问题我们已经收到并认真记录，正在安排专人跟进核实。我们会在24小时内给您详细的处理方案。期间如有任何补充信息，请随时留言，我们会第一时间查看。`,
+        resolution: `您好，关于您反馈的问题，经我们内部核实和协商，处理方案如下：{具体方案}。我们始终以客户满意为目标，如您对方案有任何异议，我们可以进一步协商。`,
+        close: `尊敬的客户，您反馈的问题已处理完成。感谢您给予我们改进的机会。如对处理结果满意，恳请在投诉页面确认"已解决"。祝您一切顺利！`
+      }
+    }
+
+    const type = complaint_type && replyTemplates[complaint_type] ? complaint_type : '其他'
+    const templates = replyTemplates[type]
+
+    // 生成处理时间线提醒
+    const timeline_tips = {
+      '24h内': '收到投诉后必须在24小时内首次回复用户（否则影响「1日回复率」指标）',
+      '72h内': '必须在72小时内处理完毕并标记"处理完成"（否则影响「3日处理完成率」指标）',
+      '标记完成后': '标记"处理完成"后用户可能继续投诉，需持续关注'
+    }
+
+    // 生成95017电话话术
+    const phone_script = {
+      preparation: `拨打前准备好以下信息：\n• 商户号：${d.merchant_id || '（请准备好）'}\n• 法人姓名：${d.legal_name || '（请准备好）'}\n• 身份证后四位：${d.legal_id_last4 || '（请准备好）'}\n• 银行卡后四位：${d.bank_account_last4 || '（请准备好）'}\n• 联系电话：${d.contact_phone || '（请准备好）'}`,
+      steps: [
+        '拨打 95017',
+        '按 2（商户服务）',
+        '输入商户号后按 # 确认',
+        '等待转接人工客服（可能等待5-15分钟）',
+        '人工接通后说明来意'
+      ],
+      script: `您好，我是商户号${d.merchant_id || 'XXXXXXXXXX'}的${d.legal_name ? '法人' + d.legal_name : '负责人'}。我司商户号因${d.violation_reason || '涉嫌违规'}被${d.problem_type || '限制'}，我们已在商户平台提交了申诉材料，想咨询一下审核进度。我们是${industry}行业，正常经营中，所有投诉都已处理完成。请问大概什么时候能有审核结果？需要我们补充什么材料吗？`,
+      tips: [
+        '语气保持礼貌诚恳，不要激动',
+        '准确报出商户号和法人信息以验证身份',
+        '明确说明已提交申诉并处理好投诉',
+        '询问是否需要补充材料',
+        '记录客服工号和回复内容',
+        '如果客服说在审核中，可以问预计时间',
+        '每隔2-3天可以再次致电跟进'
+      ]
+    }
+
+    res.json({
+      complaint_type: type,
+      templates,
+      timeline_tips,
+      phone_script,
+      industry,
+      merchant_name: merchantName,
+    })
+  } catch (err) {
+    console.error('Generate complaint reply error:', err)
+    res.status(500).json({ error: '生成投诉回复失败' })
+  }
+})
+
+// ========== 申诉全流程指导 ==========
+
+app.get('/api/sessions/:id/appeal-guide', requireUser, async (req, res) => {
+  try {
+    const session = await getSessionById(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = typeof session.collected_info === 'string' ? JSON.parse(session.collected_info || '{}') : (session.collected_info || {})
+
+    const violationReason = d.violation_reason || ''
+    const problemType = d.problem_type || ''
+    const hasComplaints = /\d+.*投诉|投诉.*\d+|有/.test(d.complaint_status || '')
+    const isFirstAppeal = !/驳回|被拒|失败/.test(d.appeal_history || '')
+
+    // 根据用户情况动态生成流程步骤
+    const steps = []
+
+    // 第1步：处理投诉（如果有的话）
+    if (hasComplaints) {
+      steps.push({
+        id: 'handle_complaints',
+        title: '优先处理所有消费者投诉',
+        priority: 'urgent',
+        icon: '🚨',
+        description: '申诉前必须先把所有投诉处理完！未处理的投诉会直接导致申诉被驳回。',
+        actions: [
+          '登录商户平台 pay.weixin.qq.com → 账户中心 → 消费者投诉',
+          '逐一回复所有"待处理"的投诉（24小时内必须首次回复）',
+          '与用户协商解决方案（退款/补偿/解释）',
+          '72小时内处理完毕并标记"处理完成"',
+          '引导满意的用户在投诉页面确认"已解决"'
+        ],
+        tips: '所有投诉必须处于"已处理完成"状态再提交申诉',
+        time_estimate: '1-3天'
+      })
+    }
+
+    // 第2步：查看违约记录
+    steps.push({
+      id: 'check_violation',
+      title: '查看违约记录详情',
+      priority: 'required',
+      icon: '🔍',
+      description: '确认处罚类型和具体原因，了解申诉要求。',
+      actions: [
+        '方式一：登录商户平台 pay.weixin.qq.com → 账户中心 → 违约记录',
+        '方式二：微信搜索【微信支付商家助手】小程序 → 风险处理 → 违约处理记录',
+        '方式三：关注【微信支付商家助手】公众号 → 我的账号 → 我是商家 → 风险处理',
+        '记录下违约类型、处罚措施、处理时效要求'
+      ],
+      tips: '截图保存违约记录页面，申诉时可能需要参考',
+      time_estimate: '10分钟'
+    })
+
+    // 第3步：准备材料
+    const materials = [
+      { name: '法人/经营者身份证正面照片', required: true, note: '申诉表单必传' },
+      { name: '法人/经营者身份证反面照片', required: true, note: '申诉表单必传' },
+      { name: '法人/经营者手持身份证正面照片', required: true, note: '申诉表单必传' },
+      { name: '营业执照照片', required: true, note: '证明经营资质' },
+    ]
+    if (/线上|小程序|公众号|网/.test(d.business_scenario || d.business_model || '')) {
+      materials.push({ name: '小程序/公众号截图', required: true, note: '线上经营场景证明' })
+      if (d.miniprogram_appid) materials.push({ name: `小程序AppID: ${d.miniprogram_appid}`, required: true, note: '表单需要填写' })
+    }
+    if (/线下|实体|门店/.test(d.business_scenario || d.business_model || '')) {
+      materials.push({ name: '门头照+内景照', required: true, note: '线下经营场景证明' })
+      materials.push({ name: '门店定位截图', required: false, note: '辅助证明' })
+    }
+    materials.push(
+      { name: '微信支付交易订单截图（2-3笔）', required: true, note: '证明真实交易，4200开头的订单号' },
+      { name: '投诉处理完成截图', required: hasComplaints, note: '证明投诉已妥善处理' },
+      { name: '退款凭证截图', required: hasComplaints, note: '证明退款已执行' },
+    )
+    // 行业特殊材料
+    if (/游戏|棋牌/.test(d.industry || '')) {
+      materials.push({ name: '游戏版号/文网文许可', required: true, note: '游戏行业必须' })
+    }
+    if (/教育|培训/.test(d.industry || '')) {
+      materials.push({ name: '办学许可证/教育资质', required: true, note: '教育行业必须' })
+    }
+    if (/食品|餐饮/.test(d.industry || '')) {
+      materials.push({ name: '食品经营许可证', required: true, note: '餐饮行业必须' })
+    }
+    if (/医疗|药品/.test(d.industry || '')) {
+      materials.push({ name: '医疗机构执业许可', required: true, note: '医疗行业必须' })
+    }
+
+    steps.push({
+      id: 'prepare_materials',
+      title: '准备申诉材料',
+      priority: 'required',
+      icon: '📋',
+      description: '根据您的情况，需要准备以下材料：',
+      materials,
+      tips: '材料尽量齐全，一次性提交成功率更高',
+      time_estimate: '1-2天'
+    })
+
+    // 第4步：填写申诉表单
+    steps.push({
+      id: 'fill_appeal_form',
+      title: '填写并提交申诉',
+      priority: 'required',
+      icon: '✍️',
+      description: '在商户平台提交申诉，我们已帮您生成好各栏内容，可直接复制粘贴。',
+      actions: [
+        '登录商户平台 pay.weixin.qq.com → 账户中心 → 违约记录',
+        '找到对应记录，点击"申请解除限制"',
+        '上传证件照片（身份证正反面+手持照）',
+        '填写"业务模式说明"→ 点击本平台【申诉文案】复制第1段',
+        '选择经营场景（线上/线下）→ 填写小程序信息',
+        '填写交易订单信息（2-3笔）',
+        '填写"投诉产生原因"→ 复制第3段',
+        '填写"投诉处理方法"→ 复制第4段',
+        '填写"退款机制"→ 复制第2段',
+        '填写"补充文字说明"→ 复制第5段',
+        '上传补充材料文件',
+        '仔细检查后点击提交'
+      ],
+      tips: '提交前仔细检查所有内容是否准确，提交后无法修改',
+      time_estimate: '30分钟'
+    })
+
+    // 第5步：等待审核 + 电话跟进
+    steps.push({
+      id: 'wait_and_follow',
+      title: '等待审核 + 电话跟进',
+      priority: 'recommended',
+      icon: '📞',
+      description: '提交后预计1-7个工作日出结果。建议2-3天后致电95017跟进。',
+      actions: [
+        '提交后第2-3天：拨打95017 → 按2 → 输入商户号 → 转人工',
+        '告知客服已提交申诉，询问审核进度',
+        '如客服要求补充材料，尽快准备提交',
+        '留意商户平台站内信、邮件和公众号通知',
+        '审核中心会展示处理进度，定期查看'
+      ],
+      tips: '每隔2-3天跟进一次，语气礼貌诚恳',
+      time_estimate: '1-7个工作日'
+    })
+
+    // 第6步：驳回应对（如果不是首次申诉）
+    if (!isFirstAppeal) {
+      steps.push({
+        id: 'rejected_plan',
+        title: '驳回后的应对方案',
+        priority: 'important',
+        icon: '🔄',
+        description: '如果申诉被驳回，不要放弃，分析原因后补充材料重新申诉。',
+        actions: [
+          '仔细阅读驳回理由（在违约记录页面查看）',
+          '针对驳回理由补充新的证据材料',
+          '修改申诉文案，重点回应驳回原因',
+          '联系95017人工客服确认需要补充什么',
+          '重新提交申诉（通常可以多次申诉）'
+        ],
+        tips: '每次申诉必须有新证据或新说明，否则容易再次被驳回',
+        time_estimate: '3-5天准备后重新提交'
+      })
+    } else {
+      steps.push({
+        id: 'rejected_plan',
+        title: '如果被驳回怎么办',
+        priority: 'info',
+        icon: '💡',
+        description: '首次申诉通过率较高。万一被驳回，可以补充材料后再次申诉。',
+        actions: [
+          '查看驳回原因',
+          '针对性补充新证据',
+          '修改文案后重新提交',
+          '致电95017咨询具体需要什么材料'
+        ],
+        tips: '大部分商户在1-2次申诉内都能通过',
+        time_estimate: '视情况而定'
+      })
+    }
+
+    // 成功率评估
+    let successRate = 70
+    let riskFactors = []
+    let positiveFactors = []
+
+    if (hasComplaints) { successRate -= 10; riskFactors.push('存在未处理投诉会降低成功率') }
+    if (!isFirstAppeal) { successRate -= 15; riskFactors.push('非首次申诉，审核会更严格') }
+    if (/套现|赌博|欺诈|洗钱/.test(violationReason)) { successRate -= 20; riskFactors.push('严重违规类型（' + violationReason + '），审核标准高') }
+    if (/交易异常|交易纠纷|投诉/.test(violationReason)) { successRate += 5; positiveFactors.push('该违规类型申诉成功率相对较高') }
+    if (d.order_info) { successRate += 5; positiveFactors.push('已提供交易订单信息') }
+    if (d.miniprogram_appid || d.miniprogram_name) { successRate += 3; positiveFactors.push('已提供经营场景信息') }
+    if (d.refund_policy) { successRate += 5; positiveFactors.push('有完善的退款政策') }
+    if (d.contact_phone) { successRate += 2; positiveFactors.push('已提供联系电话') }
+    if (/处理完|已解决|已退款/.test(d.complaint_status || '')) { successRate += 10; positiveFactors.push('投诉已处理完毕') }
+
+    successRate = Math.max(10, Math.min(95, successRate))
+
+    res.json({
+      steps,
+      success_estimate: {
+        rate: successRate,
+        level: successRate >= 75 ? 'high' : successRate >= 50 ? 'medium' : 'low',
+        risk_factors: riskFactors,
+        positive_factors: positiveFactors,
+      },
+      violation_info: {
+        type: violationReason || '未知',
+        problem: problemType || '未知',
+        industry: d.industry || '未知',
+        has_complaints: hasComplaints,
+        is_first_appeal: isFirstAppeal,
+      }
+    })
+  } catch (err) {
+    console.error('Appeal guide error:', err)
+    res.status(500).json({ error: '生成申诉指导失败' })
+  }
+})
+
+// ========== 申诉进度追踪 ==========
+
+app.get('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
+  try {
+    const sessionId = req.params.id
+    const [rows] = await pool.execute(
+      'SELECT appeal_status, user_feedback, submitted_at, result_at, rejection_reason, resubmit_count, created_at FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+      [sessionId]
+    )
+    if (rows.length === 0) return res.json({ status: null, message: '尚未生成申诉文案' })
+    const r = rows[0]
+    const statusLabels = {
+      generated: '已生成文案', submitted: '已提交申诉', under_review: '审核中',
+      approved: '申诉通过', rejected: '已被驳回', resubmitted: '已重新提交'
+    }
+    res.json({
+      status: r.appeal_status || 'generated',
+      label: statusLabels[r.appeal_status] || '已生成文案',
+      submitted_at: r.submitted_at,
+      result_at: r.result_at,
+      rejection_reason: r.rejection_reason,
+      resubmit_count: r.resubmit_count || 0,
+      user_feedback: r.user_feedback,
+      created_at: r.created_at,
+    })
+  } catch (err) {
+    console.error('Get appeal progress error:', err)
+    res.status(500).json({ error: '获取申诉进度失败' })
+  }
+})
+
+app.put('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
+  try {
+    const sessionId = req.params.id
+    const { status, feedback, rejectionReason } = req.body || {}
+    const validStatuses = ['generated', 'submitted', 'under_review', 'approved', 'rejected', 'resubmitted']
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: '无效的状态值' })
+    }
+    // Check if appeal text exists for this session
+    const [rows] = await pool.execute(
+      'SELECT id FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+      [sessionId]
+    )
+    if (rows.length === 0) return res.status(404).json({ error: '未找到申诉记录' })
+
+    const updates = ['appeal_status = ?']
+    const params = [status]
+    const now = new Date()
+    if (feedback) { updates.push('user_feedback = ?'); params.push(feedback) }
+    if (rejectionReason) { updates.push('rejection_reason = ?'); params.push(rejectionReason) }
+    if (status === 'submitted' || status === 'resubmitted') { updates.push('submitted_at = ?'); params.push(now) }
+    if (status === 'approved' || status === 'rejected') { updates.push('result_at = ?'); params.push(now) }
+    if (status === 'resubmitted') { updates.push('resubmit_count = resubmit_count + 1') }
+
+    params.push(rows[0].id)
+    await pool.execute(`UPDATE appeal_texts SET ${updates.join(', ')} WHERE id = ?`, params)
+
+    const statusLabels = {
+      generated: '已生成文案', submitted: '已提交申诉', under_review: '审核中',
+      approved: '申诉通过', rejected: '已被驳回', resubmitted: '已重新提交'
+    }
+    res.json({ success: true, status, label: statusLabels[status] })
+  } catch (err) {
+    console.error('Update appeal progress error:', err)
+    res.status(500).json({ error: '更新申诉进度失败' })
+  }
+})
+
+// ========== 驳回后智能重申策略 ==========
+
+app.post('/api/sessions/:id/resubmit-strategy', requireUser, async (req, res) => {
+  try {
+    const sessionId = req.params.id
+    const session = await getSessionById(sessionId)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
+
+    // 获取驳回原因
+    const [rows] = await pool.execute(
+      'SELECT rejection_reason, resubmit_count FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+      [sessionId]
+    )
+    const rejectionReason = rows[0]?.rejection_reason || req.body?.rejectionReason || ''
+    const resubmitCount = rows[0]?.resubmit_count || 0
+    const reasonLower = rejectionReason.toLowerCase()
+
+    // 基于驳回原因生成改进方案
+    const improvements = []
+    const newMaterials = []
+    const textFixes = []
+
+    // 通用改进
+    improvements.push({ priority: 'high', action: '拨打95017转3确认具体驳回原因', detail: '电话中记录客服的原话，这是最准确的驳回原因。话术参考「申诉指导→95017话术」Tab' })
+
+    if (reasonLower.includes('材料') || reasonLower.includes('不完整') || reasonLower.includes('缺少') || reasonLower.includes('不足')) {
+      improvements.push({ priority: 'high', action: '补充缺失材料', detail: '对照「申诉指导→材料清单」逐项检查，确保每项都有对应文件' })
+      newMaterials.push('法人手持身份证+营业执照合影（如之前未提供）')
+      newMaterials.push('补充更多交易订单凭证（至少5笔）')
+      textFixes.push('在补充说明中列出本次新增的所有材料清单')
+    }
+
+    if (reasonLower.includes('投诉') || reasonLower.includes('纠纷') || reasonLower.includes('消费者')) {
+      improvements.push({ priority: 'urgent', action: '优先处理所有消费者投诉', detail: '在商户后台→消费者投诉中逐一回复并协商解决，目标：投诉状态全部变为"已处理完成"' })
+      newMaterials.push('所有投诉的处理完成截图')
+      newMaterials.push('退款凭证截图（每笔投诉对应的退款记录）')
+      newMaterials.push('消费者确认已解决的聊天截图（如有）')
+      textFixes.push('在「投诉产生原因」中详细说明每笔投诉的处理结果')
+      textFixes.push('在「投诉处理方法」中新增已落实的整改措施')
+    }
+
+    if (reasonLower.includes('真实') || reasonLower.includes('交易') || reasonLower.includes('虚假') || reasonLower.includes('刷单')) {
+      improvements.push({ priority: 'high', action: '补充交易真实性证据', detail: '每笔被质疑的订单都需要：订单截图+物流单号+签收记录+客户沟通记录' })
+      newMaterials.push('物流签收记录（含签收照片）')
+      newMaterials.push('与买家的微信/电话沟通记录截图')
+      newMaterials.push('进货合同或供应商发票')
+      newMaterials.push('仓库实拍照片（含商品和包装）')
+      textFixes.push('在业务模式说明中详细描述完整的交易流程')
+    }
+
+    if (reasonLower.includes('整改') || reasonLower.includes('违规') || reasonLower.includes('合规')) {
+      improvements.push({ priority: 'high', action: '提供整改证据', detail: '截图保存整改前后的对比，撰写详细的整改措施说明' })
+      newMaterials.push('整改前后对比截图')
+      newMaterials.push('《整改措施说明书》（含具体措施+执行时间+责任人）')
+      textFixes.push('在补充说明中重点描述已完成的整改措施和预防机制')
+    }
+
+    if (reasonLower.includes('资质') || reasonLower.includes('许可') || reasonLower.includes('证照')) {
+      improvements.push({ priority: 'high', action: '补充行业资质证明', detail: '提供与经营范围对应的所有资质证书' })
+      newMaterials.push('行业经营许可证（如食品/医疗/教育等）')
+      newMaterials.push('相关从业人员资质证明')
+    }
+
+    if (reasonLower.includes('说明') || reasonLower.includes('不清') || reasonLower.includes('模糊')) {
+      improvements.push({ priority: 'medium', action: '优化申诉文案表述', detail: '重新生成申诉文案，使用更具体的数据和事实，避免模糊表述' })
+      textFixes.push('用具体数字替代模糊描述（如"大量"→"共15笔，金额合计¥3,200"）')
+      textFixes.push('每段申诉文案都要有对应的证据支撑')
+    }
+
+    // 通用建议
+    if (resubmitCount >= 2) {
+      improvements.push({ priority: 'medium', action: '考虑寻求专业协助', detail: '多次被驳回说明案件有一定难度，专业团队可以帮助分析具体问题并针对性优化' })
+    }
+    improvements.push({ priority: 'medium', action: '重新生成申诉文案', detail: '在平台点击「📄 申诉文案」重新生成，系统会根据最新信息优化内容' })
+
+    res.json({
+      rejection_reason: rejectionReason,
+      resubmit_count: resubmitCount,
+      improvements,
+      new_materials: newMaterials,
+      text_fixes: textFixes,
+      timeline: resubmitCount >= 2 ? '建议准备5-7天后重新提交' : '建议准备3-5天后重新提交',
+      tip: '每次重新申诉必须有实质性的新证据或新说明，切勿简单重复提交',
+    })
+  } catch (err) {
+    console.error('Resubmit strategy error:', err)
+    res.status(500).json({ error: '生成重申策略失败' })
+  }
+})
+
+// ========== 用户申诉记录一览 ==========
+
+app.get('/api/user/:id/appeal-records', requireUser, async (req, res) => {
+  try {
+    if (String(req.userId) !== String(req.params.id)) return res.status(403).json({ error: '无权访问' })
+    const uid = parseInt(req.params.id)
+    const [rows] = await pool.execute(`
+      SELECT at.session_id, at.appeal_status, at.submitted_at, at.result_at, at.rejection_reason, at.resubmit_count, at.created_at,
+             s.collected_data
+      FROM appeal_texts at
+      LEFT JOIN sessions s ON at.session_id = s.session_id
+      WHERE at.user_id = ?
+      ORDER BY at.created_at DESC
+      LIMIT 20
+    `, [uid])
+    const statusLabels = {
+      generated: '已生成文案', submitted: '已提交申诉', under_review: '审核中',
+      approved: '申诉通过', rejected: '已被驳回', resubmitted: '已重新提交'
+    }
+    const records = rows.map(r => {
+      let info = {}
+      try { info = typeof r.collected_data === 'string' ? JSON.parse(r.collected_data) : (r.collected_data || {}) } catch {}
+      return {
+        session_id: r.session_id,
+        status: r.appeal_status || 'generated',
+        label: statusLabels[r.appeal_status] || '已生成文案',
+        merchant_name: info.merchant_name || info.company_name || '',
+        problem_type: info.problem_type || '',
+        violation_reason: info.violation_reason || '',
+        submitted_at: r.submitted_at,
+        result_at: r.result_at,
+        rejection_reason: r.rejection_reason,
+        resubmit_count: r.resubmit_count || 0,
+        created_at: r.created_at,
+      }
+    })
+    res.json({ records })
+  } catch (err) {
+    console.error('Get appeal records error:', err)
+    res.status(500).json({ error: '获取申诉记录失败' })
+  }
+})
+
 // ========== 用户消费明细 ==========
 
 app.get('/api/user/:id/usage', requireUser, async (req, res) => {
@@ -1689,9 +2519,9 @@ app.get('/api/user/:id/usage', requireUser, async (req, res) => {
   }
 })
 
-// ========== 充值 API ==========
+// ========== 充值 API（真实支付集成） ==========
 
-// 获取充值配置（公开接口，用户需要看到QR码和金额选项）
+// 获取充值配置（公开接口）
 app.get('/api/recharge/config', async (req, res) => {
   try {
     const enabled = await getSystemConfig('recharge_enabled')
@@ -1703,6 +2533,8 @@ app.get('/api/recharge/config', async (req, res) => {
       getSystemConfig('recharge_qr_alipay'),
       getSystemConfig('recharge_instructions'),
     ])
+    // 检测真实支付渠道配置状态
+    const channels = getPaymentChannels()
     res.json({
       enabled: true,
       amounts: (amounts || '10,30,50,100,200,500').split(',').map(s => parseFloat(s.trim())).filter(n => n > 0),
@@ -1710,6 +2542,9 @@ app.get('/api/recharge/config', async (req, res) => {
       qrWechat: qrWechat || '',
       qrAlipay: qrAlipay || '',
       instructions: instructions || '',
+      // 真实支付渠道可用状态
+      paymentChannels: channels,
+      realPayment: channels.wechat || channels.alipay || channels.epay || channels.codepay,
     })
   } catch (err) {
     console.error('Recharge config error:', err)
@@ -1717,7 +2552,7 @@ app.get('/api/recharge/config', async (req, res) => {
   }
 })
 
-// 用户提交充值订单（需登录）
+// 用户提交充值订单（需登录）— 支持真实支付和手动充值两种模式
 app.post('/api/recharge', requireUser, async (req, res) => {
   try {
     const { amount, paymentMethod, remark } = req.body
@@ -1727,12 +2562,207 @@ app.post('/api/recharge', requireUser, async (req, res) => {
     if (!paymentMethod) return res.status(400).json({ error: '请选择支付方式' })
     const minAmount = parseFloat((await getSystemConfig('recharge_min_amount')) || '10')
     if (parseFloat(amount) < minAmount) return res.status(400).json({ error: `最低充值金额为 ¥${minAmount}` })
-    const orderId = await createRechargeOrder(userId, parseFloat(amount), paymentMethod, remark || '')
-    res.json({ success: true, orderId })
+
+    const channels = getPaymentChannels()
+    const realAmount = parseFloat(amount)
+
+    // 判断是否为真实支付渠道
+    const isRealPay = (paymentMethod === 'wechat' && channels.wechat) ||
+      (paymentMethod === 'alipay' && channels.alipay) ||
+      (paymentMethod.startsWith('epay_') && channels.epay) ||
+      (paymentMethod.startsWith('codepay_') && channels.codepay)
+
+    // 真实支付模式
+    if (isRealPay) {
+      const outTradeNo = generateOutTradeNo()
+      const orderId = await createRechargeOrder(userId, realAmount, paymentMethod, remark || '', outTradeNo)
+
+      try {
+        const payResult = await createPayment(paymentMethod, outTradeNo, realAmount, '商户申诉助手-账户充值')
+        console.log(`[支付] 用户${userId} 创建${paymentMethod}支付订单: ${outTradeNo}, 金额: ¥${realAmount}`)
+        res.json({
+          success: true,
+          orderId,
+          realPayment: true,
+          paymentMethod,
+          outTradeNo,
+          ...payResult,
+        })
+      } catch (payErr) {
+        console.error(`[支付] 创建支付订单失败:`, payErr.message)
+        // 支付创建失败，回退到手动模式
+        res.json({
+          success: true,
+          orderId,
+          realPayment: false,
+          message: `${paymentMethod === 'wechat' ? '微信' : '支付宝'}支付暂不可用，请使用扫码转账方式。管理员确认后余额将自动到账。`,
+        })
+      }
+    } else {
+      // 手动充值模式（兜底）：用户扫码转账，管理员手动确认
+      const orderId = await createRechargeOrder(userId, realAmount, paymentMethod, remark || '')
+      res.json({ success: true, orderId, realPayment: false })
+    }
   } catch (err) {
     console.error('Create recharge order error:', err)
     res.status(500).json({ error: '提交充值订单失败' })
   }
+})
+
+// 查询支付状态（前端轮询）
+app.get('/api/recharge/status/:outTradeNo', requireUser, async (req, res) => {
+  try {
+    const { outTradeNo } = req.params
+    if (!outTradeNo) return res.status(400).json({ error: '缺少订单号' })
+
+    // 先查数据库状态
+    const orders = await getUserRechargeOrders(req.userId)
+    const order = orders.find(o => o.out_trade_no === outTradeNo)
+    if (!order) return res.status(404).json({ error: '订单不存在' })
+    if (order.status === 'confirmed') return res.json({ status: 'paid', message: '支付成功，余额已到账' })
+    if (order.status === 'rejected') return res.json({ status: 'failed', message: '订单已取消' })
+
+    // 查询支付平台状态
+    const channels = getPaymentChannels()
+    if (order.payment_method === 'wechat' && channels.wechat) {
+      try {
+        const result = await queryPaymentStatus('wechat', outTradeNo)
+        if (result.tradeState === 'SUCCESS') {
+          // 自动确认订单
+          await confirmRechargeOrder(order.id)
+          const user = await getUserById(req.userId)
+          console.log(`[支付] 微信支付成功自动确认: ${outTradeNo}, 用户${req.userId}, 金额: ¥${order.amount}`)
+          return res.json({ status: 'paid', message: '支付成功，余额已到账', balance: parseFloat(user.balance) })
+        }
+        return res.json({ status: result.tradeState === 'NOTPAY' ? 'pending' : result.tradeState.toLowerCase() })
+      } catch (e) {
+        return res.json({ status: 'pending' })
+      }
+    } else if (order.payment_method === 'alipay' && channels.alipay) {
+      try {
+        const result = await queryPaymentStatus('alipay', outTradeNo)
+        if (result.tradeState === 'TRADE_SUCCESS' || result.tradeState === 'TRADE_FINISHED') {
+          await confirmRechargeOrder(order.id)
+          const user = await getUserById(req.userId)
+          console.log(`[支付] 支付宝支付成功自动确认: ${outTradeNo}, 用户${req.userId}, 金额: ¥${order.amount}`)
+          return res.json({ status: 'paid', message: '支付成功，余额已到账', balance: parseFloat(user.balance) })
+        }
+        return res.json({ status: result.tradeState === 'WAIT_BUYER_PAY' ? 'pending' : result.tradeState.toLowerCase() })
+      } catch (e) {
+        return res.json({ status: 'pending' })
+      }
+    }
+
+    res.json({ status: 'pending' })
+  } catch (err) {
+    console.error('Query payment status error:', err)
+    res.status(500).json({ error: '查询支付状态失败' })
+  }
+})
+
+// ========== 支付回调通知 ==========
+
+// 微信支付回调通知
+app.post('/api/payment/wechat/notify', async (req, res) => {
+  try {
+    const rawBody = typeof req.body === 'string' ? req.body : req.body.toString('utf8')
+    const result = handleWechatNotify(req.headers, rawBody)
+
+    console.log(`[微信支付回调] 订单: ${result.out_trade_no}, 状态: ${result.trade_state}`)
+
+    if (result.trade_state === 'SUCCESS') {
+      const outTradeNo = result.out_trade_no
+      // 查找并确认充值订单
+      const allOrders = await getRechargeOrders()
+      const order = allOrders.find(o => o.out_trade_no === outTradeNo && o.status === 'pending')
+      if (order) {
+        await confirmRechargeOrder(order.id)
+        console.log(`[微信支付回调] 自动确认订单: ${outTradeNo}, 用户${order.user_id}, 金额: ¥${order.amount}`)
+      }
+    }
+
+    // 微信要求返回 200 + JSON
+    res.json({ code: 'SUCCESS', message: '成功' })
+  } catch (err) {
+    console.error('[微信支付回调] 处理失败:', err.message)
+    res.status(500).json({ code: 'FAIL', message: err.message })
+  }
+})
+
+// 支付宝回调通知
+app.post('/api/payment/alipay/notify', async (req, res) => {
+  try {
+    const params = req.body
+    console.log(`[支付宝回调] 订单: ${params.out_trade_no}, 状态: ${params.trade_status}`)
+
+    const result = handleAlipayNotify(params)
+
+    if (result.tradeStatus === 'TRADE_SUCCESS' || result.tradeStatus === 'TRADE_FINISHED') {
+      const outTradeNo = result.outTradeNo
+      const allOrders = await getRechargeOrders()
+      const order = allOrders.find(o => o.out_trade_no === outTradeNo && o.status === 'pending')
+      if (order) {
+        await confirmRechargeOrder(order.id)
+        console.log(`[支付宝回调] 自动确认订单: ${outTradeNo}, 用户${order.user_id}, 金额: ¥${order.amount}`)
+      }
+    }
+
+    // 支付宝要求返回纯文本 "success"
+    res.send('success')
+  } catch (err) {
+    console.error('[支付宝回调] 处理失败:', err.message)
+    res.send('fail')
+  }
+})
+
+// 易支付回调通知
+app.post('/api/payment/epay/notify', async (req, res) => {
+  try {
+    const params = req.body
+    console.log(`[易支付回调] 订单: ${params.out_trade_no}, 状态: ${params.trade_status}`)
+    const result = handleEpayNotify(params)
+    if (result.tradeStatus === 'SUCCESS') {
+      const allOrders = await getRechargeOrders()
+      const order = allOrders.find(o => o.out_trade_no === result.outTradeNo && o.status === 'pending')
+      if (order) {
+        await confirmRechargeOrder(order.id)
+        console.log(`[易支付回调] 自动确认订单: ${result.outTradeNo}, 用户${order.user_id}, 金额: ¥${order.amount}`)
+      }
+    }
+    res.send('success')
+  } catch (err) {
+    console.error('[易支付回调] 处理失败:', err.message)
+    res.send('fail')
+  }
+})
+// 易支付同步返回
+app.get('/api/payment/epay/return', async (req, res) => {
+  res.redirect('/recharge-success')
+})
+
+// 码支付回调通知
+app.post('/api/payment/codepay/notify', async (req, res) => {
+  try {
+    const params = req.body
+    console.log(`[码支付回调] 订单: ${params.pay_id}`)
+    const result = handleCodePayNotify(params)
+    if (result.tradeStatus === 'SUCCESS') {
+      const allOrders = await getRechargeOrders()
+      const order = allOrders.find(o => o.out_trade_no === result.outTradeNo && o.status === 'pending')
+      if (order) {
+        await confirmRechargeOrder(order.id)
+        console.log(`[码支付回调] 自动确认订单: ${result.outTradeNo}, 用户${order.user_id}, 金额: ¥${order.amount}`)
+      }
+    }
+    res.send('success')
+  } catch (err) {
+    console.error('[码支付回调] 处理失败:', err.message)
+    res.send('fail')
+  }
+})
+// 码支付同步返回
+app.get('/api/payment/codepay/return', async (req, res) => {
+  res.redirect('/recharge-success')
 })
 
 // 用户查看自己的充值记录
@@ -1953,48 +2983,583 @@ app.delete('/api/admin/cases/:id', requireAdmin, async (req, res) => {
 
 // ========== 配置 API（需要管理员认证） ==========
 
-// 测试 DeepSeek API Key 是否有效
-app.post('/api/admin/test-deepseek', requireAdmin, async (req, res) => {
-  try {
-    const { apiKey } = req.body
-    const key = apiKey || await getSystemConfig('deepseek_api_key')
-    if (!key) return res.json({ success: false, error: '未配置 API Key' })
+// ========== AI 模型管理 API ==========
 
-    console.log('[Test DeepSeek] Key:', key.slice(0, 6) + '****' + key.slice(-4), 'Length:', key.length)
+// 获取所有模型
+app.get('/api/admin/ai-models', requireAdmin, async (req, res) => {
+  try {
+    const models = await getAIModels()
+    // 隐藏完整 API Key，只返回掩码
+    const safe = models.map(m => ({
+      ...m,
+      api_key_masked: m.api_key ? m.api_key.slice(0, 6) + '****' + m.api_key.slice(-4) : '',
+      has_key: !!m.api_key,
+      api_key: undefined,
+    }))
+    res.json({ models: safe })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取模型列表失败' }) }
+})
+
+// 创建新模型
+app.post('/api/admin/ai-models', requireAdmin, async (req, res) => {
+  try {
+    const { provider, displayName, apiKey, modelName, endpoint, isFree, sortOrder } = req.body
+    if (!provider || !modelName || !endpoint) return res.status(400).json({ error: '缺少必填字段' })
+    const result = await createAIModel({ provider, displayName: displayName || modelName, apiKey, modelName, endpoint, isFree, sortOrder })
+    res.json({ success: true, id: result.id })
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: '该供应商下已存在同名模型' })
+    console.error(err); res.status(500).json({ error: '创建失败' })
+  }
+})
+
+// 更新模型配置
+app.put('/api/admin/ai-models/:id', requireAdmin, async (req, res) => {
+  try {
+    const { displayName, apiKey, modelName, endpoint, isEnabled, isFree, sortOrder } = req.body
+    await updateAIModel(req.params.id, { displayName, apiKey, modelName, endpoint, isEnabled, isFree, sortOrder })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '更新失败' }) }
+})
+
+// 激活模型（设为当前使用）
+app.put('/api/admin/ai-models/:id/activate', requireAdmin, async (req, res) => {
+  try {
+    const model = await getAIModelById(req.params.id)
+    if (!model) return res.status(404).json({ error: '模型不存在' })
+    if (!model.api_key) return res.status(400).json({ error: '请先配置 API Key' })
+    await setActiveAIModel(req.params.id)
+    res.json({ success: true, model: model.display_name })
+  } catch (err) { console.error(err); res.status(500).json({ error: '激活失败' }) }
+})
+
+// 删除模型
+app.delete('/api/admin/ai-models/:id', requireAdmin, async (req, res) => {
+  try {
+    const model = await getAIModelById(req.params.id)
+    if (!model) return res.status(404).json({ error: '模型不存在' })
+    if (model.is_active) return res.status(400).json({ error: '不能删除当前激活的模型' })
+    await deleteAIModelDB(req.params.id)
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '删除失败' }) }
+})
+
+// 测试指定模型连接（支持传入 modelId 或直接传 endpoint+apiKey+model）
+app.post('/api/admin/ai-models/test', requireAdmin, async (req, res) => {
+  try {
+    let endpoint, apiKey, modelName, provider
+    if (req.body.modelId) {
+      const m = await getAIModelById(req.body.modelId)
+      if (!m) return res.json({ success: false, error: '模型不存在' })
+      endpoint = m.endpoint; apiKey = req.body.apiKey || m.api_key; modelName = m.model_name; provider = m.provider
+    } else {
+      endpoint = req.body.endpoint; apiKey = req.body.apiKey; modelName = req.body.modelName; provider = req.body.provider || 'custom'
+    }
+    if (!apiKey) return res.json({ success: false, error: '未配置 API Key' })
+    if (!endpoint) return res.json({ success: false, error: '未配置 API 端点' })
+
+    console.log(`[Test AI:${provider}] Model: ${modelName}, Key: ${apiKey.slice(0, 6)}****`)
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30000)
-    const r = await fetch('https://api.deepseek.com/chat/completions', {
+    const r = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: '你好' }], max_tokens: 20 }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: '你好，请用一句话介绍你自己' }], max_tokens: 50 }),
       signal: controller.signal,
     })
     clearTimeout(timeout)
 
     if (!r.ok) {
       const errText = await r.text()
-      console.log('[Test DeepSeek] Error:', r.status, errText)
-      return res.json({ success: false, error: `API 返回 ${r.status}: ${errText.substring(0, 200)}` })
+      return res.json({ success: false, error: `API ${r.status}: ${errText.substring(0, 200)}` })
     }
 
     const data = await r.json()
     const reply = data.choices?.[0]?.message?.content || ''
-    res.json({ success: true, reply: reply.substring(0, 100), model: data.model })
+    res.json({ success: true, reply: reply.substring(0, 200), model: data.model || modelName, provider })
   } catch (err) {
-    console.error('[Test DeepSeek]', err)
+    console.error('[Test AI]', err.message)
+    res.json({ success: false, error: err.name === 'AbortError' ? '请求超时(30s)' : err.message })
+  }
+})
+
+// 兼容旧接口：测试当前激活模型
+app.post('/api/admin/test-deepseek', requireAdmin, async (req, res) => {
+  try {
+    const cfg = await getAIConfig()
+    const key = req.body.apiKey || cfg.apiKey
+    if (!key) return res.json({ success: false, error: '未配置 API Key' })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+    const r = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: '你好' }], max_tokens: 20 }),
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!r.ok) { const t = await r.text(); return res.json({ success: false, error: `API ${r.status}: ${t.substring(0, 200)}` }) }
+    const data = await r.json()
+    res.json({ success: true, reply: (data.choices?.[0]?.message?.content || '').substring(0, 100), model: data.model, provider: cfg.provider })
+  } catch (err) { res.json({ success: false, error: err.message }) }
+})
+
+// ========== AI模型智能导入（自动检测API Key所属平台并批量配置） ==========
+app.post('/api/admin/ai-models/auto-import', requireAdmin, async (req, res) => {
+  try {
+    const { apiKey } = req.body
+    if (!apiKey || apiKey.trim().length < 10) return res.status(400).json({ error: '请输入有效的 API Key' })
+    const key = apiKey.trim()
+
+    // 各平台检测配置：endpoint + 测试model + 该key可用的所有模型
+    const providers = [
+      {
+        name: 'deepseek', label: 'DeepSeek',
+        endpoint: 'https://api.deepseek.com/chat/completions',
+        testModel: 'deepseek-chat',
+        models: [
+          { model: 'deepseek-chat', display: 'DeepSeek-Chat', free: 0 },
+          { model: 'deepseek-reasoner', display: 'DeepSeek-Reasoner', free: 0 },
+        ]
+      },
+      {
+        name: 'zhipu', label: '智谱AI',
+        endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        testModel: 'glm-4.7-flash',
+        models: [
+          { model: 'glm-4.7-flash', display: '智谱GLM-4-Flash（免费）', free: 1 },
+          { model: 'glm-4-plus', display: '智谱GLM-4-Plus', free: 0 },
+          { model: 'glm-4-long', display: '智谱GLM-4-Long', free: 0 },
+        ]
+      },
+      {
+        name: 'qwen', label: '通义千问',
+        endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        testModel: 'qwen-turbo',
+        models: [
+          { model: 'qwen-turbo', display: '通义千问-Turbo', free: 0 },
+          { model: 'qwen-plus', display: '通义千问-Plus', free: 0 },
+          { model: 'qwen-max', display: '通义千问-Max', free: 0 },
+          { model: 'qwen-long', display: '通义千问-Long', free: 0 },
+        ]
+      },
+      {
+        name: 'moonshot', label: 'Moonshot Kimi',
+        endpoint: 'https://api.moonshot.cn/v1/chat/completions',
+        testModel: 'moonshot-v1-8k',
+        models: [
+          { model: 'moonshot-v1-8k', display: 'Moonshot Kimi-v1-8K', free: 0 },
+          { model: 'moonshot-v1-32k', display: 'Moonshot Kimi-v1-32K', free: 0 },
+          { model: 'moonshot-v1-128k', display: 'Moonshot Kimi-v1-128K', free: 0 },
+        ]
+      },
+      {
+        name: 'siliconflow', label: 'SiliconFlow',
+        endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
+        testModel: 'deepseek-ai/DeepSeek-V3',
+        models: [
+          { model: 'deepseek-ai/DeepSeek-V3', display: 'SiliconFlow DeepSeek-V3（免费）', free: 1 },
+          { model: 'Qwen/Qwen2.5-7B-Instruct', display: 'SiliconFlow Qwen2.5-7B（免费）', free: 1 },
+          { model: 'THUDM/glm-4-9b-chat', display: 'SiliconFlow GLM4-9B（免费）', free: 1 },
+          { model: '01-ai/Yi-1.5-9B-Chat-16K', display: 'SiliconFlow Yi-1.5-9B（免费）', free: 1 },
+          { model: 'meta-llama/Meta-Llama-3-8B-Instruct', display: 'SiliconFlow Llama3-8B（免费）', free: 1 },
+          { model: 'internlm/internlm2_5-7b-chat', display: 'SiliconFlow InternLM2.5-7B（免费）', free: 1 },
+        ]
+      },
+      {
+        name: 'yi', label: '零一万物',
+        endpoint: 'https://api.lingyiwanwu.com/v1/chat/completions',
+        testModel: 'yi-lightning',
+        models: [
+          { model: 'yi-lightning', display: '零一万物Yi-Lightning', free: 0 },
+          { model: 'yi-large', display: '零一万物Yi-Large', free: 0 },
+        ]
+      },
+      {
+        name: 'spark', label: '讯飞星火',
+        endpoint: 'https://spark-api-open.xf-yun.com/v1/chat/completions',
+        testModel: 'generalv3',
+        models: [
+          { model: 'generalv3', display: '讯飞星火-Lite（免费）', free: 1 },
+          { model: 'generalv3.5', display: '讯飞星火-Pro', free: 0 },
+          { model: 'general4.0', display: '讯飞星火-Max', free: 0 },
+        ]
+      },
+      {
+        name: 'stepfun', label: '阶跃星辰',
+        endpoint: 'https://api.stepfun.com/v1/chat/completions',
+        testModel: 'step-1-8k',
+        models: [
+          { model: 'step-1-8k', display: '阶跃星辰Step-1-8K', free: 0 },
+          { model: 'step-2-16k', display: '阶跃星辰Step-2-16K', free: 0 },
+        ]
+      },
+      {
+        name: 'openai', label: 'OpenAI',
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        testModel: 'gpt-4o-mini',
+        models: [
+          { model: 'gpt-4o-mini', display: 'OpenAI GPT-4o-mini', free: 0 },
+          { model: 'gpt-4o', display: 'OpenAI GPT-4o', free: 0 },
+          { model: 'gpt-4-turbo', display: 'OpenAI GPT-4-Turbo', free: 0 },
+        ]
+      },
+      {
+        name: 'groq', label: 'Groq',
+        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        testModel: 'llama3-70b-8192',
+        models: [
+          { model: 'llama3-70b-8192', display: 'Groq Llama3-70B（免费）', free: 1 },
+          { model: 'mixtral-8x7b-32768', display: 'Groq Mixtral-8x7B（免费）', free: 1 },
+        ]
+      },
+    ]
+
+    console.log(`[Auto-Import] 开始检测 API Key: ${key.slice(0, 8)}****`)
+    let detected = null
+
+    // 并行检测所有平台（带超时）
+    const results = await Promise.allSettled(providers.map(async (p) => {
+      try {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 15000)
+        const r = await fetch(p.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+          body: JSON.stringify({ model: p.testModel, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+          signal: ctrl.signal,
+        })
+        clearTimeout(timer)
+        if (r.ok) return { provider: p, status: 'ok' }
+        const errText = await r.text()
+        // 401/403 = key不属于这个平台，其他错误可能是模型问题但key有效
+        if (r.status === 401 || r.status === 403) return { provider: p, status: 'auth_failed' }
+        if (r.status === 429) return { provider: p, status: 'ok' } // 限频说明key有效
+        return { provider: p, status: 'error', error: errText.slice(0, 100) }
+      } catch (e) {
+        return { provider: p, status: 'error', error: e.message }
+      }
+    }))
+
+    // 找到验证通过的平台
+    const matched = results.filter(r => r.status === 'fulfilled' && r.value.status === 'ok').map(r => r.value)
+    
+    if (matched.length === 0) {
+      return res.json({ success: false, error: '未能识别该 API Key 所属平台。请确认 Key 是否正确。', tested: providers.map(p => p.label) })
+    }
+
+    // 批量导入匹配平台的所有模型
+    const imported = []
+    for (const m of matched) {
+      const p = m.provider
+      for (const model of p.models) {
+        try {
+          // 检查是否已存在
+          const existingModels = await getAIModels()
+          const existing = existingModels.find(e => e.provider === p.name && e.model_name === model.model)
+          if (existing) {
+            // 更新API Key
+            await updateAIModel(existing.id, { apiKey: key })
+            imported.push({ id: existing.id, name: model.display, action: 'updated' })
+          } else {
+            // 创建新模型
+            const result = await createAIModel({
+              provider: p.name, displayName: model.display, apiKey: key,
+              modelName: model.model, endpoint: p.endpoint, isFree: model.free, sortOrder: 50
+            })
+            imported.push({ id: result.id, name: model.display, action: 'created' })
+          }
+        } catch (e) {
+          imported.push({ name: model.display, action: 'failed', error: e.message })
+        }
+      }
+    }
+
+    // 如果当前没有活跃模型，自动激活第一个导入的
+    const activeModel = await getActiveAIModel()
+    if (!activeModel && imported.length > 0) {
+      const first = imported.find(i => i.id && i.action !== 'failed')
+      if (first) await setActiveAIModel(first.id)
+    }
+
+    console.log(`[Auto-Import] 完成: ${matched.map(m => m.provider.label).join(', ')} → ${imported.length} 个模型`)
+    res.json({
+      success: true,
+      provider: matched.map(m => m.provider.label),
+      imported,
+      message: `检测到 ${matched.map(m => m.provider.label).join('/')} 平台，已自动配置 ${imported.length} 个模型`,
+    })
+  } catch (err) {
+    console.error('[Auto-Import]', err)
+    res.status(500).json({ error: '自动导入失败: ' + err.message })
+  }
+})
+
+// ========== 管理员数据清理（修复加密乱码） ==========
+app.post('/api/admin/fix-encrypted-data', requireAdmin, async (req, res) => {
+  try {
+    const result = await fixEncryptedData()
+    res.json({ success: true, ...result, message: `共 ${result.total} 个用户，修复了 ${result.fixed} 个乱码数据` })
+  } catch (err) { console.error(err); res.status(500).json({ error: '修复失败: ' + err.message }) }
+})
+
+// ========== 模型健康检测 API ==========
+
+// 获取所有模型（含健康状态）
+app.get('/api/admin/ai-models/health', requireAdmin, async (req, res) => {
+  try {
+    const models = await getAIModelsWithHealth()
+    // 安全处理：掩码 API Key，不泄露到前端
+    const safe = models.map(m => ({
+      ...m,
+      api_key_masked: m.api_key ? m.api_key.slice(0, 6) + '****' + m.api_key.slice(-4) : '',
+      has_key: !!m.api_key,
+      api_key: undefined,
+    }))
+    const active = safe.find(m => m.is_active)
+    res.json({ models: safe, activeModelId: active?.id || null })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取模型状态失败' }) }
+})
+
+// 批量检测所有模型
+app.post('/api/admin/ai-models/check-all', requireAdmin, async (req, res) => {
+  try {
+    const results = await checkAllModels()
+    const switchResult = await autoSwitchIfNeeded()
+    res.json({ results, autoSwitch: switchResult })
+  } catch (err) { console.error(err); res.status(500).json({ error: '批量检测失败' }) }
+})
+
+// 检测单个模型
+app.post('/api/admin/ai-models/:id/check', requireAdmin, async (req, res) => {
+  try {
+    const result = await checkSingleModel(parseInt(req.params.id))
+    res.json(result)
+  } catch (err) { console.error(err); res.status(500).json({ error: '检测失败' }) }
+})
+
+// 手动触发自动切换
+app.post('/api/admin/ai-models/auto-switch', requireAdmin, async (req, res) => {
+  try {
+    const result = await autoSwitchIfNeeded()
+    res.json(result || { switched: false, reason: '当前模型正常，无需切换' })
+  } catch (err) { console.error(err); res.status(500).json({ error: '切换失败' }) }
+})
+
+// ========== DeepSeek 多账号余额管理 API ==========
+
+// 查询单个DeepSeek账号余额（调用官方API）
+async function fetchDeepseekBalance(apiKey) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  try {
+    const res = await fetch('https://api.deepseek.com/user/balance', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${text.substring(0, 200)}`)
+    }
+    const data = await res.json()
+    const info = data.balance_infos?.[0] || {}
+    return {
+      isAvailable: data.is_available ?? false,
+      totalBalance: parseFloat(info.total_balance || 0),
+      grantedBalance: parseFloat(info.granted_balance || 0),
+      toppedUpBalance: parseFloat(info.topped_up_balance || 0),
+      currency: info.currency || 'CNY',
+    }
+  } catch (err) {
+    clearTimeout(timeout)
+    throw new Error(err.name === 'AbortError' ? '请求超时(15s)' : err.message)
+  }
+}
+
+// 获取所有DeepSeek账号（掩码Key+余额）
+app.get('/api/admin/deepseek-accounts', requireAdmin, async (req, res) => {
+  try {
+    const accounts = await getDeepseekAccounts()
+    const safe = accounts.map(a => ({
+      ...a,
+      api_key_masked: a.api_key ? a.api_key.slice(0, 8) + '****' + a.api_key.slice(-4) : '',
+      has_key: !!a.api_key,
+      api_key: undefined,
+      is_warning: a.total_balance !== null && parseFloat(a.total_balance) <= parseFloat(a.warning_threshold || 10),
+    }))
+    const totalBalance = accounts.reduce((s, a) => s + parseFloat(a.total_balance || 0), 0)
+    const warningCount = safe.filter(a => a.is_warning && a.is_enabled).length
+    res.json({ accounts: safe, summary: { total: accounts.length, totalBalance: totalBalance.toFixed(2), warningCount } })
+  } catch (err) { console.error(err); res.status(500).json({ error: '获取账号列表失败' }) }
+})
+
+// 添加DeepSeek账号
+app.post('/api/admin/deepseek-accounts', requireAdmin, async (req, res) => {
+  try {
+    const { label, apiKey, warningThreshold } = req.body
+    if (!apiKey) return res.status(400).json({ error: '请填写 API Key' })
+    const result = await createDeepseekAccount({ label, apiKey, warningThreshold })
+    // 立即查询余额
+    try {
+      const balance = await fetchDeepseekBalance(apiKey)
+      await updateDeepseekBalance(result.id, { totalBalance: balance.totalBalance, grantedBalance: balance.grantedBalance, toppedUpBalance: balance.toppedUpBalance, isAvailable: balance.isAvailable })
+    } catch (e) {
+      await updateDeepseekBalance(result.id, { error: e.message })
+    }
+    res.json({ success: true, id: result.id })
+  } catch (err) { console.error(err); res.status(500).json({ error: '添加失败' }) }
+})
+
+// 更新DeepSeek账号
+app.put('/api/admin/deepseek-accounts/:id', requireAdmin, async (req, res) => {
+  try {
+    const { label, apiKey, isEnabled, warningThreshold } = req.body
+    await updateDeepseekAccount(req.params.id, { label, apiKey, isEnabled, warningThreshold })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '更新失败' }) }
+})
+
+// 删除DeepSeek账号
+app.delete('/api/admin/deepseek-accounts/:id', requireAdmin, async (req, res) => {
+  try {
+    await deleteDeepseekAccount(req.params.id)
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '删除失败' }) }
+})
+
+// 批量查询所有账号余额 (NOTE: must be BEFORE :id routes to avoid Express matching 'check-all' as :id)
+app.post('/api/admin/deepseek-accounts/check-all', requireAdmin, async (req, res) => {
+  try {
+    const accounts = await getDeepseekAccounts()
+    const enabled = accounts.filter(a => a.is_enabled && a.api_key)
+    const results = []
+    for (const account of enabled) {
+      try {
+        const balance = await fetchDeepseekBalance(account.api_key)
+        await updateDeepseekBalance(account.id, { totalBalance: balance.totalBalance, grantedBalance: balance.grantedBalance, toppedUpBalance: balance.toppedUpBalance, isAvailable: balance.isAvailable })
+        results.push({ id: account.id, label: account.label, success: true, ...balance, isWarning: balance.totalBalance <= parseFloat(account.warning_threshold || 10) })
+      } catch (err) {
+        await updateDeepseekBalance(account.id, { error: err.message })
+        results.push({ id: account.id, label: account.label, success: false, error: err.message })
+      }
+      // 避免限流
+      if (enabled.indexOf(account) < enabled.length - 1) await new Promise(r => setTimeout(r, 300))
+    }
+    const totalBalance = results.filter(r => r.success).reduce((s, r) => s + r.totalBalance, 0)
+    const warningCount = results.filter(r => r.isWarning).length
+    res.json({ results, summary: { checked: results.length, totalBalance: totalBalance.toFixed(2), warningCount } })
+  } catch (err) { console.error(err); res.status(500).json({ error: '批量查询失败' }) }
+})
+
+// 查询单个账号余额
+app.post('/api/admin/deepseek-accounts/:id/check-balance', requireAdmin, async (req, res) => {
+  try {
+    const account = await getDeepseekAccountById(parseInt(req.params.id))
+    if (!account) return res.status(404).json({ error: '账号不存在' })
+    if (!account.api_key) return res.json({ success: false, error: '未配置 API Key' })
+    const balance = await fetchDeepseekBalance(account.api_key)
+    await updateDeepseekBalance(account.id, { totalBalance: balance.totalBalance, grantedBalance: balance.grantedBalance, toppedUpBalance: balance.toppedUpBalance, isAvailable: balance.isAvailable })
+    res.json({ success: true, ...balance, isWarning: balance.totalBalance <= parseFloat(account.warning_threshold || 10) })
+  } catch (err) {
+    const account = await getDeepseekAccountById(parseInt(req.params.id)).catch(() => null)
+    if (account) await updateDeepseekBalance(account.id, { error: err.message })
     res.json({ success: false, error: err.message })
   }
 })
 
-// 管理员查看Token消费明细
+// ========== 名片系统（多名片，公开+管理API）==========
+
+// 公开API：获取所有活跃名片（兼容旧的单名片接口）
+app.get('/api/contact-card', async (req, res) => {
+  try {
+    const cards = await getActiveContactCards()
+    if (cards.length > 0) {
+      // 新版：返回所有名片
+      const formatted = cards.map(c => ({
+        id: c.id, name: c.name, title: c.title, phone: c.phone, wechat: c.wechat,
+        email: c.email, qrCode: c.qr_code, description: c.description,
+        category: c.category, tags: c.tags,
+      }))
+      // 兼容旧版：enabled + 第一张名片的字段
+      res.json({ enabled: true, cards: formatted, ...formatted[0] })
+    } else {
+      // 回退到旧的system_config方式
+      const configs = await getSystemConfigs()
+      const get = (key) => configs.find(c => c.config_key === key)?.config_value || ''
+      const card = {
+        name: get('tech_contact_name') || '技术支持',
+        title: get('tech_contact_title') || 'AI申诉助手技术顾问',
+        phone: get('tech_contact_phone'), wechat: get('tech_contact_wechat'),
+        email: get('tech_contact_email'), qrCode: get('tech_contact_qr'),
+        description: get('tech_contact_desc') || '专业商户申诉解决方案，有问题随时联系我',
+        enabled: get('tech_contact_enabled') === '1',
+      }
+      res.json({ ...card, cards: card.enabled ? [card] : [] })
+    }
+  } catch (err) { res.json({ enabled: false, cards: [] }) }
+})
+
+// 公开API：点击名片计数
+app.post('/api/contact-cards/:id/click', async (req, res) => {
+  try {
+    await incrementCardMetric(parseInt(req.params.id), 'click_count')
+    res.json({ success: true })
+  } catch (err) { res.status(500).json({ error: '记录失败' }) }
+})
+
+// 管理API：名片CRUD
+app.get('/api/admin/contact-cards', requireAdmin, async (req, res) => {
+  try {
+    const { status, category } = req.query
+    const cards = await getContactCards({ status, category })
+    res.json({ cards })
+  } catch (err) { res.status(500).json({ error: '获取名片失败' }) }
+})
+
+app.get('/api/admin/contact-cards/:id', requireAdmin, async (req, res) => {
+  try {
+    const card = await getContactCardById(parseInt(req.params.id))
+    if (!card) return res.status(404).json({ error: '名片不存在' })
+    res.json({ card })
+  } catch (err) { res.status(500).json({ error: '获取名片失败' }) }
+})
+
+app.post('/api/admin/contact-cards', requireAdmin, async (req, res) => {
+  try {
+    const { name, title, phone, wechat, email, qrCode, description, category, tags, targetAudience, sortOrder, status } = req.body
+    if (!name) return res.status(400).json({ error: '名称不能为空' })
+    const result = await createContactCard({ name, title, phone, wechat, email, qrCode, description, category, tags, targetAudience, sortOrder, status })
+    res.json({ success: true, ...result })
+  } catch (err) { res.status(500).json({ error: '创建名片失败: ' + err.message }) }
+})
+
+app.put('/api/admin/contact-cards/:id', requireAdmin, async (req, res) => {
+  try {
+    const card = await updateContactCard(parseInt(req.params.id), req.body)
+    if (!card) return res.status(404).json({ error: '名片不存在' })
+    res.json({ success: true, card })
+  } catch (err) { res.status(500).json({ error: '更新名片失败' }) }
+})
+
+app.delete('/api/admin/contact-cards/:id', requireAdmin, async (req, res) => {
+  try {
+    await deleteContactCard(parseInt(req.params.id))
+    res.json({ success: true })
+  } catch (err) { res.status(500).json({ error: '删除名片失败' }) }
+})
+
+// 管理员查看Token消费明细（支持分页/筛选）
 app.get('/api/admin/token-usage', requireAdmin, async (req, res) => {
   try {
+    const { page = 1, limit = 50, type, userId, dateFrom, dateTo } = req.query
     const [usage, stats] = await Promise.all([
-      getAllTokenUsage(200),
+      getAllTokenUsage(parseInt(limit), { page: parseInt(page), type, userId: userId ? parseInt(userId) : undefined, dateFrom, dateTo }),
       getTokenUsageStats(),
     ])
-    res.json({ usage, stats })
+    res.json({ ...usage, stats })
   } catch (err) { console.error(err); res.status(500).json({ error: '获取Token明细失败' }) }
 })
 
@@ -2305,6 +3870,14 @@ app.post('/api/admin/evolution/explore', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: '探索失败: ' + err.message }) }
 })
 
+app.post('/api/admin/evolution/experiments/:id/abort', requireAdmin, async (req, res) => {
+  try {
+    const { updateExperiment } = await import('./db.js')
+    await updateExperiment(parseInt(req.params.id), { status: 'aborted', winner: 'inconclusive' })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: '终止实验失败' }) }
+})
+
 // --- 变更日志 ---
 app.get('/api/admin/evolution/changelog', requireAdmin, async (req, res) => {
   try {
@@ -2422,10 +3995,10 @@ app.post('/api/mall/products/:id/click', async (req, res) => {
 })
 
 // --- 用户端: 个性化推荐 ---
-app.get('/api/mall/recommendations', async (req, res) => {
+app.get('/api/mall/recommendations', optionalUser, async (req, res) => {
   try {
     const { sessionId } = req.query
-    const userId = req.user?.id || null
+    const userId = req.userId || null
     const recs = await getRecommendations(userId, sessionId || null, 10)
     res.json({ recommendations: recs })
   } catch (err) { res.status(500).json({ error: '获取推荐失败' }) }
@@ -2438,21 +4011,470 @@ app.put('/api/mall/recommendations/:id/status', async (req, res) => {
   } catch (err) { res.status(500).json({ error: '更新失败' }) }
 })
 
+// --- 公开: AI砍价 ---
+app.post('/api/mall/products/:id/bargain', async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const product = await getProductById(parseInt(req.params.id))
+    if (!product || product.status !== 'active') return res.status(404).json({ error: '商品不存在' })
+    const { history, message } = req.body || {}
+    const result = await aiBargain(product, history || [], message || '')
+    logAIActivity({ action: 'AI砍价', category: 'bargain', detail: `商品"${product.name}" ${result.accepted ? '成交¥'+result.finalPrice : '议价中'}`, duration_ms: Date.now()-t0 }).catch(()=>{})
+    res.json(result)
+  } catch (err) { res.json({ reply: '系统繁忙，请稍后再试', finalPrice: null, accepted: false }) }
+})
+
+// --- 公开: 下单后生成虚拟人设 ---
+app.post('/api/mall/products/:id/persona', async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const product = await getProductById(parseInt(req.params.id))
+    if (!product) return res.status(404).json({ error: '商品不存在' })
+    const { collectedData } = req.body || {}
+    const persona = await aiGenerateVirtualPersona(product, collectedData || {})
+    const p = persona || { name: '客服小助', title: '专属顾问', avatar: '👨‍💼', greeting: '您好，我是您的专属服务顾问！' }
+    logAIActivity({ action: '生成虚拟人设', category: 'persona', detail: `${p.name}·${p.title} 服务商品"${product.name}"`, duration_ms: Date.now()-t0 }).catch(()=>{})
+    res.json({ persona: p })
+  } catch (err) { res.json({ persona: { name: '客服小助', title: '专属顾问', avatar: '👨‍💼', greeting: '您好，我是您的专属服务顾问！' } }) }
+})
+
+// --- 公开: AI风险评估 ---
+app.post('/api/risk-assess', async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const { collectedData } = req.body || {}
+    const result = await aiAssessRisk(collectedData || {})
+    logAIActivity({ action: 'AI风险评估', category: 'risk', detail: `${result.label}: ${result.description || ''}`, duration_ms: Date.now()-t0 }).catch(()=>{})
+    res.json(result)
+  } catch (err) { res.json({ level: 'medium', label: '评估中', description: '评估失败' }) }
+})
+
+// --- 后台: AI行为日志 ---
+app.get('/api/admin/ai-activity', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '50')
+    const offset = parseInt(req.query.offset || '0')
+    const category = req.query.category || null
+    const logs = await getAIActivityLog(limit, offset, category)
+    const stats = await getAIActivityStats()
+    res.json({ logs, stats })
+  } catch (err) { res.status(500).json({ error: '获取AI日志失败' }) }
+})
+
+// --- 后台: AI生成名片 ---
+app.post('/api/admin/contact-cards/ai-generate', requireAdmin, async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const { description, category } = req.body || {}
+    const cardData = await aiGenerateContactCard({ description, category })
+    if (!cardData) {
+      logAIActivity({ action: 'AI生成名片', category: 'card', detail: '生成失败', status: 'failed', duration_ms: Date.now()-t0 }).catch(()=>{})
+      return res.status(500).json({ error: 'AI生成失败，请重试' })
+    }
+    const result = await createContactCard({ ...cardData, status: 'draft' })
+    logAIActivity({ action: 'AI生成名片', category: 'card', detail: `${cardData.name}·${cardData.title}`, duration_ms: Date.now()-t0 }).catch(()=>{})
+    res.json({ success: true, ...result, card: cardData })
+  } catch (err) { res.status(500).json({ error: 'AI名片生成失败: ' + err.message }) }
+})
+
+// --- 后台: AI辅助生成（规则/名片/商品） ---
+app.post('/api/admin/ai-assist', requireAdmin, async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const { type, description } = req.body || {}
+    if (!description?.trim()) return res.status(400).json({ error: '请输入描述' })
+    const cfg = await getAIConfig()
+    if (!cfg.apiKey) return res.status(500).json({ error: 'AI服务未配置' })
+
+    let systemPrompt = '', parseField = ''
+    if (type === 'rule') {
+      parseField = 'rule'
+      systemPrompt = `你是商户申诉平台的AI规则专家。用户会用自然语言描述一条业务规则，你需要将其转化为结构化的规则配置。
+输出严格JSON格式：
+{
+  "ruleKey": "英文下划线标识，如 industry_food_greeting",
+  "ruleName": "简短中文规则名",
+  "category": "规则类型，只能是: collection_strategy / response_template / industry_knowledge / scoring_weight / workflow",
+  "ruleContent": {
+    "description": "详细描述这条规则做什么",
+    "condition": "触发条件",
+    "action": "执行动作",
+    "priority": "high/medium/low",
+    "examples": ["示例场景1", "示例场景2"]
+  }
+}
+只输出JSON，不要其他内容。`
+    } else if (type === 'card') {
+      parseField = 'card'
+      systemPrompt = `你是商户申诉平台的名片设计AI。用户会用自然语言描述想要创建的联系人/客服名片，你需要生成完整的名片信息。
+输出严格JSON格式：
+{
+  "name": "姓名",
+  "title": "头衔/职位",
+  "phone": "手机号（可用虚拟号如138xxxx1234）",
+  "wechat": "微信号",
+  "email": "邮箱",
+  "description": "一句话描述此人专长",
+  "category": "分类：general/payment/legal/technical/industry",
+  "tags": ["标签1", "标签2"]
+}
+只输出JSON，不要其他内容。根据描述合理填充所有字段。`
+    } else if (type === 'product') {
+      parseField = 'product'
+      systemPrompt = `你是商户申诉平台的商品策划AI。用户会用自然语言描述想要创建的服务商品，你需要生成完整的商品信息。
+输出严格JSON格式：
+{
+  "name": "商品名称（简洁有力）",
+  "category": "分类，如：申诉服务/法律咨询/培训课程",
+  "price": 数字（合理定价，单位元），
+  "originalPrice": 数字（原价，比售价高20-50%），
+  "description": "详细商品描述（2-3句话，突出价值）",
+  "tags": ["标签1", "标签2", "标签3"],
+  "targetAudience": ["目标客户1", "目标客户2"]
+}
+只输出JSON，不要其他内容。`
+    } else {
+      return res.status(400).json({ error: '不支持的类型: ' + type })
+    }
+
+    const aiRes = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({ model: cfg.model, messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: description.trim() },
+      ], temperature: 0.7, max_tokens: 1500 }),
+      signal: AbortSignal.timeout(30000),
+    })
+
+    if (!aiRes.ok) return res.status(500).json({ error: 'AI调用失败' })
+    const data = await aiRes.json()
+    const raw = data.choices?.[0]?.message?.content || ''
+
+    // 提取JSON
+    let result
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw)
+    } catch { return res.status(500).json({ error: 'AI返回格式异常', raw }) }
+
+    logAIActivity({ action: `AI辅助生成${type}`, category: 'assist', detail: description.trim().slice(0, 80), duration_ms: Date.now()-t0 }).catch(()=>{})
+    res.json({ [parseField]: result })
+  } catch (err) {
+    console.error('[AI-Assist]', err)
+    res.status(500).json({ error: 'AI辅助生成失败: ' + err.message })
+  }
+})
+
+// --- 后台: AI自动生成商品 ---
+app.post('/api/admin/mall/products/ai-generate', requireAdmin, async (req, res) => {
+  try {
+    const analyses = await getConversationAnalyses(20)
+    const result = await aiAutoCreateProducts(analyses)
+    res.json({ success: true, ...result })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'AI生成商品失败: ' + err.message }) }
+})
+
+app.post('/api/admin/mall/products/ai-suggest', requireAdmin, async (req, res) => {
+  try {
+    const analyses = await getConversationAnalyses(20)
+    const suggestions = await aiSuggestNewProducts(analyses)
+    res.json({ suggestions: suggestions || [] })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'AI建议失败: ' + err.message }) }
+})
+
+// --- 公开: AI智能名片推荐 ---
+app.post('/api/contact-cards/ai-recommend', async (req, res) => {
+  try {
+    const { collectedData, messages } = req.body || {}
+    const card = await aiRecommendContactCard(collectedData || {}, messages || [])
+    res.json({ card: card ? { id: card.id, name: card.name, title: card.title, phone: card.phone, wechat: card.wechat, email: card.email, qrCode: card.qr_code, description: card.description, aiReason: card.aiReason } : null })
+  } catch (err) { res.json({ card: null }) }
+})
+
+// --- 用户端: 购买商品 ---
+app.post('/api/orders/purchase', requireUser, async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const user = await getUserById(req.userId)
+    if (!user) return res.status(401).json({ error: '用户不存在' })
+
+    const { productId, collectedData } = req.body || {}
+    const product = await getProductById(parseInt(productId))
+    if (!product || product.status !== 'active') return res.status(404).json({ error: '商品不存在或已下架' })
+
+    // 扣余额
+    const price = parseFloat(product.price)
+    const balance = parseFloat(user.balance || 0)
+    if (balance < price) return res.status(400).json({ error: '余额不足', needRecharge: true, balance, price })
+
+    await deductBalance(user.id, price)
+    await incrementProductMetric(product.id, 'purchase_count')
+
+    // 生成虚拟人设
+    const persona = await aiGenerateVirtualPersona(product, collectedData || {})
+    const p = persona || { name: '客服小助', title: '专属服务顾问', avatar: '👨‍💼', personality: '专业、耐心', greeting: `您好！我是您的专属服务顾问，将全程协助您处理"${product.name}"相关事宜。` }
+
+    // 创建订单
+    const orderNo = `ORD${Date.now()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const order = await createOrder({
+      orderNo, userId: user.id, productId: product.id, productName: product.name,
+      price, persona: p, collectedData: collectedData || {},
+    })
+
+    // 写入首条服务消息（AI打招呼）
+    await appendServiceMessage(order.id, { role: 'assistant', content: p.greeting, ts: Date.now() })
+    await updateOrderStatus(order.id, 'serving')
+
+    logAIActivity({ action: '商品购买+生成人设', category: 'purchase', detail: `${user.nickname||user.id}购买"${product.name}" ¥${price} → ${p.name}·${p.title}`, duration_ms: Date.now()-t0 }).catch(()=>{})
+
+    res.json({ success: true, orderNo: order.orderNo, orderId: order.id, persona: p })
+  } catch (err) {
+    console.error('[Purchase]', err)
+    res.status(500).json({ error: '购买失败: ' + err.message })
+  }
+})
+
+// --- 用户端: 我的订单列表 ---
+app.get('/api/orders', requireUser, async (req, res) => {
+  try {
+    const orders = await getUserOrders(req.userId)
+    res.json({ orders: orders.map(o => ({
+      id: o.id, orderNo: o.order_no, productName: o.product_name, price: o.price,
+      status: o.status, persona: o.persona, createdAt: o.created_at,
+    })) })
+  } catch (err) { res.status(500).json({ error: '获取订单失败' }) }
+})
+
+// --- 用户端: 订单详情 ---
+app.get('/api/orders/:orderNo', requireUser, async (req, res) => {
+  try {
+    const order = await getOrderByNo(req.params.orderNo)
+    if (!order || order.user_id !== req.userId) return res.status(404).json({ error: '订单不存在' })
+    const product = await getProductById(order.product_id)
+    res.json({
+      order: {
+        id: order.id, orderNo: order.order_no, productName: order.product_name,
+        productCategory: product?.category || '', price: order.price, status: order.status,
+        persona: order.persona, collectedData: order.collected_data,
+        messages: order.service_messages || [], createdAt: order.created_at,
+      }
+    })
+  } catch (err) { res.status(500).json({ error: '获取订单详情失败' }) }
+})
+
+// --- 用户端: 订单AI服务对话 ---
+app.post('/api/orders/:orderNo/chat', requireUser, async (req, res) => {
+  const t0 = Date.now()
+  try {
+    const order = await getOrderByNo(req.params.orderNo)
+    if (!order || order.user_id !== req.userId) return res.status(404).json({ error: '订单不存在' })
+    if (order.status === 'refunded') return res.status(400).json({ error: '该订单已退款' })
+
+    const { message } = req.body || {}
+    if (!message?.trim()) return res.status(400).json({ error: '消息不能为空' })
+
+    // 记录用户消息
+    await appendServiceMessage(order.id, { role: 'user', content: message.trim(), ts: Date.now() })
+
+    // 构建AI对话
+    const persona = order.persona || {}
+    const collectedData = order.collected_data || {}
+    const userContext = Object.entries(collectedData).filter(([k,v]) => v && !k.startsWith('_')).map(([k,v]) => `${k}: ${v}`).join('\n')
+
+    const systemPrompt = `你是${persona.name || '专属服务顾问'}，${persona.title || '客服顾问'}。
+${persona.systemPrompt || '你专业、耐心、有经验，帮助用户解决商户申诉相关问题。'}
+
+## 你的性格
+${persona.personality || '专业、温暖、有耐心'}
+
+## 用户购买的服务
+${order.product_name}
+
+## 用户已知情况
+${userContext || '暂无详细信息'}
+
+## 你的核心职责
+1. 根据用户的具体情况，帮助分析问题、制定申诉策略
+2. 如果用户需要，帮助撰写申诉报告、申诉文案、证据整理方案
+3. 解答用户的疑问，提供专业建议
+4. 用第一人称，像真人顾问一样自然沟通，不要暴露自己是AI
+5. 主动推进问题解决进度，每次回复都要有实质性帮助
+
+## 重要
+- 直接帮用户做事，不要只给建议
+- 如果用户要你写报告/申诉书，直接写出来
+- 语气温暖但专业`
+
+    const historyMsgs = (order.service_messages || []).slice(-20).map(m => ({ role: m.role, content: m.content }))
+
+    const cfg = await getAIConfig()
+    const aiMessages = [{ role: 'system', content: systemPrompt }, ...historyMsgs, { role: 'user', content: message.trim() }]
+
+    const aiRes = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({ model: cfg.model, messages: aiMessages, temperature: 0.7, max_tokens: 2000 }),
+      signal: AbortSignal.timeout(30000),
+    })
+
+    let reply = '抱歉，系统繁忙，请稍后再试。'
+    if (aiRes.ok) {
+      const data = await aiRes.json()
+      reply = data.choices?.[0]?.message?.content || reply
+    }
+
+    await appendServiceMessage(order.id, { role: 'assistant', content: reply, ts: Date.now() })
+    logAIActivity({ action: '服务对话', category: 'service', detail: `订单${order.order_no}: ${message.trim().slice(0,50)}`, duration_ms: Date.now()-t0 }).catch(()=>{})
+
+    res.json({ reply })
+  } catch (err) {
+    console.error('[ServiceChat]', err)
+    res.status(500).json({ error: '对话失败: ' + err.message })
+  }
+})
+
+// ========== 监控告警 API ==========
+
+// 公开健康检查端点（供外部监控平台调用，如 UptimeRobot/阿里云监控）
+app.get('/api/health', async (req, res) => {
+  try {
+    const summary = getHealthSummary()
+    const statusCode = summary.status === 'critical' ? 503 : 200
+    res.status(statusCode).json(summary)
+  } catch (err) {
+    res.status(503).json({ status: 'error', error: err.message })
+  }
+})
+
+// 管理员：完整监控状态
+app.get('/api/admin/monitor/status', requireAdmin, (req, res) => {
+  try {
+    res.json(getMonitorStatus())
+  } catch (err) {
+    res.status(500).json({ error: '获取监控状态失败: ' + err.message })
+  }
+})
+
+// 管理员：手动触发健康检测
+app.post('/api/admin/monitor/check', requireAdmin, async (req, res) => {
+  try {
+    const result = await triggerHealthCheck()
+    res.json({ success: true, result })
+  } catch (err) {
+    res.status(500).json({ error: '健康检测失败: ' + err.message })
+  }
+})
+
+// 管理员：获取告警列表
+app.get('/api/admin/monitor/alerts', requireAdmin, (req, res) => {
+  const limit = parseInt(req.query.limit || '50')
+  const level = req.query.level || null
+  res.json({ alerts: getAlerts(limit, level) })
+})
+
+// 管理员：确认告警
+app.put('/api/admin/monitor/alerts/:id/acknowledge', requireAdmin, (req, res) => {
+  const ok = acknowledgeAlert(req.params.id)
+  res.json({ success: ok })
+})
+
+// 管理员：清空告警
+app.delete('/api/admin/monitor/alerts', requireAdmin, (req, res) => {
+  const count = clearAlerts()
+  res.json({ success: true, cleared: count })
+})
+
+// 管理员：重置 API 指标
+app.post('/api/admin/monitor/reset-api-metrics', requireAdmin, (req, res) => {
+  resetApiMetrics()
+  res.json({ success: true })
+})
+
+// ========== 数据备份 API ==========
+
+// 管理员：获取备份状态
+app.get('/api/admin/backup/status', requireAdmin, (req, res) => {
+  try {
+    res.json(getBackupStatus())
+  } catch (err) {
+    res.status(500).json({ error: '获取备份状态失败: ' + err.message })
+  }
+})
+
+// 管理员：手动触发备份
+app.post('/api/admin/backup/run', requireAdmin, async (req, res) => {
+  try {
+    const result = await runBackup({ type: 'manual' })
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: '备份失败: ' + err.message })
+  }
+})
+
+// 管理员：删除备份文件
+app.delete('/api/admin/backup/:filename', requireAdmin, (req, res) => {
+  const result = deleteBackupFile(req.params.filename)
+  res.status(result.success ? 200 : 400).json(result)
+})
+
 // SPA fallback（排除 /api 路径，避免 API 404 返回 HTML）
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: '接口不存在' })
   }
-  res.sendFile(path.join(distPath, 'index.html'))
+  const htmlPath = path.join(distPath, 'index.html')
+  res.sendFile(htmlPath, (err) => {
+    if (err) {
+      console.error('[SPA] index.html 发送失败:', err.message)
+      res.status(500).send('<!DOCTYPE html><html><head><meta charset="utf-8"><title>加载中</title></head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#666"><div style="text-align:center"><p>页面加载失败，请刷新重试</p><button onclick="location.reload()" style="margin-top:12px;padding:8px 24px;background:#07C160;color:#fff;border:none;border-radius:8px;cursor:pointer">刷新</button></div></body></html>')
+    }
+  })
 })
 
 // 全局错误处理（生产环境不泄露内部错误细节）
 app.use((err, req, res, _next) => {
-  console.error('Unhandled error:', err)
+  // 区分错误类型，记录详细日志
+  const statusCode = err.status || err.statusCode || 500
   const isDev = process.env.NODE_ENV !== 'production'
-  res.status(err.status || 500).json({
+
+  // 结构化错误日志
+  const logData = {
+    method: req.method,
+    path: req.path,
+    statusCode,
+    message: err.message,
+    ...(isDev && { stack: err.stack }),
+  }
+
+  if (statusCode >= 500) {
+    console.error('[ERROR]', JSON.stringify(logData))
+  } else {
+    console.warn('[WARN]', JSON.stringify(logData))
+  }
+
+  // 防止头已发送时重复响应
+  if (res.headersSent) return
+
+  res.status(statusCode).json({
     error: isDev ? err.message : '服务器内部错误，请稍后重试',
+    ...(isDev && { path: req.path, method: req.method }),
   })
+})
+
+// ========== 进程级错误捕获 ==========
+
+// 未捕获的 Promise 拒绝
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] 未处理的 Promise 拒绝:', reason)
+  // 不立即退出，让现有请求完成
+})
+
+// 未捕获的同步异常
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] 未捕获的异常:', err)
+  // 给 10 秒处理剩余请求后退出（不可恢复的状态）
+  setTimeout(() => { process.exit(1) }, 10000)
 })
 
 async function start() {
@@ -2463,10 +4485,26 @@ async function start() {
     // 启动 AI 自进化引擎
     startEvolutionScheduler()
 
+    // 启动模型健康巡检（每30分钟）
+    startHealthScheduler(30)
+
+    // 启动系统监控巡检（每1分钟）
+    startMonitorScheduler(1)
+
+    // 启动数据库自动备份调度（每日凌晨3点）
+    startBackupScheduler()
+
+    console.log('📊 监控告警系统已启动（/api/health 可用）')
+    console.log('💾 数据备份系统已启动')
+
     // 优雅关闭：先停止接受新连接，等待现有请求完成，再关闭数据库
+    const { stopHealthScheduler } = await import('./modelHealth.js')
     const shutdown = (signal) => {
       console.log(`\n⏹ 收到 ${signal}，正在优雅关闭...`)
       stopEvolutionScheduler()
+      stopHealthScheduler()
+      stopMonitorScheduler()
+      stopBackupScheduler()
       server.close(() => {
         console.log('✅ HTTP 服务器已关闭')
         process.exit(0)

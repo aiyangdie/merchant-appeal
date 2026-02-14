@@ -1,11 +1,75 @@
-import { getSystemConfig } from './db.js'
+import { getSystemConfig, getActiveAIModel } from './db.js'
 import { countTokens, countMessagesTokens } from './tokenizer.js'
 import { loadActiveRulesForPrompt } from './evolution.js'
 import { loadProductCatalogForPrompt } from './mall.js'
 
-// ========== DeepSeek API 集成 ==========
+// ========== 多模型 AI Provider 抽象层 ==========
+
+/**
+ * 读取当前激活的 AI 模型配置（从 ai_models 表）
+ * 支持传入 customApiKey 覆盖系统配置
+ */
+async function getAIConfig(customApiKey = null) {
+  const active = await getActiveAIModel()
+  const temperature = parseFloat((await getSystemConfig('ai_temperature')) || '0.7')
+
+  if (active) {
+    return {
+      provider: active.provider,
+      apiKey: customApiKey || active.api_key,
+      model: active.model_name,
+      endpoint: active.endpoint,
+      temperature,
+    }
+  }
+
+  // 回退：从旧 system_config 读取（兼容）
+  const provider = (await getSystemConfig('ai_provider')) || 'deepseek'
+  const FALLBACK = {
+    deepseek: { key: 'deepseek_api_key', model: 'deepseek_model', defaultModel: 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' },
+    zhipu:    { key: 'zhipu_api_key',    model: 'zhipu_model',    defaultModel: 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' },
+  }
+  const fb = FALLBACK[provider] || FALLBACK.deepseek
+  return {
+    provider,
+    apiKey: customApiKey || await getSystemConfig(fb.key),
+    model: (await getSystemConfig(fb.model)) || fb.defaultModel,
+    endpoint: fb.endpoint,
+    temperature,
+  }
+}
+
+// ========== AI Chat 集成（多模型支持） ==========
 
 const BASE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥有8年微信支付/支付宝/抖音/快手/美团等全平台风控申诉实战经验，累计处理1800+商户申诉案件，整体成功率82%，二次申诉成功率71%。你的核心价值是帮商家用最少的时间和成本解决商户号问题。
+
+## 用户水平自动识别（极其重要）
+你必须在前2轮对话中判断用户的经验水平，并自动调整沟通方式：
+
+### 小白用户特征（占80%）
+- 说话口语化："商户号被封了咋办""微信不让收钱了"
+- 不知道专业术语：不知道什么是"风控""申诉""商户号"在哪看
+- 对流程完全陌生："我该怎么办""第一次遇到"
+- 焦虑、着急
+
+**应对方式**：
+- 用最简单的大白话，避免专业术语
+- 每步都给具体操作指引："打开微信→搜索'商家助手'→点进去→看到..."
+- 多用鼓励语气："别担心，这种情况我见多了，能搞定的~"
+- 主动告诉用户去哪找信息："不知道商户号的话，打开'微信支付商家助手'小程序首页就能看到"
+- 问题更简单直白
+
+### 老手用户特征（占20%）
+- 会用专业术语："涉嫌交易异常""风控触发""二次申诉"
+- 了解申诉流程：知道95017、知道商户平台在哪
+- 可能申诉过：提到被驳回、补充材料
+- 目标明确，希望高效
+
+**应对方式**：
+- 直接用专业语言沟通
+- 跳过基础解释，专注策略分析
+- 提供更深层的风控逆向分析
+- 给出进阶技巧和案例对比
 
 ## 核心规则
 1. **每次只问一个问题**，等客户回答后再问下一个。
@@ -15,6 +79,7 @@ const BASE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥�
 5. **回答问题时，必须结合用户的具体数据给出针对性回答**，禁止泛泛的通用回答。
 6. 你要主动思考和推理——分析用户的行业特点、违规可能原因、最优申诉策略，而不是被动收集信息。
 7. 用户一条消息中可能包含多个字段的信息（如行业+处罚类型），全部接收并确认，不要只关注一个。
+8. **用户说"不懂""帮我看看""不知道怎么办"时**，不要问他不懂什么，而是主动引导："没关系，我来问您几个简单问题就能帮您分析了~先说说您是做什么生意的？"
 
 ## 三层深度推理框架（你的核心竞争力）
 
@@ -311,25 +376,30 @@ const BASE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥�
 | 资金冻结/复杂案件 | 极高 | 4000-6000元 |
 
 ## 对话风格
-- 专业、简洁、自信、亲和，体现丰富的申诉经验
-- 每次回复控制在合理长度，不要长篇大论
-- 每次只问一个问题，等客户回答
-- 绝对不要使用 Markdown 格式（不要用 **粗体**、### 标题、- 列表等）
-- 使用纯文本格式，方便用户直接复制粘贴到微信
-- 选项列表用 ① ② ③ ④ ⑤ 编号，不要用 - 或 * 或 • 符号
-- 可以使用 ✅ 💡 ⚠️ 🔑 📊 等少量实用emoji增强可读性
-- 句尾可以适当用 ~ 让语气更亲和
-- 回答用户问题时，引用用户已提供的具体数据，让用户感受到个性化服务
-- 主动引用类似行业的成功案例增强用户信心
-- 对资金冻结案件主动提醒结算账户相关信息的重要性
-- 收到关键信息后给出即时诊断（如：了解到是"涉嫌交易异常"，马上告诉用户这类案件成功率较高，关键是什么）
-- 对话中自然穿插专业判断，让用户感觉在跟真正的行业老手交流
-- 用户焦虑时先共情再给方案："理解，换谁都着急。不过这种情况我见得多了，关键是..."
-- 每次给出具体可执行的下一步行动，不要给模糊建议`
+- 简洁专业，像真人顾问聊天，不像机器人填表
+- 每次回复控制在3-5句话，不要长篇大论
+- 每次只问一个问题
+- 收到关键信息立刻给诊断，不要等收集完再分析
+- 用户焦虑时先共情再给方案
+- 给具体可执行的下一步，不给模糊建议
+- 引用用户已提供的数据，体现个性化
+- 少用emoji，最多1-2个，不要堆砌
+- 句尾适当用~让语气亲和
+
+## 工具引导
+在关键节点简短提醒用户使用平台工具：
+- 诊断完成→提醒顶部"申诉指导"
+- 提到投诉→提醒"申诉指导→投诉话术"
+- 提到95017→提醒"申诉指导→95017话术"
+- 信息收集完→提醒"申诉文案"和"投诉材料"按钮
+不要每次都提醒，用户知道了就不用重复。
+
+## 商品推荐
+案件复杂/用户说不会操作时，简短提一句"也有专业团队可以协助"，不要长篇推销。`
 
 /**
  * 构建包含用户已收集数据的完整 system prompt
- * 让 DeepSeek 在回答问题时能参考用户数据，给出个性化回答
+ * 让 AI 在回答问题时能参考用户数据，给出个性化回答
  * 同时注入 AI 自学习规则库中的活跃规则
  */
 async function buildSystemPrompt(collectedData = {}) {
@@ -350,6 +420,8 @@ async function buildSystemPrompt(collectedData = {}) {
     company_name: '公司全称', license_no: '统一社会信用代码',
     legal_name: '法人姓名', legal_id_last4: '身份证后四位',
     industry: '所属行业', business_model: '经营模式',
+    business_scenario: '经营场景', miniprogram_name: '小程序/公众号名称',
+    miniprogram_appid: '小程序AppID', order_info: '交易订单信息',
     complaint_status: '投诉情况', refund_policy: '退款政策',
     bank_name: '开户银行', bank_account_last4: '结算账户后四位',
     contact_phone: '联系电话', appeal_history: '申诉历史',
@@ -370,28 +442,28 @@ async function buildSystemPrompt(collectedData = {}) {
   if (vr) {
     const violationDiag = []
     if (vr.includes('交易异常') || vr.includes('异常交易')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：交易异常\n你必须在回复中融入以下诊断逻辑：\n- 风控触发层：规则引擎层（交易量突变比>300%）或模型层（交易模式偏离）\n- 反驳策略：用"合理商业原因"解释交易波动（促销活动/季节旺季/新品上市/媒体曝光）\n- 核心证据链：3-5笔订单的完整闭环（下单→付款→发货→物流→签收）\n- 加分项：历史交易趋势对比图、活动策划方案截图、推广投放记录\n- 成功率预判：首次申诉70-85%，材料充分可达90%`)
+      violationDiag.push(`\n## 本案诊断：交易异常\n- 触发层：规则引擎（交易量突变>300%）或模型层（模式偏离）\n- 反驳：用合理商业原因解释波动（促销/旺季/新品/引流）\n- 证据链：3-5笔订单完整闭环（下单→付款→发货→物流→签收）\n- 加分：交易趋势对比图、活动方案截图、推广记录\n- 成功率：首次70-85%，材料充分可达90%`)
     }
     if (vr.includes('纠纷') || vr.includes('投诉')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：交易纠纷\n⚠️ 关键前提：必须先处理完所有投诉再申诉！投诉未清零=100%被驳回\n- 风控规则：投诉率>万分之25预警，>万分之50处罚\n- 处理步骤：①联系投诉用户→②原路全额退款→③引导在投诉页面留言"已解决"→④等投诉状态更新→⑤再提交申诉\n- 文案策略：承认投诉存在→分析原因→展示处理结果→说明改进措施\n- 如用户说有未处理投诉，立即给出处理方案，不要先继续收集其他信息`)
+      violationDiag.push(`\n## 本案诊断：交易纠纷\n关键前提：必须先处理完所有投诉再申诉，投诉未清零=100%被驳回\n- 风控规则：投诉率>万分之25预警，>万分之50处罚\n- 处理步骤：①联系投诉用户→②原路全额退款→③引导在投诉页面留言"已解决"→④等状态更新→⑤再提交申诉\n- 文案策略：承认投诉→分析原因→展示处理结果→说明改进措施\n- 有未处理投诉时，立即给出处理方案，不要继续收集其他信息`)
     }
     if (vr.includes('套现') || vr.includes('信用卡')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：信用卡套现嫌疑\n- 风控关注：大额无商品、收款后快速退款、交易双方同IP/设备/地理位置\n- 反驳核心：每笔大额交易都必须有完整的商品交付证据链\n- 必须准备：5笔以上完整链路+进货合同+供应商发票+物流签收+不同收货地址\n- 注意：审核员能看到交易数据，任何编造的交易信息都会被识破\n- 成功率：证据充分60-75%，不充分<40%`)
+      violationDiag.push(`\n## 本案诊断：信用卡套现嫌疑\n- 风控关注：大额无商品、收款后快速退款、交易双方同IP/设备/地理位置\n- 反驳核心：每笔大额交易都要有完整商品交付证据链\n- 必须准备：5笔以上完整链路+进货合同+供应商发票+物流签收+不同收货地址\n- 审核员能看到交易数据，编造信息会被识破\n- 成功率：证据充分60-75%，不充分<40%`)
     }
     if (vr.includes('跨类目') || vr.includes('类目')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：跨类目经营\n- 整改优先：必须先整改再申诉（下架不符商品→变更工商范围→申请变更类目）\n- 关键问：用户的营业执照经营范围是否包含实际业务？不包含需先去工商变更\n- 时间窗口：变更工商范围需5-10个工作日\n- 成功率：整改到位后75-85%`)
+      violationDiag.push(`\n## 本案诊断：跨类目经营\n- 整改优先：下架不符商品→变更工商范围→申请变更类目→再申诉\n- 关键：营业执照经营范围是否包含实际业务？不包含需先工商变更（5-10工作日）\n- 成功率：整改到位后75-85%`)
     }
     if (vr.includes('分销') || vr.includes('传销')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：多级分销\n- 微信铁律：只允许一级分销，超过一层=违规\n- 证明要点：仅直推佣金、无入门费、无囤货、可随时退出\n- 必须提供：分销后台截图+佣金结构文档+分销规则说明\n- 如果确实是多级：建议先关闭多级功能、修改规则后再申诉`)
+      violationDiag.push(`\n## 本案诊断：多级分销\n- 微信铁律：只允许一级分销，超过一层=违规\n- 证明：仅直推佣金、无入门费、无囤货、可随时退出\n- 必须提供：分销后台截图+佣金结构文档+分销规则说明\n- 确实多级：先关闭多级功能、修改规则后再申诉`)
     }
     if (vr.includes('欺诈') || vr.includes('售假') || vr.includes('虚假')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：欺诈/售假\n- 核心挑战：必须用铁证证明商品为正品\n- 证据链：品牌授权→经销商协议→进货发票→质检报告→物流签收\n- 如果有虚假宣传：承认+已修改所有材料+用诚意打动审核\n- 成功率：40-60%（难度最高的类型之一）`)
+      violationDiag.push(`\n## 本案诊断：欺诈/售假\n- 核心：必须用铁证证明正品\n- 证据链：品牌授权→经销商协议→进货发票→质检报告→物流签收\n- 有虚假宣传：承认+已修改+用诚意打动审核\n- 成功率：40-60%`)
     }
     if (vr.includes('赌博') || vr.includes('色情') || vr.includes('涉黄')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：赌博/色情（极难）\n⚠️ 成功率<50%，必须如实告知用户难度\n- 棋牌类必须：游戏版号/软著+防沉迷系统+实名认证+无现金兑换证明\n- 社交类必须：内容审核机制+违规整改截图+7×24审核团队证明\n- 建议：如果业务确实有擦边内容，先彻底整改再考虑申诉\n- Plan B：严重情况考虑注销后换新主体+合规业务模式`)
+      violationDiag.push(`\n## 本案诊断：赌博/色情（极难，成功率<50%）\n- 棋牌类：版号/软著+防沉迷+实名认证+无现金兑换证明\n- 社交类：内容审核机制+违规整改截图+7×24审核团队证明\n- 有擦边内容先彻底整改再考虑申诉\n- Plan B：注销后换新主体+合规业务模式`)
     }
     if (vr.includes('洗钱') || vr.includes('资金异常')) {
-      violationDiag.push(`\n## 🎯 本案专项诊断：洗钱/资金异常（极难）\n⚠️ 建议寻求专业法律支持\n- 每笔被标记交易需要：合同+发票+物流/服务交付证明三方印证\n- 跨境业务还需：外汇许可+海关报关单+反洗钱内控制度\n- 成功率：35-55%`)
+      violationDiag.push(`\n## 本案诊断：洗钱/资金异常（极难，建议法律支持）\n- 每笔被标记交易：合同+发票+物流/服务交付证明三方印证\n- 跨境还需：外汇许可+海关报关单+反洗钱内控制度\n- 成功率：35-55%`)
     }
     if (violationDiag.length > 0) dataSection += violationDiag.join('\n')
   }
@@ -418,7 +490,7 @@ async function buildSystemPrompt(collectedData = {}) {
     }
     for (const [key, strategy] of Object.entries(industryStrategies)) {
       if (industry.includes(key)) {
-        dataSection += `\n\n## 🏭 ${key}行业专属申诉策略\n${strategy}\n`
+        dataSection += `\n\n## ${key}行业申诉策略\n${strategy}\n`
         break
       }
     }
@@ -428,17 +500,17 @@ async function buildSystemPrompt(collectedData = {}) {
   const pt = (collectedData.problem_type || '').toLowerCase()
   if (pt) {
     if (pt.includes('冻结') || pt.includes('延迟')) {
-      dataSection += `\n\n## 💰 资金冻结案件特别指引\n- 必须主动提醒用户提供结算账户信息（开户银行+后四位）\n- 拨打95017转3时用"商户号+结算账户后四位"验证身份催审\n- 申诉成功后3-5个工作日自动解冻；未申诉冻结期180天\n- 冻结期间可正常申诉，不需等180天\n- 如用户急需资金，建议同时准备Plan B（新主体申请）\n`
+      dataSection += `\n\n## 资金冻结案件指引\n- 提醒用户提供结算账户信息（开户银行+后四位）\n- 95017转3用"商户号+结算账户后四位"验证催审\n- 成功后3-5工作日自动解冻；未申诉冻结期180天\n- 冻结期间可正常申诉\n`
     }
     if (pt.includes('封禁')) {
-      dataSection += `\n\n## 🚫 商户号封禁案件特别指引\n- 难度最高，成功率40-60%\n- 可能需要法人视频认证\n- 建议同时考虑Plan B：注销条件（无违规+无余额+无投诉+30天无交易）→新主体重新申请\n- 材料要求极高：全套证件+详细业务说明+充分整改证据\n`
+      dataSection += `\n\n## 商户号封禁案件指引\n- 难度最高，成功率40-60%，可能需法人视频认证\n- Plan B：注销条件（无违规+无余额+无投诉+30天无交易）→新主体申请\n- 材料要求极高：全套证件+详细业务说明+充分整改证据\n`
     }
   }
 
   // ===== 动态注入：申诉历史策略调整 =====
   const ah = (collectedData.appeal_history || '').toLowerCase()
   if (ah && (ah.includes('驳回') || ah.includes('失败') || ah.includes('不通过') || ah.includes('被拒'))) {
-    dataSection += `\n\n## 🔄 二次申诉特别策略（有驳回历史）\n⚠️ 必须在对话中执行以下策略：\n- 建议用户先打95017转3查具体驳回原因\n- 间隔至少3-5个工作日再提交\n- 二次材料量应是首次的1.5-2倍\n- 文案开头写"针对X月X日驳回意见，我们已做如下补充"\n- 连续5次不通过可能被标记为"不支持申诉"——每次必须充分准备\n- 考虑是否需要增加法人视频认证增强可信度\n`
+    dataSection += `\n\n## 二次申诉策略（有驳回历史）\n- 建议先打95017转3查具体驳回原因\n- 间隔至少3-5工作日再提交\n- 二次材料量应是首次的1.5-2倍\n- 文案开头写"针对X月X日驳回意见，已做如下补充"\n- 连续5次不通过可能被标记为"不支持申诉"\n`
   }
 
   // AI-First: 收集进度上下文（不再依赖 _current_step 门控）
@@ -451,16 +523,12 @@ async function buildSystemPrompt(collectedData = {}) {
 
   // 敏感行业特别提示
   if (collectedData._sensitive_industry) {
-    dataSection += `\n⚠️ **重要：该用户行业被检测为敏感类目「${collectedData._sensitive_industry}」，风险等级：${collectedData._sensitive_risk || '未知'}。**\n`
-    dataSection += '回答时需特别注意：1) 如实评估申诉难度，不要过度乐观 2) 重点强调需要的合规资质和证明材料 3) 如果业务确实违规，建议用户考虑整改后再申诉或更换合规业务模式\n'
+    dataSection += `\n**敏感行业：${collectedData._sensitive_industry}，风险：${collectedData._sensitive_risk || '未知'}。** 如实评估难度，强调合规资质，违规建议先整改。\n`
   }
 
-  // 行业扩展提示
   if (collectedData._industry_tip) {
-    dataSection += `\n💡 行业关键提示：${collectedData._industry_tip}\n`
+    dataSection += `\n行业提示：${collectedData._industry_tip}\n`
   }
-
-  dataSection += '\n请在适当时候提醒用户：您提供的数据仅在本次聊天咨询中使用，不会用于其他任何用途。'
 
   return BASE_SYSTEM_PROMPT + dataSection + dynamicRules + productCatalog
 }
@@ -480,17 +548,11 @@ export function getWelcomeMessage() {
   return WELCOME_MESSAGE
 }
 
-// DeepSeek API 调用（支持自定义 API Key + 用户数据上下文）
-async function callDeepSeek(chatHistory, customApiKey, collectedData = {}) {
-  // 优先使用传入的自定义 key，否则使用系统配置的官方 key
-  const apiKey = customApiKey || await getSystemConfig('deepseek_api_key')
-  if (!apiKey) return null
+// AI API 调用（统一多模型 — 支持所有 OpenAI 兼容接口）
+async function callAIChat(chatHistory, customApiKey, collectedData = {}) {
+  const cfg = await getAIConfig(customApiKey)
+  if (!cfg.apiKey) return null
 
-  const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
-  const temp = parseFloat((await getSystemConfig('ai_temperature')) || '0.7')
-
-  // DeepSeek API 只接受 system/user/assistant 三种 role
-  // admin → assistant（管理员回复对 AI 来说等同助手消息）
   const systemPrompt = await buildSystemPrompt(collectedData)
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -500,48 +562,44 @@ async function callDeepSeek(chatHistory, customApiKey, collectedData = {}) {
     })),
   ]
 
+  // 构建请求体（所有 OpenAI 兼容接口通用参数）
+  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature, max_tokens: 4096, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.2 }
+
   // 带超时和重试的请求
   const MAX_RETRIES = 2
-  let lastErr = null
   let res = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30000) // 30秒超时
-      res = await fetch('https://api.deepseek.com/chat/completions', {
+      const timeout = setTimeout(() => controller.abort(), 30000)
+      res = await fetch(cfg.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${cfg.apiKey}`,
         },
-        body: JSON.stringify({
-          model, messages, temperature: temp, max_tokens: 4096,
-          top_p: 0.9,
-          frequency_penalty: 0.3,
-          presence_penalty: 0.2,
-        }),
+        body: JSON.stringify(reqBody),
         signal: controller.signal,
       })
       clearTimeout(timeout)
-      break // 成功连接
+      break
     } catch (err) {
-      lastErr = err
-      console.error(`DeepSeek fetch attempt ${attempt + 1} failed:`, err.message)
+      console.error(`[${cfg.provider}] fetch attempt ${attempt + 1} failed:`, err.message)
       if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1))) // 递增等待
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
       }
     }
   }
 
   if (!res) {
-    console.error('DeepSeek: all retries failed')
+    console.error(`[${cfg.provider}] all retries failed`)
     throw new Error('NETWORK_ERROR')
   }
 
   if (!res.ok) {
     const errText = await res.text()
-    console.error('DeepSeek API error:', res.status, errText)
+    console.error(`[${cfg.provider}] API error:`, res.status, errText)
     const errCode = res.status
     if (errCode === 401) throw new Error('API_KEY_INVALID')
     if (errCode === 402) throw new Error('API_BALANCE_INSUFFICIENT')
@@ -553,7 +611,6 @@ async function callDeepSeek(chatHistory, customApiKey, collectedData = {}) {
   const content = data.choices?.[0]?.message?.content || null
   if (!content) return null
 
-  // 优先使用 API 返回的 token 用量，否则本地计算
   let inputTokens, outputTokens
   if (data.usage) {
     inputTokens = data.usage.prompt_tokens || 0
@@ -566,7 +623,7 @@ async function callDeepSeek(chatHistory, customApiKey, collectedData = {}) {
   return { content, inputTokens, outputTokens }
 }
 
-// ========== 规则引擎（DeepSeek 不可用时的后备方案） ==========
+// ========== 规则引擎（AI 不可用时的后备方案） ==========
 
 const STEPS = {
   WELCOME: 0,
@@ -797,11 +854,11 @@ ${hasBusiness ? `我方经营情况如下：${d.business}\n\n` : ''}我方从事
 
 /**
  * AI 处理完整对话：诊断、回答问题、评估报价、生成材料、后续修改
- * 将完整聊天历史发给 DeepSeek，由 AI 自然地推进对话
+ * 将完整聊天历史发给 AI，由 AI 自然地推进对话
  */
 export async function chatWithAI(chatHistory, customApiKey, collectedData = {}) {
   try {
-    const result = await callDeepSeek(chatHistory, customApiKey, collectedData)
+    const result = await callAIChat(chatHistory, customApiKey, collectedData)
     if (result) {
       return {
         response: result.content,
@@ -811,21 +868,18 @@ export async function chatWithAI(chatHistory, customApiKey, collectedData = {}) 
       }
     }
   } catch (err) {
-    console.error('DeepSeek chat failed:', err.message)
+    console.error('AI chat failed:', err.message)
     return { error: err.message }
   }
   return null
 }
 
 /**
- * 流式 AI 对话：返回 DeepSeek 的 SSE 流，供路由层直接 pipe 给前端
+ * 流式 AI 对话：返回 SSE 流，供路由层直接 pipe 给前端
  */
 export async function streamChatWithAI(chatHistory, customApiKey, collectedData = {}) {
-  const apiKey = customApiKey || await getSystemConfig('deepseek_api_key')
-  if (!apiKey) throw new Error('NO_API_KEY')
-
-  const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
-  const temp = parseFloat((await getSystemConfig('ai_temperature')) || '0.7')
+  const cfg = await getAIConfig(customApiKey)
+  if (!cfg.apiKey) throw new Error('NO_API_KEY')
 
   const systemPrompt = await buildSystemPrompt(collectedData)
   const messages = [
@@ -836,43 +890,40 @@ export async function streamChatWithAI(chatHistory, customApiKey, collectedData 
     })),
   ]
 
+  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature, max_tokens: 4096, stream: true, stream_options: { include_usage: true }, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.2 }
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 60000)
 
-  const res = await fetch('https://api.deepseek.com/chat/completions', {
+  const res = await fetch(cfg.endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${cfg.apiKey}`,
     },
-    body: JSON.stringify({
-      model, messages, temperature: temp, max_tokens: 4096, stream: true,
-      top_p: 0.9,
-      frequency_penalty: 0.3,
-      presence_penalty: 0.2,
-    }),
+    body: JSON.stringify(reqBody),
     signal: controller.signal,
   })
   clearTimeout(timeout)
 
   if (!res.ok) {
     const errText = await res.text()
-    console.error('DeepSeek stream error:', res.status, errText)
+    console.error(`[${cfg.provider}] stream error:`, res.status, errText)
     if (res.status === 401) throw new Error('API_KEY_INVALID')
     if (res.status === 402) throw new Error('API_BALANCE_INSUFFICIENT')
     if (res.status === 429) throw new Error('API_RATE_LIMIT')
     throw new Error(`API_ERROR_${res.status}`)
   }
 
-  // 返回原始响应体和 inputTokens 估算
+  // 本地预估input tokens作为fallback（当API不返回usage时使用）
   const inputTokens = countMessagesTokens(messages)
   return { body: res.body, inputTokens }
 }
 
-// ========== DeepSeek 智能字段提取（从混乱输入中抓取有用信息） ==========
+// ========== AI 智能字段提取（从混乱输入中抓取有用信息） ==========
 
 /**
- * 用 DeepSeek 从用户的混乱/答非所问/半句话输入中提取结构化字段
+ * 用 AI 从用户的混乱/答非所问/半句话输入中提取结构化字段
  * 轻量级 JSON 调用，不走流式，快速返回
  * @param {string} userMessage - 用户原始消息
  * @param {object} collectedData - 已收集的数据
@@ -882,10 +933,8 @@ export async function streamChatWithAI(chatHistory, customApiKey, collectedData 
  * @returns {object} { extracted: {field: value}, intent: string } 或 null
  */
 export async function extractFieldsWithAI(userMessage, collectedData = {}, currentStep = 0, customApiKey = null, recentHistory = []) {
-  const apiKey = customApiKey || await getSystemConfig('deepseek_api_key')
-  if (!apiKey) return null
-
-  const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
+  const cfg = await getAIConfig(customApiKey)
+  if (!cfg.apiKey) return null
 
   // 构建已收集/未收集字段摘要
   const fieldDefs = [
@@ -1037,25 +1086,27 @@ correction=true表示用户在纠正/修改之前的信息。无可提取信息�
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15000) // 15秒超时
 
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const extractBody = {
+      model: cfg.model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 512,
+    }
+    extractBody.response_format = { type: 'json_object' }
+
+    const res = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${cfg.apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1, // 低温度确保准确提取
-        max_tokens: 512,
-        response_format: { type: 'json_object' },
-      }),
+      body: JSON.stringify(extractBody),
       signal: controller.signal,
     })
     clearTimeout(timeout)
 
     if (!res.ok) {
-      console.error('DeepSeek extraction error:', res.status)
+      console.error(`[${cfg.provider}] extraction error:`, res.status)
       return null
     }
 
@@ -1076,7 +1127,7 @@ correction=true表示用户在纠正/修改之前的信息。无可提取信息�
       outputTokens: usage.completion_tokens || 0,
     }
   } catch (err) {
-    console.error('DeepSeek extraction failed:', err.message)
+    console.error('AI extraction failed:', err.message)
     return null
   }
 }
@@ -1084,14 +1135,12 @@ correction=true表示用户在纠正/修改之前的信息。无可提取信息�
 // ========== 行业自适应字段扩展 ==========
 
 /**
- * 当行业被识别后，让 DeepSeek 生成该行业特有的额外信息需求
+ * 当行业被识别后，让 AI 生成该行业特有的额外信息需求
  * 一次性调用，结果缓存在 session 的 _dynamic_fields 中
  */
 export async function expandFieldsForIndustry(industry, problemType, collectedData = {}, customApiKey = null) {
-  const apiKey = customApiKey || await getSystemConfig('deepseek_api_key')
-  if (!apiKey) return null
-
-  const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
+  const cfg = await getAIConfig(customApiKey)
+  if (!cfg.apiKey) return null
 
   const prompt = `你是商户申诉信息分析师。根据行业和问题类型，列出该行业申诉需要额外收集的信息。
 
@@ -1112,16 +1161,18 @@ export async function expandFieldsForIndustry(industry, problemType, collectedDa
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15000)
 
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const expandBody = {
+      model: cfg.model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 1024,
+    }
+    expandBody.response_format = { type: 'json_object' }
+
+    const res = await fetch(cfg.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1024,
-        response_format: { type: 'json_object' },
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(expandBody),
       signal: controller.signal,
     })
     clearTimeout(timeout)
@@ -1150,14 +1201,12 @@ export async function expandFieldsForIndustry(industry, problemType, collectedDa
 // ========== AI 智能完成度评估 ==========
 
 /**
- * 让 DeepSeek 判断已收集的信息是否足够生成申诉材料
+ * 让 AI 判断已收集的信息是否足够生成申诉材料
  * 返回 readiness score + 下一步建议
  */
 export async function assessCompletenessWithAI(collectedData = {}, customApiKey = null) {
-  const apiKey = customApiKey || await getSystemConfig('deepseek_api_key')
-  if (!apiKey) return { score: 0, ready: false }
-
-  const model = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
+  const cfg = await getAIConfig(customApiKey)
+  if (!cfg.apiKey) return { score: 0, ready: false }
 
   // 构建已收集信息摘要
   const info = Object.entries(collectedData)
@@ -1191,16 +1240,18 @@ ${info || '（暂无）'}
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 12000)
 
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const assessBody = {
+      model: cfg.model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 256,
+    }
+    assessBody.response_format = { type: 'json_object' }
+
+    const res = await fetch(cfg.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 256,
-        response_format: { type: 'json_object' },
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(assessBody),
       signal: controller.signal,
     })
     clearTimeout(timeout)
@@ -1233,7 +1284,7 @@ ${info || '（暂无）'}
 
 /**
  * 构建信息收集阶段的 AI 对话指令
- * AI-First 架构：让 DeepSeek 自主驱动整个信息收集对话，不再依赖本地规则引擎
+ * AI-First 架构：让 AI 自主驱动整个信息收集对话，不再依赖本地规则引擎
  * @param {string} extractionNote - 已提取字段的系统提示（可选）
  * @param {string} dynamicNote - 行业动态字段提示（可选）
  */
@@ -1348,4 +1399,4 @@ export function processUserMessage(userMessage, currentStep, collectedData) {
   return fallbackProcess(userMessage, currentStep, collectedData)
 }
 
-export { STEPS }
+export { STEPS, getAIConfig }

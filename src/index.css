@@ -22,6 +22,7 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC',
@@ -35,10 +36,10 @@ body {
 }
 
 /* ========== 精致滚动条 ========== */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 99px; transition: background 0.2s; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -237,14 +238,35 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* ========== GPU加速 & 丝滑滚动 ========== */
+.gpu-scroll {
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
+  will-change: scroll-position;
+  contain: layout style;
+}
+
+/* 面板切换淡入 */
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel-animate {
+  animation: panelFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 /* ========== 通用组件样式 ========== */
 .card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .card-hover:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
 
 /* 玻璃态效果 */
@@ -298,8 +320,13 @@ body {
 }
 
 /* ========== 按钮微交互 ========== */
-button { transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
-button:active:not(:disabled) { transform: scale(0.96); }
+button { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+button:active:not(:disabled) { transform: scale(0.97); }
+
+/* 输入框聚焦增强 */
+input, textarea, select {
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
 
 /* 发送按钮脉冲 */
 @keyframes send-pulse {
@@ -403,6 +430,297 @@ textarea:focus, input:focus, select:focus {
 .session-removing {
   animation: fadeOutLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ========== 面板滑入修复空白闪烁 ========== */
+@keyframes panelSlideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes panelSlideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.panel-slide-left {
+  animation: panelSlideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.panel-slide-right {
+  animation: panelSlideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.panel-slide-left > *, .panel-slide-right > * {
+  animation: fadeContent 0.2s ease-out 0.05s both;
+}
+
+/* ========== 专业模式 · 浅色金色高级主题 ========== */
+.pro-mode {
+  --pro-bg: #FAFAF7;
+  --pro-surface: #FFFFFF;
+  --pro-surface-2: #F8F6F0;
+  --pro-border: rgba(184, 134, 11, 0.12);
+  --pro-accent: #B8860B;
+  --pro-accent-light: rgba(184, 134, 11, 0.08);
+  --pro-text: #1C1917;
+  --pro-text-dim: #78716C;
+}
+
+/* 专业模式头部：浅色磨砂 + 金色底线 */
+.pro-header {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(184, 134, 11, 0.15);
+  box-shadow: 0 1px 3px rgba(184, 134, 11, 0.04);
+}
+
+/* 专业模式头像光晕 */
+@keyframes proGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(184, 134, 11, 0.2), 0 0 3px rgba(184, 134, 11, 0.4); }
+  50% { box-shadow: 0 0 16px rgba(184, 134, 11, 0.35), 0 0 6px rgba(184, 134, 11, 0.5); }
+}
+.pro-avatar-glow {
+  animation: proGlow 3s ease-in-out infinite;
+}
+
+/* 专业模式进度条流光 */
+@keyframes proProgressShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.pro-progress-bar {
+  background: linear-gradient(90deg, #B8860B 0%, #D4A04A 30%, #E8C675 50%, #D4A04A 70%, #B8860B 100%);
+  background-size: 200% 100%;
+  animation: proProgressShimmer 3s linear infinite;
+}
+
+/* 模式切换动画 */
+@keyframes modeSwitch {
+  0% { opacity: 0.7; transform: scale(0.99); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.mode-switch-anim {
+  animation: modeSwitch 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 专业模式聊天背景：温暖浅色 */
+.pro-chat-bg {
+  background: linear-gradient(180deg, #FAFAF7 0%, #F5F3ED 50%, #FAFAF7 100%);
+}
+
+/* 专业模式气泡：白底金色边框 */
+.pro-bubble-ai {
+  background: #FFFFFF;
+  border: 1px solid rgba(184, 134, 11, 0.1);
+  color: #1C1917;
+  box-shadow: 0 1px 4px rgba(184, 134, 11, 0.06);
+}
+.pro-bubble-ai .message-content strong {
+  color: #92600A;
+}
+.pro-bubble-ai .message-content p {
+  color: #292524;
+}
+
+/* 专业模式卡片 */
+.pro-module-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(184, 134, 11, 0.1);
+  transition: all 0.2s ease;
+}
+.pro-module-card:hover {
+  border-color: rgba(184, 134, 11, 0.25);
+  box-shadow: 0 2px 12px rgba(184, 134, 11, 0.08);
+}
+.pro-module-card.completed {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+/* 装饰网格：极淡金色 */
+.pro-grid-bg {
+  background-image: none;
+}
+
+/* TypingIndicator 金色适配 */
+.pro-mode .typing-dot {
+  background: #D4A04A;
+}
+
+/* 专业模式滚动条 */
+.pro-mode ::-webkit-scrollbar-thumb {
+  background: rgba(184, 134, 11, 0.15);
+}
+.pro-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(184, 134, 11, 0.28);
+}
+
+/* 专业模式 Markdown 气泡内容 */
+.pro-bubble-ai .message-content h2,
+.pro-bubble-ai .message-content h3 {
+  color: #44403C;
+}
+.pro-bubble-ai .message-content code {
+  background: rgba(184, 134, 11, 0.08);
+  color: #92600A;
+}
+.pro-bubble-ai .message-content blockquote {
+  border-left-color: rgba(184, 134, 11, 0.3);
+  color: #78716C;
+}
+.pro-bubble-ai .message-content a {
+  color: #B8860B;
+}
+.pro-bubble-ai .message-content ul li::before {
+  color: #B8860B;
+}
+.pro-bubble-ai .message-content table th {
+  background: rgba(184, 134, 11, 0.06);
+  color: #44403C;
+}
+.pro-bubble-ai .message-content table td {
+  border-color: rgba(184, 134, 11, 0.08);
+  color: #57534E;
+}
+.pro-bubble-ai .message-content hr {
+  border-color: rgba(184, 134, 11, 0.1);
+}
+
+/* ========== 风险可视化主题系统 ========== */
+
+/* 风险等级：严重 */
+.risk-severe {
+  --risk-color: #dc2626;
+  --risk-color-light: rgba(220, 38, 38, 0.08);
+  --risk-color-border: rgba(220, 38, 38, 0.2);
+  --risk-glow: rgba(220, 38, 38, 0.12);
+  --risk-bg: linear-gradient(180deg, #fef2f2 0%, #fff5f5 30%, #fef2f2 100%);
+  --risk-header-bg: rgba(254, 242, 242, 0.92);
+  --risk-header-border: rgba(220, 38, 38, 0.18);
+  --risk-badge-bg: #fecaca;
+  --risk-badge-text: #991b1b;
+  --risk-bubble-border: rgba(220, 38, 38, 0.12);
+  --risk-bubble-shadow: 0 1px 4px rgba(220, 38, 38, 0.08);
+  --risk-accent: #b91c1c;
+}
+
+/* 风险等级：高 */
+.risk-high {
+  --risk-color: #ea580c;
+  --risk-color-light: rgba(234, 88, 12, 0.07);
+  --risk-color-border: rgba(234, 88, 12, 0.15);
+  --risk-glow: rgba(234, 88, 12, 0.1);
+  --risk-bg: linear-gradient(180deg, #fff7ed 0%, #fffbf5 30%, #fff7ed 100%);
+  --risk-header-bg: rgba(255, 247, 237, 0.92);
+  --risk-header-border: rgba(234, 88, 12, 0.15);
+  --risk-badge-bg: #fed7aa;
+  --risk-badge-text: #9a3412;
+  --risk-bubble-border: rgba(234, 88, 12, 0.1);
+  --risk-bubble-shadow: 0 1px 4px rgba(234, 88, 12, 0.06);
+  --risk-accent: #c2410c;
+}
+
+/* 风险等级：中 */
+.risk-medium {
+  --risk-color: #d97706;
+  --risk-color-light: rgba(217, 119, 6, 0.06);
+  --risk-color-border: rgba(217, 119, 6, 0.12);
+  --risk-glow: rgba(217, 119, 6, 0.08);
+  --risk-bg: linear-gradient(180deg, #fffbeb 0%, #fffef5 30%, #fffbeb 100%);
+  --risk-header-bg: rgba(255, 251, 235, 0.92);
+  --risk-header-border: rgba(217, 119, 6, 0.12);
+  --risk-badge-bg: #fde68a;
+  --risk-badge-text: #92400e;
+  --risk-bubble-border: rgba(217, 119, 6, 0.08);
+  --risk-bubble-shadow: 0 1px 4px rgba(217, 119, 6, 0.05);
+  --risk-accent: #b45309;
+}
+
+/* 风险等级：低 */
+.risk-low {
+  --risk-color: #16a34a;
+  --risk-color-light: rgba(22, 163, 74, 0.06);
+  --risk-color-border: rgba(22, 163, 74, 0.12);
+  --risk-glow: rgba(22, 163, 74, 0.08);
+  --risk-bg: linear-gradient(180deg, #f0fdf4 0%, #f8fff8 30%, #f0fdf4 100%);
+  --risk-header-bg: rgba(240, 253, 244, 0.92);
+  --risk-header-border: rgba(22, 163, 74, 0.12);
+  --risk-badge-bg: #bbf7d0;
+  --risk-badge-text: #166534;
+  --risk-bubble-border: rgba(22, 163, 74, 0.08);
+  --risk-bubble-shadow: 0 1px 4px rgba(22, 163, 74, 0.05);
+  --risk-accent: #15803d;
+}
+
+/* 风险主题应用 */
+[class*="risk-"] .risk-header {
+  background: var(--risk-header-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--risk-header-border);
+  box-shadow: 0 1px 3px var(--risk-glow);
+}
+
+/* 风险呼吸灯（严重时更明显） */
+@keyframes riskBreath {
+  0%, 100% { box-shadow: 0 0 0 0 var(--risk-glow), inset 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 20px 2px var(--risk-glow), inset 0 0 30px -10px var(--risk-color-light); }
+}
+
+.risk-severe .risk-breath {
+  animation: riskBreath 2.5s ease-in-out infinite;
+}
+.risk-high .risk-breath {
+  animation: riskBreath 4s ease-in-out infinite;
+}
+
+/* 风险图标脉冲 */
+@keyframes riskPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.8; }
+}
+.risk-severe .risk-icon-pulse {
+  animation: riskPulse 1.5s ease-in-out infinite;
+}
+.risk-high .risk-icon-pulse {
+  animation: riskPulse 3s ease-in-out infinite;
+}
+
+/* 风险级别徽章 */
+.risk-badge {
+  background: var(--risk-badge-bg);
+  color: var(--risk-badge-text);
+  font-weight: 700;
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: 0.02em;
+}
+
+/* 风险级别 AI 气泡 */
+[class*="risk-"] .risk-bubble-ai {
+  border: 1px solid var(--risk-bubble-border);
+  box-shadow: var(--risk-bubble-shadow);
+}
+[class*="risk-"] .risk-bubble-ai .message-content strong {
+  color: var(--risk-accent);
+}
+
+/* 风险等级切换过渡 */
+@keyframes riskTransition {
+  0% { opacity: 0.85; filter: brightness(1.05); }
+  100% { opacity: 1; filter: brightness(1); }
+}
+.risk-transition {
+  animation: riskTransition 0.6s ease-out;
+}
+
+/* 风险边栏指示条 */
+.risk-indicator-bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--risk-color);
+  border-radius: 0 3px 3px 0;
+  opacity: 0.6;
+}
+.risk-severe .risk-indicator-bar { opacity: 1; }
 
 /* ========== 移动端适配增强 ========== */
 @media (max-width: 640px) {

@@ -48,7 +48,10 @@ export function decrypt(cipherBase64) {
   try {
     const key = getKey()
     const buf = Buffer.from(cipherBase64, 'base64')
-    if (buf.length < IV_LENGTH + TAG_LENGTH + 1) return ''
+    if (buf.length < IV_LENGTH + TAG_LENGTH + 1) {
+      // 不是加密格式，可能是明文
+      return cipherBase64
+    }
     const iv = buf.subarray(0, IV_LENGTH)
     const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH)
     const ciphertext = buf.subarray(IV_LENGTH + TAG_LENGTH)
@@ -56,8 +59,32 @@ export function decrypt(cipherBase64) {
     decipher.setAuthTag(tag)
     return decipher.update(ciphertext, null, 'utf8') + decipher.final('utf8')
   } catch {
-    // 如果解密失败（可能是旧的未加密数据），返回原文
+    // 解密失败：如果原文看起来是加密数据（base64），说明密钥不匹配
+    if (isEncrypted(cipherBase64)) {
+      return '[数据待恢复]'
+    }
+    // 否则可能是明文，直接返回
     return cipherBase64
+  }
+}
+
+/**
+ * 尝试解密，失败返回 null（用于程序判断是否可解密）
+ */
+export function tryDecrypt(cipherBase64) {
+  if (!cipherBase64) return null
+  try {
+    const key = getKey()
+    const buf = Buffer.from(cipherBase64, 'base64')
+    if (buf.length < IV_LENGTH + TAG_LENGTH + 1) return null
+    const iv = buf.subarray(0, IV_LENGTH)
+    const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH)
+    const ciphertext = buf.subarray(IV_LENGTH + TAG_LENGTH)
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+    decipher.setAuthTag(tag)
+    return decipher.update(ciphertext, null, 'utf8') + decipher.final('utf8')
+  } catch {
+    return null
   }
 }
 
@@ -90,4 +117,12 @@ export function safeEncrypt(value) {
 export function safeDecrypt(value) {
   if (!value) return ''
   return decrypt(value)
+}
+
+/**
+ * 批量修复：用新密钥重新加密明文数据（用于密钥变更后的数据迁移）
+ */
+export function reEncrypt(plaintext) {
+  if (!plaintext) return ''
+  return encrypt(plaintext)
 }

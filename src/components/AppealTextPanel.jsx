@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 
 const SECTIONS = [
-  { key: 'business_model', label: '业务模式', icon: '💼', dbKey: 'business_model' },
-  { key: 'refund_rules', label: '退款规则', icon: '💰', dbKey: 'refund_rules' },
-  { key: 'complaint_cause', label: '投诉产生原因及详细说明', icon: '📋', dbKey: 'complaint_cause' },
-  { key: 'complaint_resolution', label: '投诉处理方法', icon: '🔧', dbKey: 'complaint_resolution' },
-  { key: 'supplementary', label: '补充说明', icon: '📝', dbKey: 'supplementary' },
+  { key: 'business_model', label: '业务模式说明', icon: '💼', dbKey: 'business_model', formField: '对应表单「业务模式说明」' },
+  { key: 'refund_rules', label: '退款机制与退款方式', icon: '💰', dbKey: 'refund_rules', formField: '对应表单「退款机制与退款方式」' },
+  { key: 'complaint_cause', label: '投诉产生原因及详细说明', icon: '📋', dbKey: 'complaint_cause', formField: '对应表单「投诉产生原因及详细说明」' },
+  { key: 'complaint_resolution', label: '投诉处理方法', icon: '🔧', dbKey: 'complaint_resolution', formField: '对应表单「投诉处理方法」' },
+  { key: 'supplementary', label: '补充文字说明', icon: '📝', dbKey: 'supplementary', formField: '对应表单「补充文字说明」' },
 ]
 
 export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHeaders }) {
@@ -15,6 +15,9 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
   const [copiedKey, setCopiedKey] = useState(null)
   const [cost, setCost] = useState(null)
   const [costInfo, setCostInfo] = useState(null) // { cost, isOfficialMode, cached, inputTokens, outputTokens }
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(null) // 'approved' | 'rejected' | null
+  const [feedbackText, setFeedbackText] = useState('')
 
   useEffect(() => {
     if (sessionId) loadExisting()
@@ -107,6 +110,25 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
     }
   }
 
+  async function updateStatus(newStatus, feedback = '') {
+    if (!sessionId) return
+    setStatusLoading(true)
+    try {
+      const body = { status: newStatus }
+      if (feedback) {
+        if (newStatus === 'rejected') body.rejectionReason = feedback
+        else body.feedback = feedback
+      }
+      if (newStatus === 'rejected' && appealText?.resubmit_count > 0) body.status = 'rejected'
+      const res = await fetch(`/api/sessions/${sessionId}/appeal-feedback`, {
+        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.appealText) setAppealText(data.appealText)
+    } catch (e) { console.error('Update status failed:', e) }
+    setStatusLoading(false)
+  }
+
   function charCount(text) {
     return text ? text.length : 0
   }
@@ -141,13 +163,14 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
               </svg>
             </div>
             <h3 className="text-sm font-semibold text-gray-800 mb-1">生成申诉文案</h3>
-            <p className="text-xs text-gray-400 mb-1 px-6">根据您提供的信息，AI将生成5段专业申诉文案</p>
-            <p className="text-xs text-gray-400 mb-4 px-6">每段300字符内，可直接复制到微信商户后台提交</p>
+            <p className="text-xs text-gray-400 mb-1 px-6">对应微信商户后台真实申诉表单的5个填写栏</p>
+            <p className="text-xs text-gray-400 mb-4 px-6">每段300字符内，可<b className="text-gray-600">直接复制粘贴</b>到申诉表单提交</p>
             <div className="space-y-2">
               {SECTIONS.map(s => (
                 <div key={s.key} className="flex items-center gap-2 text-xs text-gray-500 px-4">
                   <span>{s.icon}</span>
-                  <span>{s.label}（300字符）</span>
+                  <span className="font-medium">{s.label}</span>
+                  <span className="text-gray-300 text-[10px]">300字符</span>
                 </div>
               ))}
             </div>
@@ -179,11 +202,14 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
               return (
                 <div key={s.key} className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{s.icon}</span>
-                      <span className="text-xs font-semibold text-gray-700">{s.label}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">{s.icon}</span>
+                        <span className="text-xs font-semibold text-gray-700">{s.label}</span>
+                      </div>
+                      {s.formField && <p className="text-[10px] text-gray-400 mt-0.5 ml-6">{s.formField}</p>}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${count > 300 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
                         {count}/300
                       </span>
@@ -201,6 +227,94 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
                 </div>
               )
             })}
+            {/* 申诉进度跟踪 */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3.5 border border-indigo-100">
+              <h4 className="text-xs font-semibold text-indigo-700 mb-2">📋 申诉进度跟踪</h4>
+              <p className="text-[10px] text-indigo-400 mb-2.5">复制文案提交后，请更新进度，帮助AI学习优化</p>
+              {(() => {
+                const st = appealText.appeal_status || 'generated'
+                const STATUS_FLOW = [
+                  { key: 'submitted', label: '已提交申诉', icon: '📤', color: 'bg-blue-500', desc: '已将文案提交到微信商户后台' },
+                  { key: 'under_review', label: '审核中', icon: '⏳', color: 'bg-yellow-500', desc: '微信正在审核我的申诉' },
+                  { key: 'approved', label: '申诉通过 🎉', icon: '✅', color: 'bg-green-500', desc: '太好了！商户号已恢复' },
+                  { key: 'rejected', label: '申诉被驳回', icon: '❌', color: 'bg-red-500', desc: '很遗憾，本次申诉未通过' },
+                ]
+                const currentIdx = STATUS_FLOW.findIndex(s => s.key === st)
+                return (
+                  <div className="space-y-1.5">
+                    {/* Progress bar */}
+                    <div className="flex items-center gap-1 mb-3">
+                      {STATUS_FLOW.map((s, i) => (
+                        <React.Fragment key={s.key}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
+                            st === s.key ? `${s.color} text-white` : i <= currentIdx ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                          }`}>{st === s.key ? s.icon : i <= currentIdx ? '✓' : i+1}</div>
+                          {i < STATUS_FLOW.length - 1 && <div className={`flex-1 h-0.5 ${i < currentIdx ? 'bg-green-300' : 'bg-gray-200'}`} />}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    {/* Action buttons */}
+                    {(st === 'generated' || st === 'rejected') && (
+                      <button onClick={() => updateStatus('submitted')} disabled={statusLoading}
+                        className="w-full py-2 text-xs font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">
+                        📤 {st === 'rejected' ? '重新提交申诉' : '我已提交申诉'}
+                      </button>
+                    )}
+                    {st === 'submitted' && (
+                      <button onClick={() => updateStatus('under_review')} disabled={statusLoading}
+                        className="w-full py-2 text-xs font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50">
+                        ⏳ 微信正在审核中
+                      </button>
+                    )}
+                    {(st === 'submitted' || st === 'under_review') && (
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <button onClick={() => setShowFeedback('approved')} disabled={statusLoading}
+                          className="py-2 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50">
+                          ✅ 申诉通过了！
+                        </button>
+                        <button onClick={() => setShowFeedback('rejected')} disabled={statusLoading}
+                          className="py-2 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50">
+                          ❌ 申诉被驳回
+                        </button>
+                      </div>
+                    )}
+                    {st === 'approved' && (
+                      <div className="text-center py-2 bg-green-50 rounded-lg border border-green-200">
+                        <span className="text-sm">🎉</span>
+                        <p className="text-xs font-semibold text-green-700 mt-1">恭喜！申诉通过</p>
+                        {appealText.user_feedback && <p className="text-[10px] text-green-500 mt-0.5">{appealText.user_feedback}</p>}
+                      </div>
+                    )}
+                    {st === 'rejected' && (
+                      <div className="text-center py-2 bg-red-50 rounded-lg border border-red-200">
+                        <p className="text-xs font-semibold text-red-600">申诉被驳回</p>
+                        {appealText.rejection_reason && <p className="text-[10px] text-red-400 mt-0.5">原因: {appealText.rejection_reason}</p>}
+                        {appealText.resubmit_count > 0 && <p className="text-[10px] text-red-300 mt-0.5">已重新提交 {appealText.resubmit_count} 次</p>}
+                      </div>
+                    )}
+                    {/* Feedback form */}
+                    {showFeedback && (
+                      <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200 space-y-2">
+                        <p className="text-[11px] font-medium text-gray-700">{showFeedback === 'approved' ? '🎉 太好了！请分享一下：' : '😔 请告诉我们驳回原因：'}</p>
+                        <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)}
+                          placeholder={showFeedback === 'approved' ? '申诉成功的关键是什么？（可选）' : '微信给的驳回原因是什么？'}
+                          className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-indigo-300" rows={2} />
+                        <div className="flex gap-2">
+                          <button onClick={() => { updateStatus(showFeedback, feedbackText); setShowFeedback(null); setFeedbackText('') }}
+                            disabled={statusLoading}
+                            className={`flex-1 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 ${showFeedback === 'approved' ? 'bg-green-500' : 'bg-red-500'}`}>
+                            确认提交
+                          </button>
+                          <button onClick={() => { setShowFeedback(null); setFeedbackText('') }}
+                            className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-lg">取消</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+
             <button onClick={() => { setAppealText(null); setCostInfo(null); setTimeout(() => generate(true), 100) }}
               className="w-full py-2 text-xs text-orange-500 bg-orange-50 rounded-lg font-medium hover:bg-orange-100 transition-colors">
               重新生成文案

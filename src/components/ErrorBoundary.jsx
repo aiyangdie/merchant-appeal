@@ -12,9 +12,20 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary]', error, errorInfo)
+    // chunk加载失败（部署更新后旧资源404）→ 自动刷新一次
+    const isChunkError = error?.message && (
+      /loading.*(chunk|module)/i.test(error.message) ||
+      /dynamically imported module/i.test(error.message) ||
+      /failed to fetch/i.test(error.message)
+    )
+    if (isChunkError && !sessionStorage.getItem('chunk_reload')) {
+      sessionStorage.setItem('chunk_reload', '1')
+      window.location.reload()
+    }
   }
 
   handleReload = () => {
+    sessionStorage.removeItem('chunk_reload')
     this.setState({ hasError: false, error: null })
     window.location.reload()
   }

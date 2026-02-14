@@ -13,7 +13,17 @@
  * 9. 定时任务 — 30分钟分析 / 2小时升降级 / 每日聚合+聚类
  */
 
-import { getSystemConfig } from './db.js'
+import { getSystemConfig, getActiveAIModel } from './db.js'
+
+// 内联 AI provider 配置（避免与 ai.js 循环依赖）
+async function getAIConfig() {
+  const active = await getActiveAIModel()
+  if (active) return { provider: active.provider, apiKey: active.api_key, model: active.model_name, endpoint: active.endpoint }
+  // 回退
+  const provider = (await getSystemConfig('ai_provider')) || 'deepseek'
+  if (provider === 'zhipu') return { provider, apiKey: await getSystemConfig('zhipu_api_key'), model: (await getSystemConfig('zhipu_model')) || 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' }
+  return { provider, apiKey: await getSystemConfig('deepseek_api_key'), model: (await getSystemConfig('deepseek_model')) || 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' }
+}
 import {
   saveConversationAnalysis, getUnanalyzedSessions, getActiveRules, getAllAIRules, getAIRuleById,
   createAIRule, updateRuleEffectiveness, incrementRuleUsage,
@@ -57,7 +67,7 @@ export function invalidateRulesCache() {
 // ========== 1. 对话分析器 ==========
 
 /**
- * 分析单次对话：调用 DeepSeek 对完整对话进行质量评估
+ * 分析单次对话：调用 AI 对完整对话进行质量评估
  * @param {string} sessionId - 会话ID
  * @returns {object|null} 分析结果
  */
@@ -95,16 +105,14 @@ export async function analyzeConversation(sessionId) {
     // 基础指标计算（不需要AI）
     const basicMetrics = computeBasicMetrics(messages, collectedData)
 
-    // 调用 DeepSeek 进行深度分析
-    const aiAnalysis = await callDeepSeekForAnalysis(messages, collectedData, basicMetrics)
+    // 调用 AI 进行深度分析
+    const aiAnalysis = await callAIForAnalysis(messages, collectedData, basicMetrics)
 
     // 捕获当前活跃规则ID（用于后续按规则归因效果评估）
     const currentActiveRuleIds = getActiveRuleIds()
 
-    // 合并基础指标和AI分析结果
-    const aiProf = aiAnalysis?.professionalismScore
-    const aiAppeal = aiAnalysis?.appealSuccessRate
-    const aiSat = aiAnalysis?.userSatisfaction
+    // AI驱动：AI可用时100%使用AI评分，不与基础指标平均
+    const hasAI = aiAnalysis && aiAnalysis.professionalismScore != null
     const analysis = {
       sessionId,
       userId: session.user_id,
@@ -114,13 +122,14 @@ export async function analyzeConversation(sessionId) {
       collectionTurns: basicMetrics.collectionTurns,
       fieldsCollected: basicMetrics.fieldsCollected,
       fieldsSkipped: basicMetrics.fieldsSkipped,
-      fieldsRefused: basicMetrics.fieldsRefused,
+      fieldsRefused: aiAnalysis?.fieldsRefused || basicMetrics.fieldsRefused,
       completionRate: basicMetrics.completionRate,
-      professionalismScore: aiProf != null ? Math.round((aiProf + basicMetrics.professionalismScore) / 2) : basicMetrics.professionalismScore,
-      appealSuccessRate: aiAppeal != null ? Math.round((aiAppeal + basicMetrics.appealSuccessRate) / 2) : basicMetrics.appealSuccessRate,
-      userSatisfaction: aiSat != null ? Math.round((aiSat + basicMetrics.userSatisfaction) / 2) : basicMetrics.userSatisfaction,
-      responseQuality: basicMetrics.responseQuality,
-      userSentiment: aiAnalysis?.userSentiment || basicMetrics.estimatedSentiment,
+      // 全AI驱动评分：AI可用→用AI分数，AI不可用→基于完成率的事实估算
+      professionalismScore: hasAI ? aiAnalysis.professionalismScore : Math.round(basicMetrics.completionRate * 0.6 + (basicMetrics.responseStats.avgLength > 100 ? 20 : 10)),
+      appealSuccessRate: hasAI ? aiAnalysis.appealSuccessRate : Math.round(basicMetrics.completionRate * 0.8),
+      userSatisfaction: hasAI ? aiAnalysis.userSatisfaction : Math.round(basicMetrics.completionRate * 0.5 + (basicMetrics.isCollectionDone ? 20 : 0)),
+      responseQuality: aiAnalysis?.responseQuality || basicMetrics.responseStats,
+      userSentiment: aiAnalysis?.userSentiment || 'neutral',
       dropOffPoint: aiAnalysis?.dropOffPoint || '',
       collectionEfficiency: {
         ...basicMetrics.efficiency,
@@ -128,8 +137,10 @@ export async function analyzeConversation(sessionId) {
       },
       sentimentTrajectory: aiAnalysis?.sentimentTrajectory || [],
       suggestions: aiAnalysis?.suggestions || [],
+      ruleProposals: aiAnalysis?.ruleProposals || [],
       rawAnalysis: aiAnalysis?.rawText || '',
       activeRuleIds: currentActiveRuleIds,
+      analysisSource: hasAI ? 'ai' : 'basic_only', // 标记分析来源
     }
 
     // 存储分析结果
@@ -148,7 +159,7 @@ export async function analyzeConversation(sessionId) {
       )
     }
 
-    console.log(`[Evolution] 对话分析完成: session=${sessionId}, id=${id}, 完成率=${basicMetrics.completionRate}%, 标签=${tagResult?.tags?.length || 0}, 规则=${currentActiveRuleIds.length}`)
+    console.log(`[Evolution] 对话分析完成: session=${sessionId}, id=${id}, 来源=${analysis.analysisSource}, 完成率=${basicMetrics.completionRate}%, 专业度=${analysis.professionalismScore}, 标签=${tagResult?.tags?.length || 0}, 规则=${currentActiveRuleIds.length}`)
     return { id, ...analysis }
   } catch (err) {
     _analyzingSet.delete(sessionId)
@@ -158,7 +169,7 @@ export async function analyzeConversation(sessionId) {
 }
 
 /**
- * 计算基础指标（纯逻辑，不调AI）
+ * 收集客观事实数据（纯数据提取，不做任何主观评分——评分全交给AI）
  */
 function computeBasicMetrics(messages, collectedData) {
   const ALL_FIELDS = [
@@ -174,93 +185,35 @@ function computeBasicMetrics(messages, collectedData) {
   })
 
   const userMsgs = messages.filter(m => m.role === 'user')
+  const asstMsgs = messages.filter(m => m.role === 'assistant')
   const totalTurns = userMsgs.length
 
-  // 估算收集对话轮数（粗略：报告生成前的对话都算收集）
   const isCollectionDone = collectedData._collection_complete === true || collectedData._collection_complete === 'true'
-  const collectionTurns = isCollectionDone ? Math.max(totalTurns - 2, totalTurns) : totalTurns
+  const collectionTurns = isCollectionDone ? Math.max(1, totalTurns - 2) : totalTurns
 
-  // 用户情绪粗估
-  let negativeSignals = 0
-  let positiveSignals = 0
-  for (const msg of userMsgs) {
-    const c = msg.content || ''
-    if (/不想|烦|算了|太慢|没用|垃圾|废话/.test(c)) negativeSignals++
-    if (/谢谢|感谢|不错|很好|厉害|专业/.test(c)) positiveSignals++
-  }
-
-  let estimatedSentiment = 'neutral'
-  if (negativeSignals >= 3) estimatedSentiment = 'negative'
-  else if (negativeSignals >= 1 && positiveSignals === 0) estimatedSentiment = 'slightly_negative'
-  else if (positiveSignals >= 2) estimatedSentiment = 'positive'
-  else if (positiveSignals >= 1) estimatedSentiment = 'slightly_positive'
-
-  // 跳过和拒绝字段估算
+  // 跳过字段（客观事实）
   const skippedFields = ALL_FIELDS.filter(k => collectedData[k] === '用户暂未提供' || collectedData[k] === '⏳待补充')
-  const refusedCount = userMsgs.filter(m => /不知道|不记得|忘了|没有|不方便|不想说/.test(m.content)).length
 
-  // === 专业度评分（基于AI回复质量的客观指标）===
-  const asstMsgs = messages.filter(m => m.role === 'assistant')
-  let professionalismScore = 50 // 基础分
-  let responseQuality = { avgLength: 0, structuredReplies: 0, actionableAdvice: 0, empathySignals: 0, industryTerms: 0, totalReplies: asstMsgs.length }
-
-  if (asstMsgs.length > 0) {
-    const totalLen = asstMsgs.reduce((s, m) => s + (m.content?.length || 0), 0)
-    responseQuality.avgLength = Math.round(totalLen / asstMsgs.length)
-
-    for (const m of asstMsgs) {
-      const c = m.content || ''
-      if (/###|步骤|方案|建议|材料|证据|策略/.test(c)) responseQuality.structuredReplies++
-      if (/具体|操作|提交|准备|需要您|请您|第[一二三四五]/.test(c)) responseQuality.actionableAdvice++
-      if (/理解|放心|别担心|没关系|很正常|遇到过/.test(c)) responseQuality.empathySignals++
-      if (/风控|申诉|结算|交易|冻结|限额|处罚|合规|资质|备案/.test(c)) responseQuality.industryTerms++
-    }
-
-    // 专业度评分 = 基础50 + 结构化(+15) + 可操作建议(+15) + 共情(+10) + 行业术语(+10)
-    const r = asstMsgs.length
-    professionalismScore = 50
-      + Math.min(15, Math.round((responseQuality.structuredReplies / r) * 15))
-      + Math.min(15, Math.round((responseQuality.actionableAdvice / r) * 15))
-      + Math.min(10, Math.round((responseQuality.empathySignals / r) * 10))
-      + Math.min(10, Math.round((responseQuality.industryTerms / r) * 10))
-  }
-
-  // === 预估申诉成功率（基于信息完整度 + 关键字段权重）===
-  const CRITICAL_FIELDS = ['problem_type', 'violation_reason', 'merchant_id', 'industry']
-  const IMPORTANT_FIELDS = ['company_name', 'license_no', 'legal_name', 'business_model']
-  const criticalFilled = CRITICAL_FIELDS.filter(k => filled.includes(k)).length
-  const importantFilled = IMPORTANT_FIELDS.filter(k => filled.includes(k)).length
+  // 完成率（纯数学，不含主观判断）
   const completionRate = Math.round((filled.length / ALL_FIELDS.length) * 100)
 
-  let appealSuccessRate = 0
-  if (criticalFilled >= 3) appealSuccessRate += 35
-  else if (criticalFilled >= 2) appealSuccessRate += 20
-  else appealSuccessRate += criticalFilled * 8
-  appealSuccessRate += importantFilled * 8
-  appealSuccessRate += Math.min(25, Math.round(completionRate * 0.25))
-  if (isCollectionDone) appealSuccessRate += 10
-  appealSuccessRate = Math.min(95, Math.max(5, appealSuccessRate))
-
-  // === 用户满意度指数（基于行为信号）===
-  let userSatisfaction = 50
-  userSatisfaction += positiveSignals * 8
-  userSatisfaction -= negativeSignals * 12
-  if (isCollectionDone) userSatisfaction += 15
-  if (totalTurns >= 3 && filled.length >= 3) userSatisfaction += 10 // 持续互动 = 满意
-  if (filled.length > 0 && collectionTurns / filled.length <= 2) userSatisfaction += 5 // 高效收集 = 满意
-  userSatisfaction = Math.min(100, Math.max(5, userSatisfaction))
+  // AI回复的客观统计数据（仅统计量，不做评分）
+  const totalAsstLen = asstMsgs.reduce((s, m) => s + (m.content?.length || 0), 0)
+  const responseStats = {
+    totalReplies: asstMsgs.length,
+    avgLength: asstMsgs.length > 0 ? Math.round(totalAsstLen / asstMsgs.length) : 0,
+    totalUserMessages: userMsgs.length,
+    avgUserMsgLength: userMsgs.length > 0 ? Math.round(userMsgs.reduce((s, m) => s + (m.content?.length || 0), 0) / userMsgs.length) : 0,
+  }
 
   return {
     fieldsCollected: filled.length,
     fieldsSkipped: skippedFields.length,
-    fieldsRefused: Math.min(refusedCount, ALL_FIELDS.length - filled.length),
+    fieldsRefused: 0, // 由AI判断哪些是拒绝
     completionRate,
     collectionTurns,
-    estimatedSentiment,
-    professionalismScore,
-    appealSuccessRate,
-    userSatisfaction,
-    responseQuality,
+    isCollectionDone,
+    responseStats,
     efficiency: {
       turnsPerField: filled.length > 0 ? Math.round((collectionTurns / filled.length) * 10) / 10 : 0,
       fieldsPerTurn: totalTurns > 0 ? Math.round((filled.length / totalTurns) * 10) / 10 : 0,
@@ -271,16 +224,14 @@ function computeBasicMetrics(messages, collectedData) {
 }
 
 /**
- * 调用 DeepSeek 对对话进行深度分析
+ * 调用 AI 对对话进行深度分析
  */
-async function callDeepSeekForAnalysis(messages, collectedData, basicMetrics) {
-  const apiKey = await getSystemConfig('deepseek_api_key')
-  if (!apiKey) {
+async function callAIForAnalysis(messages, collectedData, basicMetrics) {
+  const cfg = await getAIConfig()
+  if (!cfg.apiKey) {
     console.log('[Evolution] 无API Key，跳过AI深度分析')
     return null
   }
-
-  const modelName = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
 
   // 构建对话摘要（避免发送完整对话浪费token）
   const userMsgs = messages.filter(m => m.role === 'user')
@@ -295,87 +246,101 @@ async function callDeepSeekForAnalysis(messages, collectedData, basicMetrics) {
     `[${r.category}] ${r.rule_name}`
   ).join(', ') || '暂无活跃规则'
 
-  const analysisPrompt = `你是一个对话质量分析专家。请分析以下商户申诉咨询对话，输出严格JSON格式。
+  const analysisPrompt = `你是资深对话质量分析AI。你是唯一的评分来源，系统不会做任何预评分，所有主观评价完全由你决定。
 
-## 对话概况
+## 你的职责
+分析商户申诉咨询对话，对AI助手的表现进行全方位评估和评分。
+
+## 对话客观数据
 - 总轮数：${basicMetrics.collectionTurns}
 - 已收集字段：${basicMetrics.fieldsCollected}/16
-- 完成率：${basicMetrics.completionRate}%
-- 已收集：${basicMetrics.efficiency.filledFields.join(', ') || '无'}
-- 跳过/未提供：${basicMetrics.efficiency.skippedFields.join(', ') || '无'}
+- 数据完成率：${basicMetrics.completionRate}%
+- 已收集字段：${basicMetrics.efficiency.filledFields.join(', ') || '无'}
+- 跳过/待补充：${basicMetrics.efficiency.skippedFields.join(', ') || '无'}
+- AI平均回复长度：${basicMetrics.responseStats.avgLength}字
+- 用户平均消息长度：${basicMetrics.responseStats.avgUserMsgLength}字
+- 收集是否完成：${basicMetrics.isCollectionDone ? '是' : '否'}
 - 当前活跃AI规则：${activeRulesSummary}
 
 ## 对话内容
 ${conversationSummary}
 
-## 输出JSON格式（严格遵守）
+## 输出JSON格式（严格遵守，所有评分由你独立判断）
 {
   "userSentiment": "positive|slightly_positive|neutral|slightly_negative|negative",
-  "professionalismScore": 0-100,
-  "appealSuccessRate": 0-100,
-  "userSatisfaction": 0-100,
+  "professionalismScore": "(0-100) AI助手专业度评分。评估维度：回复结构化程度、行业知识运用、是否给出可操作建议、是否有共情表达、语言是否专业得体、是否高效引导对话",
+  "appealSuccessRate": "(0-100) 基于已收集信息评估申诉成功概率。考虑：关键信息完整性、行业特点、违规类型严重程度、证据充分性",
+  "userSatisfaction": "(0-100) 用户满意度评估。基于：用户的语气变化、配合程度、是否表达不满、是否主动提供信息、对话是否顺畅完成",
+  "fieldsRefused": "(数字) 用户明确拒绝或表示不知道/不方便提供的字段数量",
+  "responseQuality": {
+    "structureScore": "(0-100) 回复结构化程度",
+    "empathyScore": "(0-100) 共情能力",
+    "actionabilityScore": "(0-100) 建议可操作性",
+    "industryKnowledge": "(0-100) 行业知识运用",
+    "efficiency": "(0-100) 对话效率(少轮多收集)",
+    "summary": "一句话总结AI回复质量"
+  },
   "sentimentTrajectory": [
-    {"turn": 1, "sentiment": "neutral", "reason": "初始咨询"},
-    {"turn": 3, "sentiment": "positive", "reason": "获得专业建议后态度积极"}
+    {"turn": 1, "sentiment": "neutral", "reason": "初始咨询"}
   ],
-  "dropOffPoint": "字段名或空字符串（如果用户中途失去耐心，指出在哪个字段/问题处）",
+  "dropOffPoint": "字段名或空字符串（用户在哪个环节失去耐心/放弃）",
   "efficiency": {
     "smoothTransitions": true,
     "redundantQuestions": 0,
     "missedMultiFieldInputs": 0,
-    "bestMoment": "AI在第X轮给出行业诊断，增强了用户信任",
-    "worstMoment": "AI在第X轮追问已回答的信息，导致用户不耐烦"
+    "bestMoment": "AI表现最好的时刻描述",
+    "worstMoment": "AI表现最差的时刻描述（没有则空字符串）"
   },
   "suggestions": [
     {
-      "type": "collection_strategy|question_template|conversation_pattern|diagnosis_rule",
+      "type": "collection_strategy|question_template|conversation_pattern|diagnosis_rule|empathy|efficiency",
       "priority": "high|medium|low",
       "field": "相关字段名或空",
-      "current": "当前做法描述",
-      "recommended": "建议改进描述",
-      "reason": "改进原因",
+      "current": "当前做法",
+      "recommended": "建议改进",
+      "reason": "原因",
       "expectedImpact": "预期效果"
     }
   ],
   "ruleProposals": [
     {
       "category": "collection_strategy|question_template|industry_knowledge|violation_strategy|conversation_pattern|diagnosis_rule",
-      "ruleKey": "唯一标识如 industry_餐饮_order",
+      "ruleKey": "唯一标识",
       "ruleName": "规则名称",
-      "content": {
-        "description": "规则描述",
-        "condition": "触发条件",
-        "action": "执行动作"
-      }
+      "content": {"description": "规则描述", "condition": "触发条件", "action": "执行动作"}
     }
   ]
 }
 
-注意：
-- suggestions 至少给出2-5条具体可执行的改进建议
-- ruleProposals 如果发现可以提炼为通用规则的模式，提出1-3条规则提案
-- 关注：提问顺序是否合理、多字段信息是否被忽略、用户情绪变化、AI回复质量
-- 只输出JSON，不要其他内容`
+## 评分要求
+- 你是唯一评分者，请独立、严格、客观地评分
+- professionalismScore：50分为及格线，80+为优秀
+- suggestions：至少2-5条可执行建议，每条必须具体到可落地
+- ruleProposals：发现可复用模式时提出1-3条规则
+- 重点关注：提问效率、重复追问、情绪管理、行业适配性、信息遗漏
+- 只输出JSON`
 
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const analysisBody = {
+      model: cfg.model,
+      messages: [{ role: 'user', content: analysisPrompt }],
+      temperature: 0.3,
+      max_tokens: 2000,
+    }
+    analysisBody.response_format = { type: 'json_object' }
+
+    const response = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${cfg.apiKey}`,
       },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
-      }),
+      body: JSON.stringify(analysisBody),
       signal: AbortSignal.timeout(30000),
     })
 
     if (!response.ok) {
-      console.error(`[Evolution] DeepSeek API ${response.status}`)
+      console.error(`[Evolution] ${cfg.provider} API ${response.status}`)
       return null
     }
 
@@ -394,6 +359,8 @@ ${conversationSummary}
         professionalismScore: typeof parsed.professionalismScore === 'number' ? parsed.professionalismScore : null,
         appealSuccessRate: typeof parsed.appealSuccessRate === 'number' ? parsed.appealSuccessRate : null,
         userSatisfaction: typeof parsed.userSatisfaction === 'number' ? parsed.userSatisfaction : null,
+        fieldsRefused: typeof parsed.fieldsRefused === 'number' ? parsed.fieldsRefused : 0,
+        responseQuality: parsed.responseQuality || {},
         sentimentTrajectory: parsed.sentimentTrajectory || [],
         dropOffPoint: parsed.dropOffPoint || '',
         efficiency: parsed.efficiency || {},
@@ -406,7 +373,7 @@ ${conversationSummary}
       return { rawText }
     }
   } catch (err) {
-    console.error('[Evolution] DeepSeek分析调用失败:', err.message)
+    console.error('[Evolution] AI分析调用失败:', err.message)
     return null
   }
 }
@@ -418,16 +385,18 @@ ${conversationSummary}
  * @param {object} analysis - analyzeConversation 的返回结果
  */
 export async function generateRulesFromAnalysis(analysis) {
-  if (!analysis?.suggestions?.length && !analysis?.rawAnalysis) return []
+  if (!analysis?.suggestions?.length && !analysis?.ruleProposals?.length && !analysis?.rawAnalysis) return []
 
   const created = []
 
-  // 从AI分析的 ruleProposals 中创建规则
-  let proposals = []
-  try {
-    const raw = JSON.parse(analysis.rawAnalysis || '{}')
-    proposals = raw.ruleProposals || []
-  } catch { /* ignore */ }
+  // 优先使用已解析的 ruleProposals，回退到从 rawAnalysis 中解析
+  let proposals = analysis.ruleProposals || []
+  if (proposals.length === 0 && analysis.rawAnalysis) {
+    try {
+      const raw = JSON.parse(analysis.rawAnalysis)
+      proposals = raw.ruleProposals || []
+    } catch { /* ignore */ }
+  }
 
   for (const proposal of proposals) {
     if (!proposal.category || !proposal.ruleKey) continue
@@ -485,14 +454,14 @@ export async function generateRulesFromAnalysis(analysis) {
 }
 
 /**
- * AI自动审批规则：调用DeepSeek评估规则质量、合法性、对商户的帮助程度
+ * AI自动审批规则：调用AI评估规则质量、合法性、对商户的帮助程度
  * 自动通过高质量规则，拒绝低质量/有害规则，记录详细审批原因
  * @param {number} ruleId - 规则ID
  * @returns {object} { decision, score, reason }
  */
 export async function autoReviewRule(ruleId) {
-  const apiKey = await getSystemConfig('deepseek_api_key')
-  if (!apiKey) {
+  const cfg = await getAIConfig()
+  if (!cfg.apiKey) {
     console.log(`[AutoReview] 无API Key，规则#${ruleId}保持待审批`)
     return { decision: 'pending', score: 0, reason: '无API Key，需人工审批' }
   }
@@ -501,8 +470,6 @@ export async function autoReviewRule(ruleId) {
   if (!rule || rule.status !== 'pending_review') {
     return { decision: 'skip', score: 0, reason: '规则不存在或已审批' }
   }
-
-  const modelName = (await getSystemConfig('deepseek_model')) || 'deepseek-chat'
 
   const reviewPrompt = `你是一个AI规则审批专家。我们的系统是帮助商户进行申诉咨询的智能助手。
 请评估以下AI自动生成的规则是否应该被采纳。
@@ -541,21 +508,23 @@ export async function autoReviewRule(ruleId) {
 只输出JSON，不要其他内容。`
 
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const reviewBody = {
+      model: cfg.model,
+      messages: [{ role: 'user', content: reviewPrompt }],
+      temperature: 0.2,
+      max_tokens: 1000,
+    }
+    reviewBody.response_format = { type: 'json_object' }
+
+    const response = await fetch(cfg.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [{ role: 'user', content: reviewPrompt }],
-        temperature: 0.2,
-        max_tokens: 1000,
-        response_format: { type: 'json_object' },
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(reviewBody),
       signal: AbortSignal.timeout(30000),
     })
 
     if (!response.ok) {
-      console.error(`[AutoReview] DeepSeek API ${response.status}`)
+      console.error(`[AutoReview] ${cfg.provider} API ${response.status}`)
       return { decision: 'pending', score: 0, reason: 'AI审批接口异常，需人工审批' }
     }
 
@@ -805,10 +774,8 @@ async function updateRuleScoresFromAnalysis(ruleIds, analysis) {
  * - pending_review 超过7天未审批 → 自动归档
  */
 export async function autoPromoteRules() {
-  const { getAllAIRules: fetchAllRules } = await import('./db.js')
-
   // 1. 自动升级：待审批 → 生效
-  const pendingRules = await fetchAllRules(null, 'pending_review')
+  const pendingRules = await getAllAIRules(null, 'pending_review')
   let promoted = 0, archived = 0
 
   for (const rule of pendingRules) {
@@ -864,6 +831,9 @@ export function schedulePostConversationAnalysis(sessionId) {
           safeExecute('incremental_aggregation', () => aggregateKnowledgeClusters()).catch(() => {})
           console.log(`[AutoGrowth] 达到10次分析，触发增量知识聚合`)
         }
+
+        // 更新探索实验的样本计数
+        trackExperimentSample(sessionId, result).catch(() => {})
 
         console.log(`[Evolution] 对话后自动分析完成: ${sessionId}, 新规则=${newRules.length}(AI自动审批中)`)
       }
@@ -1249,6 +1219,47 @@ export async function getEngineHealthSummary() {
   }
 }
 
+// ========== 9.5 探索实验样本追踪 ==========
+
+/**
+ * 对话分析完成后，检查该对话是否属于某个运行中的实验，更新样本计数
+ */
+async function trackExperimentSample(sessionId, analysis) {
+  try {
+    const running = await getExperiments('running')
+    if (running.length === 0) return
+
+    const activeRuleIds = analysis.activeRuleIds || []
+
+    for (const exp of running) {
+      if (!exp.rule_id) continue
+      const isVariantA = activeRuleIds.includes(exp.rule_id)
+
+      if (isVariantA) {
+        // 实验组：使用了实验规则
+        const currentResultA = exp.result_a || { totalCompletion: 0, totalSat: 0, count: 0 }
+        currentResultA.totalCompletion = (currentResultA.totalCompletion || 0) + (analysis.completionRate || 0)
+        currentResultA.totalSat = (currentResultA.totalSat || 0) + (analysis.userSatisfaction || 0)
+        currentResultA.count = (currentResultA.count || 0) + 1
+        currentResultA.avgCompletion = currentResultA.count > 0 ? currentResultA.totalCompletion / currentResultA.count : 0
+        currentResultA.avgSatisfaction = currentResultA.count > 0 ? currentResultA.totalSat / currentResultA.count : 0
+        await updateExperiment(exp.id, { sampleA: (exp.sample_a || 0) + 1, resultA: currentResultA })
+      } else {
+        // 对照组：未使用实验规则
+        const currentResultB = exp.result_b || { totalCompletion: 0, totalSat: 0, count: 0 }
+        currentResultB.totalCompletion = (currentResultB.totalCompletion || 0) + (analysis.completionRate || 0)
+        currentResultB.totalSat = (currentResultB.totalSat || 0) + (analysis.userSatisfaction || 0)
+        currentResultB.count = (currentResultB.count || 0) + 1
+        currentResultB.avgCompletion = currentResultB.count > 0 ? currentResultB.totalCompletion / currentResultB.count : 0
+        currentResultB.avgSatisfaction = currentResultB.count > 0 ? currentResultB.totalSat / currentResultB.count : 0
+        await updateExperiment(exp.id, { sampleB: (exp.sample_b || 0) + 1, resultB: currentResultB })
+      }
+    }
+  } catch (err) {
+    console.error('[Experiment] 样本追踪失败:', err.message)
+  }
+}
+
 // ========== 10. 自主探索模式 ==========
 
 /**
@@ -1348,6 +1359,8 @@ export async function runExplorationCycle() {
 
 let evolutionTimer = null
 let _allTimers = []
+let _dailyTimer = null
+let _dailyInterval = null
 
 /**
  * 启动自进化定时任务（V3 增强版）
@@ -1396,13 +1409,13 @@ function scheduleDailyAggregation() {
   if (next2am <= now) next2am.setDate(next2am.getDate() + 1)
 
   const delay = next2am - now
-  setTimeout(() => {
+  _dailyTimer = setTimeout(() => {
     const dailyTask = async () => {
       await safeExecute('daily_aggregation', () => aggregateDailyMetrics())
       await safeExecute('knowledge_clustering', () => aggregateKnowledgeClusters())
     }
     dailyTask()
-    setInterval(dailyTask, 24 * 60 * 60 * 1000)
+    _dailyInterval = setInterval(dailyTask, 24 * 60 * 60 * 1000)
   }, delay)
 
   console.log(`[Evolution] 每日聚合将在 ${next2am.toLocaleTimeString()} 执行 (${Math.round(delay / 60000)}分钟后)`)
@@ -1415,5 +1428,7 @@ export function stopEvolutionScheduler() {
   }
   for (const t of _allTimers) clearInterval(t)
   _allTimers = []
+  if (_dailyTimer) { clearTimeout(_dailyTimer); _dailyTimer = null }
+  if (_dailyInterval) { clearInterval(_dailyInterval); _dailyInterval = null }
   console.log('[Evolution] 自进化引擎已停止')
 }

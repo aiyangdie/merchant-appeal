@@ -1,12 +1,12 @@
 import { encodingForModel } from 'js-tiktoken'
 
-// DeepSeek 使用与 GPT-4 兼容的 cl100k_base 编码
-// 本地计算 token 数量，不依赖远程 API
+// 本地 token 计数（用于估算，实际计费以 API 返回的 usage 为准）
+// 使用 cl100k_base 编码，与大多数主流模型兼容
 let encoder = null
 
 function getEncoder() {
   if (!encoder) {
-    // cl100k_base 是 DeepSeek/GPT-4 系列通用的 tokenizer
+    // cl100k_base 是 GPT-4/DeepSeek/智谱等主流模型通用的 tokenizer
     encoder = encodingForModel('gpt-4')
   }
   return encoder
@@ -51,7 +51,7 @@ export function countMessagesTokens(messages) {
 
 /**
  * 根据 token 用量计算费用
- * DeepSeek-Chat 参考价：
+ * AI 参考定价：
  *   输入: ¥0.001 / 1K tokens
  *   输出: ¥0.002 / 1K tokens
  * 最终费用 = (输入费 + 输出费) × multiplier

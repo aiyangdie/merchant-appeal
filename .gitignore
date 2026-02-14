@@ -5,5 +5,6 @@ dist/
 .env.production
 *.log
 data/
+backups/
 .DS_Store
 Thumbs.db

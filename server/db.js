@@ -1,9 +1,9 @@
 import mysql from 'mysql2/promise'
 import bcrypt from 'bcryptjs'
-import { encrypt, decrypt, safeEncrypt, safeDecrypt, hmacHash } from './crypto.js'
+import { encrypt, decrypt, safeEncrypt, safeDecrypt, hmacHash } from './utils/crypto.js'
 
 // 敏感配置字段 — 存储时加密、读取时解密
-const SENSITIVE_SYS_KEYS = ['deepseek_api_key']
+const SENSITIVE_SYS_KEYS = ['deepseek_api_key', 'zhipu_api_key']
 const SENSITIVE_PAY_KEYS = [
   'wx_api_key', 'wx_api_v3_key', 'wx_private_key', 'wx_serial_no',
   'ali_private_key', 'ali_public_key',
@@ -24,6 +24,8 @@ const DB_CONFIG = {
 }
 
 let pool = null
+
+export function getPool() { return pool }
 
 // LIKE 查询特殊字符转义，防止 % 和 _ 被当作通配符
 function escapeLike(str) {
@@ -174,6 +176,9 @@ export async function initDatabase() {
       INDEX idx_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
+  // 迁移：给 recharge_orders 加 out_trade_no 列（真实支付订单号）
+  try { await pool.execute('ALTER TABLE recharge_orders ADD COLUMN out_trade_no VARCHAR(64) DEFAULT "" AFTER remark') } catch { /* 已存在 */ }
+  try { await pool.execute('ALTER TABLE recharge_orders ADD INDEX idx_out_trade_no (out_trade_no)') } catch { /* 已存在 */ }
 
   // 用户行为追踪表
   await pool.execute(`
@@ -248,6 +253,43 @@ export async function initDatabase() {
       complaint_cause TEXT,
       complaint_resolution TEXT,
       supplementary TEXT,
+      input_tokens INT DEFAULT 0,
+      output_tokens INT DEFAULT 0,
+      cost DECIMAL(10,4) DEFAULT 0.0000,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 迁移：appeal_texts 加申诉进度跟踪字段
+  const appealTrackCols = {
+    appeal_status: "ENUM('generated','submitted','under_review','approved','rejected','resubmitted') DEFAULT 'generated'",
+    user_feedback: 'TEXT DEFAULT NULL',
+    submitted_at: 'DATETIME DEFAULT NULL',
+    result_at: 'DATETIME DEFAULT NULL',
+    rejection_reason: 'VARCHAR(500) DEFAULT NULL',
+    resubmit_count: 'INT DEFAULT 0',
+  }
+  for (const [col, def] of Object.entries(appealTrackCols)) {
+    try { await pool.execute(`SELECT ${col} FROM appeal_texts LIMIT 0`) }
+    catch { try { await pool.execute(`ALTER TABLE appeal_texts ADD COLUMN ${col} ${def}`) } catch {} }
+  }
+
+  // 投诉材料整理表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS complaint_docs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      user_id INT NOT NULL,
+      doc_title VARCHAR(256) DEFAULT '',
+      complaint_summary TEXT,
+      merchant_info TEXT,
+      violation_detail TEXT,
+      evidence_list TEXT,
+      timeline TEXT,
+      appeal_points TEXT,
+      full_document MEDIUMTEXT,
       input_tokens INT DEFAULT 0,
       output_tokens INT DEFAULT 0,
       cost DECIMAL(10,4) DEFAULT 0.0000,
@@ -542,6 +584,203 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
 
+  // 名片/联系人卡片表（支持多名片）
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS contact_cards (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(128) NOT NULL DEFAULT '技术支持',
+      title VARCHAR(256) DEFAULT '',
+      phone VARCHAR(64) DEFAULT '',
+      wechat VARCHAR(128) DEFAULT '',
+      email VARCHAR(256) DEFAULT '',
+      qr_code VARCHAR(512) DEFAULT '',
+      description TEXT,
+      category VARCHAR(64) DEFAULT 'general',
+      tags JSON,
+      target_audience JSON,
+      ai_recommend_keywords JSON,
+      sort_order INT DEFAULT 0,
+      status ENUM('active','draft','archived') DEFAULT 'active',
+      view_count INT DEFAULT 0,
+      click_count INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_status (status),
+      INDEX idx_category (category),
+      INDEX idx_sort (sort_order, id DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // AI行为日志表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS ai_activity_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      action VARCHAR(128) NOT NULL,
+      category VARCHAR(64) DEFAULT 'general',
+      detail TEXT,
+      tokens_used INT DEFAULT 0,
+      cost DECIMAL(10,6) DEFAULT 0,
+      duration_ms INT DEFAULT 0,
+      status ENUM('success','failed','pending') DEFAULT 'success',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_created (created_at DESC),
+      INDEX idx_category (category)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 订单表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_no VARCHAR(64) NOT NULL UNIQUE,
+      user_id INT NOT NULL,
+      product_id INT NOT NULL,
+      product_name VARCHAR(256) NOT NULL,
+      price DECIMAL(10,2) NOT NULL,
+      status ENUM('paid','serving','completed','refunded') DEFAULT 'paid',
+      persona JSON,
+      collected_data JSON,
+      service_messages JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_status (status),
+      INDEX idx_order_no (order_no),
+      INDEX idx_created (created_at DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // AI 模型管理表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS ai_models (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      provider VARCHAR(50) NOT NULL,
+      display_name VARCHAR(100) NOT NULL,
+      api_key VARCHAR(1000) DEFAULT '',
+      model_name VARCHAR(100) NOT NULL,
+      endpoint VARCHAR(500) NOT NULL,
+      is_active TINYINT(1) DEFAULT 0,
+      is_enabled TINYINT(1) DEFAULT 1,
+      is_free TINYINT(1) DEFAULT 0,
+      sort_order INT DEFAULT 0,
+      health_status VARCHAR(20) DEFAULT 'unknown',
+      last_check_at DATETIME DEFAULT NULL,
+      last_error VARCHAR(500) DEFAULT NULL,
+      consecutive_fails INT DEFAULT 0,
+      response_ms INT DEFAULT NULL,
+      extra JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_provider_model (provider, model_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 兼容旧表：添加新字段（已有表不会被 CREATE TABLE IF NOT EXISTS 修改）
+  const healthCols = ['health_status', 'last_check_at', 'last_error', 'consecutive_fails', 'response_ms']
+  for (const col of healthCols) {
+    try { await pool.execute(`SELECT ${col} FROM ai_models LIMIT 0`) }
+    catch { 
+      const colDefs = {
+        health_status: "VARCHAR(20) DEFAULT 'unknown'",
+        last_check_at: 'DATETIME DEFAULT NULL',
+        last_error: 'VARCHAR(500) DEFAULT NULL',
+        consecutive_fails: 'INT DEFAULT 0',
+        response_ms: 'INT DEFAULT NULL',
+      }
+      try { await pool.execute(`ALTER TABLE ai_models ADD COLUMN ${col} ${colDefs[col]}`) } catch {}
+    }
+  }
+
+  // 预设常见 AI 模型供应商（INSERT IGNORE 幂等）
+  const aiModelPresets = [
+    // --- 国内模型 ---
+    ['zhipu',     '智谱GLM-4-Flash（免费）',   '', 'glm-4.7-flash',     'https://open.bigmodel.cn/api/paas/v4/chat/completions',  1, 1, 1, 1],
+    ['zhipu',     '智谱GLM-4-Plus',           '', 'glm-4-plus',        'https://open.bigmodel.cn/api/paas/v4/chat/completions',  0, 1, 0, 2],
+    ['zhipu',     '智谱GLM-4-Long',           '', 'glm-4-long',        'https://open.bigmodel.cn/api/paas/v4/chat/completions',  0, 1, 0, 3],
+    ['deepseek',  'DeepSeek-Chat',            '', 'deepseek-chat',     'https://api.deepseek.com/chat/completions',              0, 1, 0, 4],
+    ['deepseek',  'DeepSeek-Reasoner',        '', 'deepseek-reasoner', 'https://api.deepseek.com/chat/completions',              0, 1, 0, 5],
+    ['qwen',      '通义千问-Turbo',            '', 'qwen-turbo',        'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 6],
+    ['qwen',      '通义千问-Plus',             '', 'qwen-plus',         'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 7],
+    ['qwen',      '通义千问-Max',              '', 'qwen-max',          'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 8],
+    ['qwen',      '通义千问-Long',             '', 'qwen-long',         'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 9],
+    ['moonshot',  'Moonshot Kimi-v1-8K',      '', 'moonshot-v1-8k',    'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 10],
+    ['moonshot',  'Moonshot Kimi-v1-32K',     '', 'moonshot-v1-32k',   'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 11],
+    ['moonshot',  'Moonshot Kimi-v1-128K',    '', 'moonshot-v1-128k',  'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 12],
+    ['baichuan',  '百川Baichuan4',            '', 'Baichuan4',         'https://api.baichuan-ai.com/v1/chat/completions',        0, 1, 0, 13],
+    ['yi',        '零一万物Yi-Lightning',      '', 'yi-lightning',      'https://api.lingyiwanwu.com/v1/chat/completions',        0, 1, 0, 14],
+    ['yi',        '零一万物Yi-Large',          '', 'yi-large',          'https://api.lingyiwanwu.com/v1/chat/completions',        0, 1, 0, 15],
+    ['doubao',    '字节豆包-Lite-32K',         '', 'doubao-lite-32k',   'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 0, 1, 0, 16],
+    ['doubao',    '字节豆包-Pro-32K',          '', 'doubao-pro-32k',    'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 0, 1, 0, 17],
+    ['spark',     '讯飞星火-Lite（免费）',      '', 'generalv3',         'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 1, 18],
+    ['spark',     '讯飞星火-Pro',              '', 'generalv3.5',       'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 0, 19],
+    ['spark',     '讯飞星火-Max',              '', 'general4.0',        'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 0, 20],
+    ['minimax',   'MiniMax abab6.5s',         '', 'abab6.5s-chat',     'https://api.minimax.chat/v1/text/chatcompletion_v2',     0, 1, 0, 21],
+    ['stepfun',   '阶跃星辰Step-1-8K',        '', 'step-1-8k',         'https://api.stepfun.com/v1/chat/completions',            0, 1, 0, 22],
+    ['stepfun',   '阶跃星辰Step-2-16K',       '', 'step-2-16k',        'https://api.stepfun.com/v1/chat/completions',            0, 1, 0, 23],
+    ['hunyuan',   '腾讯混元-Lite（免费）',      '', 'hunyuan-lite',      'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 1, 24],
+    ['hunyuan',   '腾讯混元-Standard',         '', 'hunyuan-standard',  'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 0, 25],
+    ['hunyuan',   '腾讯混元-Pro',              '', 'hunyuan-pro',       'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 0, 26],
+    // --- SiliconFlow 免费模型 ---
+    ['siliconflow','SiliconFlow Qwen2.5-7B（免费）','','Qwen/Qwen2.5-7B-Instruct','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 30],
+    ['siliconflow','SiliconFlow GLM4-9B（免费）','', 'THUDM/glm-4-9b-chat','https://api.siliconflow.cn/v1/chat/completions',     0, 1, 1, 31],
+    ['siliconflow','SiliconFlow DeepSeek-V3（免费）','','deepseek-ai/DeepSeek-V3','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 32],
+    ['siliconflow','SiliconFlow Yi-1.5-9B（免费）','','01-ai/Yi-1.5-9B-Chat-16K','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 33],
+    ['siliconflow','SiliconFlow Llama3-8B（免费）','','meta-llama/Meta-Llama-3-8B-Instruct','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 34],
+    ['siliconflow','SiliconFlow InternLM2.5-7B（免费）','','internlm/internlm2_5-7b-chat','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 35],
+    // --- 国际模型 ---
+    ['openai',    'OpenAI GPT-4o-mini',       '', 'gpt-4o-mini',       'https://api.openai.com/v1/chat/completions',             0, 1, 0, 40],
+    ['openai',    'OpenAI GPT-4o',            '', 'gpt-4o',            'https://api.openai.com/v1/chat/completions',             0, 1, 0, 41],
+    ['openai',    'OpenAI GPT-4-Turbo',       '', 'gpt-4-turbo',       'https://api.openai.com/v1/chat/completions',             0, 1, 0, 42],
+    ['openai',    'OpenAI o1-mini',            '', 'o1-mini',           'https://api.openai.com/v1/chat/completions',             0, 1, 0, 43],
+    ['anthropic', 'Claude 3.5 Sonnet',        '', 'claude-3-5-sonnet-20241022', 'https://api.anthropic.com/v1/messages',         0, 1, 0, 44],
+    ['anthropic', 'Claude 3.5 Haiku',         '', 'claude-3-5-haiku-20241022',  'https://api.anthropic.com/v1/messages',         0, 1, 0, 45],
+    ['gemini',    'Google Gemini 2.0 Flash',  '', 'gemini-2.0-flash',  'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 0, 1, 0, 46],
+    ['gemini',    'Google Gemini 1.5 Pro',    '', 'gemini-1.5-pro',    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 0, 1, 0, 47],
+    ['groq',      'Groq Llama3-70B（免费）',   '', 'llama3-70b-8192',   'https://api.groq.com/openai/v1/chat/completions',       0, 1, 1, 48],
+    ['groq',      'Groq Mixtral-8x7B（免费）', '', 'mixtral-8x7b-32768','https://api.groq.com/openai/v1/chat/completions',       0, 1, 1, 49],
+    // --- 自定义 ---
+    ['custom',    '自定义模型',                '', 'custom-model',      'https://your-api.com/v1/chat/completions',               0, 0, 0, 99],
+  ]
+  for (const [provider, name, key, model, endpoint, active, enabled, free, order] of aiModelPresets) {
+    await pool.execute(
+      'INSERT IGNORE INTO ai_models (provider, display_name, api_key, model_name, endpoint, is_active, is_enabled, is_free, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [provider, name, key, model, endpoint, active, enabled, free, order]
+    )
+  }
+
+  // DeepSeek 多账号余额管理表
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS deepseek_accounts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      label VARCHAR(100) NOT NULL DEFAULT '',
+      api_key VARCHAR(1000) NOT NULL,
+      is_enabled TINYINT(1) DEFAULT 1,
+      total_balance DECIMAL(12,2) DEFAULT NULL,
+      granted_balance DECIMAL(12,2) DEFAULT NULL,
+      topped_up_balance DECIMAL(12,2) DEFAULT NULL,
+      is_available TINYINT(1) DEFAULT NULL,
+      warning_threshold DECIMAL(10,2) DEFAULT 10.00,
+      last_check_at DATETIME DEFAULT NULL,
+      last_error VARCHAR(500) DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+
+  // 迁移：将旧 system_config 中的 API Key 迁移到 ai_models 表
+  try {
+    const oldZhipuKey = await getSystemConfig('zhipu_api_key')
+    if (oldZhipuKey) {
+      const encKey = safeEncrypt(oldZhipuKey)
+      await pool.execute("UPDATE ai_models SET api_key = ? WHERE provider = 'zhipu' AND api_key = ''", [encKey])
+    }
+    const oldDeepseekKey = await getSystemConfig('deepseek_api_key')
+    if (oldDeepseekKey) {
+      const encKey = safeEncrypt(oldDeepseekKey)
+      await pool.execute("UPDATE ai_models SET api_key = ? WHERE provider = 'deepseek' AND api_key = ''", [encKey])
+    }
+  } catch {}
+
   // 默认管理员（bcrypt 哈希密码）
   const [admins] = await pool.execute('SELECT COUNT(*) as cnt FROM admins')
   if (admins[0].cnt === 0) {
@@ -569,17 +808,28 @@ export async function initDatabase() {
     ['enable_chat',         '1',                        '启用聊天功能（1=开启 0=关闭）',   'general', 5],
     ['announcement',        '',                         '前台公告内容（留空不显示）',      'general', 6],
     ['copyright_text',      '© 2026 微信商户号申诉助手', '版权信息',                     'general', 7],
+    ['ai_provider',         'zhipu',                   'AI服务商（deepseek / zhipu）',  'ai',      9],
     ['deepseek_api_key',    '',                         'DeepSeek API Key',             'ai',      10],
     ['deepseek_model',      'deepseek-chat',            'DeepSeek 模型名称',             'ai',      11],
-    ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      12],
-    ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      13],
-    ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      14],
+    ['zhipu_api_key',       '',                         '智谱AI API Key（GLM免费模型）',  'ai',      12],
+    ['zhipu_model',         'glm-4.7-flash',            '智谱AI 模型名称',               'ai',      13],
+    ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      14],
+    ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      15],
+    ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      16],
     ['recharge_enabled',    '1',                       '启用用户充值功能',               'recharge', 20],
     ['recharge_amounts',    '10,30,50,100,200,500',    '预设充值金额（逗号分隔）',        'recharge', 21],
     ['recharge_min_amount', '10',                      '最低充值金额（元）',              'recharge', 22],
     ['recharge_qr_wechat',  '',                        '微信收款二维码图片URL',           'recharge', 23],
     ['recharge_qr_alipay',  '',                        '支付宝收款二维码图片URL',          'recharge', 24],
     ['recharge_instructions','扫码支付后，请在下方输入您的支付截图备注或交易单号，管理员确认后余额将自动到账。', '充值说明文字', 'recharge', 25],
+    ['tech_contact_enabled', '1',                       '启用技术人员名片',                'contact', 30],
+    ['tech_contact_name',    '',                         '技术人员姓名',                    'contact', 31],
+    ['tech_contact_title',   'AI申诉助手技术顾问',         '职位头衔',                       'contact', 32],
+    ['tech_contact_phone',   '',                         '联系电话',                        'contact', 33],
+    ['tech_contact_wechat',  '',                         '微信号',                          'contact', 34],
+    ['tech_contact_email',   '',                         '邮箱',                            'contact', 35],
+    ['tech_contact_qr',      '',                         '微信二维码图片URL',                'contact', 36],
+    ['tech_contact_desc',    '专业商户申诉解决方案，有问题随时联系我', '名片描述语',            'contact', 37],
   ]
   for (const [key, value, label, group, order] of sysDefaults) {
     await pool.execute(
@@ -806,6 +1056,23 @@ export async function adjustUserBalance(userId, amount) {
   await pool.execute('UPDATE users SET balance = balance + ? WHERE id = ?', [amount, userId])
   const user = await getUserById(userId)
   return user
+}
+
+export async function fixEncryptedData() {
+  const [rows] = await pool.execute('SELECT id, phone, nickname FROM users')
+  let fixed = 0
+  for (const row of rows) {
+    const phone = safeDecrypt(row.phone)
+    const nickname = safeDecrypt(row.nickname)
+    if (phone === '[数据待恢复]' || nickname === '[数据待恢复]') {
+      const placeholderPhone = `用户${row.id}`
+      const placeholderNick = `用户${row.id}`
+      await pool.execute('UPDATE users SET phone = ?, nickname = ?, phone_hash = ? WHERE id = ?',
+        [safeEncrypt(placeholderPhone), safeEncrypt(placeholderNick), hmacHash(placeholderPhone), row.id])
+      fixed++
+    }
+  }
+  return { total: rows.length, fixed }
 }
 
 export async function deleteUser(userId) {
@@ -1087,22 +1354,97 @@ export async function getDashboardStats() {
     ip: safeDecrypt(r.ip),
   }))
 
+  // Token消耗汇总（成本概览）
+  const [[tokenSummary]] = await pool.execute(
+    `SELECT COUNT(*) as total_requests,
+     COALESCE(SUM(input_tokens),0) as total_input,
+     COALESCE(SUM(output_tokens),0) as total_output,
+     COALESCE(SUM(total_tokens),0) as total_tokens,
+     COALESCE(SUM(cost),0) as total_user_cost
+     FROM token_usage`
+  )
+  const [[todayToken]] = await pool.execute(
+    `SELECT COUNT(*) as requests, COALESCE(SUM(total_tokens),0) as tokens, COALESCE(SUM(cost),0) as cost
+     FROM token_usage WHERE DATE(created_at) = CURDATE()`
+  )
+  // 按类型汇总Token
+  const [tokenByType] = await pool.execute(
+    `SELECT type, COUNT(*) as cnt,
+     COALESCE(SUM(input_tokens),0) as input_tokens,
+     COALESCE(SUM(output_tokens),0) as output_tokens,
+     COALESCE(SUM(total_tokens),0) as tokens,
+     COALESCE(SUM(cost),0) as cost
+     FROM token_usage GROUP BY type ORDER BY tokens DESC`
+  )
+  // 充值收入统计
+  const [[rechargeStats]] = await pool.execute(
+    `SELECT COALESCE(SUM(CASE WHEN status='confirmed' THEN amount ELSE 0 END),0) as confirmed_total,
+     COUNT(CASE WHEN status='confirmed' THEN 1 END) as confirmed_count,
+     COUNT(CASE WHEN status='pending' THEN 1 END) as pending_count,
+     COALESCE(SUM(CASE WHEN status='pending' THEN amount ELSE 0 END),0) as pending_total
+     FROM recharge_orders`
+  )
+  // 7天收入趋势
+  const [dailyRevenue] = await pool.execute(
+    `SELECT DATE(confirmed_at) as day, COALESCE(SUM(amount),0) as revenue, COUNT(*) as orders
+     FROM recharge_orders WHERE status='confirmed' AND confirmed_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+     GROUP BY DATE(confirmed_at) ORDER BY day`
+  )
+  // 模型健康摘要
+  let modelHealth = { total: 0, healthy: 0, error: 0, unknown: 0, activeModel: null }
+  try {
+    const [models] = await pool.execute('SELECT id, display_name, health_status, is_active, is_free, is_enabled FROM ai_models WHERE is_enabled = 1')
+    modelHealth.total = models.length
+    modelHealth.healthy = models.filter(m => m.health_status === 'healthy').length
+    modelHealth.error = models.filter(m => ['error','timeout','auth_failed','balance_empty'].includes(m.health_status)).length
+    modelHealth.unknown = models.filter(m => !m.health_status || m.health_status === 'unknown').length
+    const active = models.find(m => m.is_active)
+    if (active) modelHealth.activeModel = { name: active.display_name, status: active.health_status, isFree: !!active.is_free }
+  } catch {}
+
+  // AI成本估算（免费模型成本=0）
+  const aiCostEstimate = (parseInt(tokenSummary.total_input) / 1000 * 0.001) + (parseInt(tokenSummary.total_output) / 1000 * 0.002)
+  const userCharges = parseFloat(tokenSummary.total_user_cost || 0)
+  const rechargeIncome = parseFloat(rechargeStats.confirmed_total || 0)
+
   return {
     totalSessions, activeSessions, totalMessages, todaySessions, chatSessions,
     totalUsers, todayUsers, todayMessages, activeUsersToday,
     totalRevenue: parseFloat(totalRevenue), todayRevenue: parseFloat(todayRevenue),
     avgMsgsPerSession: avgMsgsPerSession || 0,
-    dailySessions, dailyMessages, dailyUsers,
+    dailySessions, dailyMessages, dailyUsers, dailyRevenue,
     hourlyMessages, apiModes, topUsers, recentActions,
+    // 新增：Token成本与收入分析
+    tokenSummary: {
+      ...tokenSummary,
+      todayRequests: todayToken.requests,
+      todayTokens: todayToken.tokens,
+      todayCost: todayToken.cost,
+    },
+    tokenByType,
+    rechargeStats: {
+      confirmedTotal: parseFloat(rechargeStats.confirmed_total),
+      confirmedCount: parseInt(rechargeStats.confirmed_count),
+      pendingCount: parseInt(rechargeStats.pending_count),
+      pendingTotal: parseFloat(rechargeStats.pending_total),
+    },
+    profitAnalysis: {
+      rechargeIncome,
+      userCharges,
+      aiCostEstimate,
+      grossProfit: rechargeIncome - aiCostEstimate,
+      profitRate: rechargeIncome > 0 ? ((rechargeIncome - aiCostEstimate) / rechargeIncome * 100).toFixed(1) : 0,
+    },
+    modelHealth,
   }
 }
 
 // ========== 充值订单 ==========
 
-export async function createRechargeOrder(userId, amount, paymentMethod, remark = '') {
+export async function createRechargeOrder(userId, amount, paymentMethod, remark = '', outTradeNo = '') {
   const [result] = await pool.execute(
-    'INSERT INTO recharge_orders (user_id, amount, payment_method, remark) VALUES (?, ?, ?, ?)',
-    [userId, amount, paymentMethod, remark]
+    'INSERT INTO recharge_orders (user_id, amount, payment_method, remark, out_trade_no) VALUES (?, ?, ?, ?, ?)',
+    [userId, amount, paymentMethod, remark, outTradeNo]
   )
   return result.insertId
 }
@@ -1122,17 +1464,19 @@ export async function getRechargeOrders(status = null) {
 
 export async function getUserRechargeOrders(userId) {
   const [rows] = await pool.execute(
-    'SELECT id, amount, status, payment_method, remark, admin_note, created_at, confirmed_at FROM recharge_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
+    'SELECT id, amount, status, payment_method, remark, out_trade_no, admin_note, created_at, confirmed_at FROM recharge_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
     [userId]
   )
   return rows
 }
 
-export async function confirmRechargeOrder(orderId, adminId, adminNote = '') {
+export async function confirmRechargeOrder(orderId, adminId = null, adminNote = '') {
   // 原子操作：UPDATE + WHERE status='pending' 防止并发双重确认
+  const confirmedBy = adminId || 0 // 0 表示系统自动确认（支付回调）
+  const note = adminNote || (adminId ? '' : '支付平台自动确认')
   const [result] = await pool.execute(
     'UPDATE recharge_orders SET status = ?, confirmed_at = NOW(), confirmed_by = ?, admin_note = ? WHERE id = ? AND status = ?',
-    ['confirmed', adminId, adminNote, orderId, 'pending']
+    ['confirmed', confirmedBy, note, orderId, 'pending']
   )
   if (result.affectedRows === 0) return null
   // 读取订单信息用于充值
@@ -1253,18 +1597,35 @@ export async function getUserTokenStats(userId) {
   return { totals, today }
 }
 
-export async function getAllTokenUsage(limit = 100) {
+export async function getAllTokenUsage(limit = 100, { page = 1, type, userId, dateFrom, dateTo } = {}) {
+  let where = '1=1'
+  const params = []
+  if (type) { where += ' AND t.type = ?'; params.push(type) }
+  if (userId) { where += ' AND t.user_id = ?'; params.push(userId) }
+  if (dateFrom) { where += ' AND t.created_at >= ?'; params.push(dateFrom) }
+  if (dateTo) { where += ' AND t.created_at <= ?'; params.push(dateTo + ' 23:59:59') }
+  const offset = (page - 1) * limit
   const [rows] = await pool.execute(
-    `SELECT t.*, u.phone, u.nickname FROM token_usage t
+    `SELECT t.*, u.phone, u.nickname
+     FROM token_usage t
      LEFT JOIN users u ON t.user_id = u.id
-     ORDER BY t.created_at DESC LIMIT ?`,
-    [limit]
+     WHERE ${where}
+     ORDER BY t.created_at DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
   )
-  return rows.map(r => ({
-    ...r,
-    phone: safeDecrypt(r.phone),
-    nickname: safeDecrypt(r.nickname),
-  }))
+  const [[{ total }]] = await pool.execute(
+    `SELECT COUNT(*) as total FROM token_usage t WHERE ${where}`, params
+  )
+  return {
+    records: rows.map(r => ({
+      ...r,
+      phone: safeDecrypt(r.phone),
+      nickname: safeDecrypt(r.nickname),
+    })),
+    total,
+    page,
+    pageSize: limit,
+  }
 }
 
 export async function getTokenUsageStats() {
@@ -1343,6 +1704,94 @@ export async function getAppealText(sessionId) {
     [sessionId]
   )
   return rows.length > 0 ? rows[0] : null
+}
+
+// ========== 申诉进度跟踪 ==========
+
+export async function updateAppealStatus(sessionId, userId, { status, feedback, rejectionReason }) {
+  const now = new Date()
+  const updates = ['appeal_status = ?']
+  const params = [status]
+  if (feedback) { updates.push('user_feedback = ?'); params.push(feedback) }
+  if (rejectionReason) { updates.push('rejection_reason = ?'); params.push(rejectionReason) }
+  if (status === 'submitted' || status === 'resubmitted') { updates.push('submitted_at = ?'); params.push(now) }
+  if (status === 'approved' || status === 'rejected') { updates.push('result_at = ?'); params.push(now) }
+  if (status === 'resubmitted') { updates.push('resubmit_count = resubmit_count + 1') }
+  params.push(sessionId, userId)
+  await pool.execute(`UPDATE appeal_texts SET ${updates.join(', ')} WHERE session_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1`, params)
+}
+
+export async function getAppealStats() {
+  const [[totals]] = await pool.execute(
+    `SELECT COUNT(*) as total,
+     SUM(appeal_status='generated') as \`generated\`,
+     SUM(appeal_status='submitted') as \`submitted\`,
+     SUM(appeal_status='under_review') as under_review,
+     SUM(appeal_status='approved') as approved,
+     SUM(appeal_status='rejected') as rejected,
+     SUM(appeal_status='resubmitted') as resubmitted
+     FROM appeal_texts`
+  )
+  // 成功率 = approved / (approved + rejected)
+  const decided = parseInt(totals.approved || 0) + parseInt(totals.rejected || 0)
+  const successRate = decided > 0 ? (parseInt(totals.approved || 0) / decided * 100).toFixed(1) : 0
+
+  // 按行业成功率
+  const [byIndustry] = await pool.execute(
+    `SELECT s.collected_data->>'$.industry' as industry,
+     COUNT(*) as total,
+     SUM(a.appeal_status='approved') as approved,
+     SUM(a.appeal_status='rejected') as rejected
+     FROM appeal_texts a JOIN sessions s ON a.session_id = s.id
+     WHERE a.appeal_status IN ('approved','rejected')
+     GROUP BY industry HAVING industry IS NOT NULL AND industry != ''
+     ORDER BY total DESC LIMIT 20`
+  )
+
+  // 按违规类型成功率
+  const [byViolation] = await pool.execute(
+    `SELECT s.collected_data->>'$.problem_type' as violation_type,
+     COUNT(*) as total,
+     SUM(a.appeal_status='approved') as approved,
+     SUM(a.appeal_status='rejected') as rejected
+     FROM appeal_texts a JOIN sessions s ON a.session_id = s.id
+     WHERE a.appeal_status IN ('approved','rejected')
+     GROUP BY violation_type HAVING violation_type IS NOT NULL AND violation_type != ''
+     ORDER BY total DESC LIMIT 20`
+  )
+
+  // 7天趋势
+  const [dailyTrend] = await pool.execute(
+    `SELECT DATE(result_at) as day,
+     SUM(appeal_status='approved') as approved,
+     SUM(appeal_status='rejected') as rejected
+     FROM appeal_texts
+     WHERE result_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND appeal_status IN ('approved','rejected')
+     GROUP BY DATE(result_at) ORDER BY day`
+  )
+
+  // 最近反馈
+  const [recentFeedback] = await pool.execute(
+    `SELECT a.session_id, a.appeal_status, a.user_feedback, a.result_at, a.rejection_reason, a.resubmit_count,
+     s.collected_data->>'$.industry' as industry, s.collected_data->>'$.problem_type' as violation_type
+     FROM appeal_texts a JOIN sessions s ON a.session_id = s.id
+     WHERE a.appeal_status IN ('approved','rejected') AND a.result_at IS NOT NULL
+     ORDER BY a.result_at DESC LIMIT 20`
+  )
+
+  return {
+    totals: { ...totals, successRate, decided },
+    byIndustry: byIndustry.map(r => ({
+      ...r, successRate: (parseInt(r.approved||0) + parseInt(r.rejected||0)) > 0
+        ? (parseInt(r.approved||0) / (parseInt(r.approved||0) + parseInt(r.rejected||0)) * 100).toFixed(1) : 0
+    })),
+    byViolation: byViolation.map(r => ({
+      ...r, successRate: (parseInt(r.approved||0) + parseInt(r.rejected||0)) > 0
+        ? (parseInt(r.approved||0) / (parseInt(r.approved||0) + parseInt(r.rejected||0)) * 100).toFixed(1) : 0
+    })),
+    dailyTrend,
+    recentFeedback,
+  }
 }
 
 // ========== AI 自进化：规则库 ==========
@@ -1488,6 +1937,7 @@ export async function getConversationAnalyses(limit = 50, filters = {}) {
     sentiment_trajectory: safeParse(r.sentiment_trajectory),
     suggestions: safeParse(r.suggestions),
     active_rule_ids: safeParse(r.active_rule_ids),
+    response_quality: safeParse(r.response_quality),
   }))
 }
 
@@ -1500,6 +1950,8 @@ export async function getConversationAnalysisById(id) {
     collection_efficiency: safeParse(r.collection_efficiency),
     sentiment_trajectory: safeParse(r.sentiment_trajectory),
     suggestions: safeParse(r.suggestions),
+    active_rule_ids: safeParse(r.active_rule_ids),
+    response_quality: safeParse(r.response_quality),
   }
 }
 
@@ -1544,23 +1996,55 @@ export async function getAnalysisStats() {
 export async function getQualityTopAndLow() {
   const cols = `session_id, industry, problem_type, completion_rate, professionalism_score,
      appeal_success_rate, user_satisfaction, user_sentiment, fields_collected, total_turns, analyzed_at,
-     suggestions, drop_off_point, raw_analysis`
+     suggestions, drop_off_point, raw_analysis, collection_efficiency, response_quality`
   const [topAnalyses] = await pool.execute(
-    `SELECT ${cols} FROM conversation_analyses ORDER BY professionalism_score DESC, completion_rate DESC LIMIT 5`
+    `SELECT ${cols} FROM conversation_analyses WHERE total_turns >= 3 ORDER BY professionalism_score DESC, completion_rate DESC LIMIT 5`
   )
   const [lowAnalyses] = await pool.execute(
-    `SELECT ${cols} FROM conversation_analyses WHERE professionalism_score > 0 ORDER BY professionalism_score ASC LIMIT 5`
+    `SELECT ${cols} FROM conversation_analyses WHERE professionalism_score > 0 AND total_turns >= 3 AND fields_collected >= 1 ORDER BY professionalism_score ASC, completion_rate ASC LIMIT 5`
   )
-  const pf = a => ({
-    ...a,
-    completion_rate: parseFloat(a.completion_rate),
-    professionalism_score: parseFloat(a.professionalism_score),
-    appeal_success_rate: parseFloat(a.appeal_success_rate),
-    user_satisfaction: parseFloat(a.user_satisfaction),
-    suggestions: safeParse(a.suggestions) || [],
-    drop_off_point: a.drop_off_point || '',
-    ai_highlights: extractAIHighlights(a),
-  })
+  const pf = a => {
+    const suggestions = safeParse(a.suggestions) || []
+    const collEff = safeParse(a.collection_efficiency) || {}
+    const respQuality = safeParse(a.response_quality) || {}
+    const highlights = extractAIHighlights(a)
+
+    // 当AI深度分析缺失时，基于基础指标自动生成诊断
+    const autoDiagnostics = []
+    if (suggestions.length === 0 && !highlights.worstMoment) {
+      const cr = parseFloat(a.completion_rate) || 0
+      const prof = parseFloat(a.professionalism_score) || 0
+      const sat = parseFloat(a.user_satisfaction) || 0
+      const turns = a.total_turns || 0
+      const fields = a.fields_collected || 0
+
+      if (cr < 30) autoDiagnostics.push({ priority: 'high', recommended: `信息收集完成率仅${Math.round(cr)}%，需优化收集策略，减少用户流失` })
+      if (prof < 50) autoDiagnostics.push({ priority: 'high', recommended: `AI专业度评分${Math.round(prof)}，建议增加结构化回复和行业术语` })
+      if (sat < 40) autoDiagnostics.push({ priority: 'high', recommended: `用户满意度仅${Math.round(sat)}，需增强共情表达和高效引导` })
+      if (turns > 15 && cr < 50) autoDiagnostics.push({ priority: 'medium', recommended: `对话${turns}轮但完成率低，收集效率需提升` })
+      if (fields < 3 && turns >= 5) autoDiagnostics.push({ priority: 'medium', recommended: `${turns}轮对话仅收集${fields}个字段，建议优化多字段合并提问` })
+      if (collEff.redundantQuestions > 0) autoDiagnostics.push({ priority: 'medium', recommended: `存在${collEff.redundantQuestions}个重复提问，需避免追问已回答信息` })
+      if (a.user_sentiment === 'negative' || a.user_sentiment === 'slightly_negative') {
+        autoDiagnostics.push({ priority: 'high', recommended: '用户情绪偏负面，需增强共情回应和耐心引导' })
+      }
+      if (autoDiagnostics.length === 0) {
+        autoDiagnostics.push({ priority: 'low', recommended: '基础指标正常，等待AI深度分析生成更精准建议' })
+      }
+    }
+
+    return {
+      ...a,
+      completion_rate: parseFloat(a.completion_rate),
+      professionalism_score: parseFloat(a.professionalism_score),
+      appeal_success_rate: parseFloat(a.appeal_success_rate),
+      user_satisfaction: parseFloat(a.user_satisfaction),
+      suggestions: suggestions.length > 0 ? suggestions : autoDiagnostics,
+      drop_off_point: a.drop_off_point || '',
+      ai_highlights: highlights,
+      collection_efficiency: collEff,
+      response_quality: respQuality,
+    }
+  }
   return { topAnalyses: topAnalyses.map(pf), lowAnalyses: lowAnalyses.map(pf) }
 }
 
@@ -1609,13 +2093,16 @@ export async function upsertLearningMetrics(date, data) {
   await pool.execute(
     `INSERT INTO learning_metrics
      (metric_date, total_conversations, avg_collection_turns, avg_completion_rate, avg_user_satisfaction,
+      avg_professionalism, avg_appeal_success,
       completion_count, drop_off_count, top_drop_off_fields, top_improvements, rules_generated, rules_promoted)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
       total_conversations = VALUES(total_conversations),
       avg_collection_turns = VALUES(avg_collection_turns),
       avg_completion_rate = VALUES(avg_completion_rate),
       avg_user_satisfaction = VALUES(avg_user_satisfaction),
+      avg_professionalism = VALUES(avg_professionalism),
+      avg_appeal_success = VALUES(avg_appeal_success),
       completion_count = VALUES(completion_count),
       drop_off_count = VALUES(drop_off_count),
       top_drop_off_fields = VALUES(top_drop_off_fields),
@@ -1625,6 +2112,7 @@ export async function upsertLearningMetrics(date, data) {
     [
       date, data.totalConversations || 0, data.avgCollectionTurns || 0,
       data.avgCompletionRate || 0, data.avgUserSatisfaction || 0,
+      data.avgProfessionalism || 0, data.avgAppealSuccess || 0,
       data.completionCount || 0, data.dropOffCount || 0,
       JSON.stringify(data.topDropOffFields || []),
       JSON.stringify(data.topImprovements || []),
@@ -1993,4 +2481,337 @@ export async function getFieldChangeLog(sessionId, fieldKey = null) {
   sql += ' ORDER BY created_at ASC'
   const [rows] = await pool.execute(sql, params)
   return rows
+}
+
+// ========== AI 模型管理 ==========
+
+export async function getAIModels() {
+  const [rows] = await pool.execute('SELECT * FROM ai_models ORDER BY sort_order ASC, id ASC')
+  return rows.map(r => ({
+    ...r,
+    api_key: r.api_key ? safeDecrypt(r.api_key) : '',
+  }))
+}
+
+export async function getAIModelById(id) {
+  const [rows] = await pool.execute('SELECT * FROM ai_models WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }
+}
+
+export async function getActiveAIModel() {
+  const [rows] = await pool.execute('SELECT * FROM ai_models WHERE is_active = 1 AND is_enabled = 1 LIMIT 1')
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }
+}
+
+export async function createAIModel({ provider, displayName, apiKey, modelName, endpoint, isFree, sortOrder, extra }) {
+  const encKey = apiKey ? safeEncrypt(apiKey) : ''
+  const [result] = await pool.execute(
+    'INSERT INTO ai_models (provider, display_name, api_key, model_name, endpoint, is_free, sort_order, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [provider, displayName, encKey, modelName, endpoint, isFree ? 1 : 0, sortOrder || 0, extra ? JSON.stringify(extra) : null]
+  )
+  return { id: result.insertId }
+}
+
+export async function updateAIModel(id, fields) {
+  const sets = []
+  const params = []
+  if (fields.displayName !== undefined) { sets.push('display_name=?'); params.push(fields.displayName) }
+  if (fields.apiKey !== undefined) { sets.push('api_key=?'); params.push(fields.apiKey ? safeEncrypt(fields.apiKey) : '') }
+  if (fields.modelName !== undefined) { sets.push('model_name=?'); params.push(fields.modelName) }
+  if (fields.endpoint !== undefined) { sets.push('endpoint=?'); params.push(fields.endpoint) }
+  if (fields.isEnabled !== undefined) { sets.push('is_enabled=?'); params.push(fields.isEnabled ? 1 : 0) }
+  if (fields.isFree !== undefined) { sets.push('is_free=?'); params.push(fields.isFree ? 1 : 0) }
+  if (fields.sortOrder !== undefined) { sets.push('sort_order=?'); params.push(fields.sortOrder) }
+  if (fields.extra !== undefined) { sets.push('extra=?'); params.push(JSON.stringify(fields.extra)) }
+  if (sets.length === 0) return
+  params.push(id)
+  await pool.execute(`UPDATE ai_models SET ${sets.join(',')} WHERE id = ?`, params)
+}
+
+export async function setActiveAIModel(id) {
+  await pool.execute('UPDATE ai_models SET is_active = 0')
+  await pool.execute('UPDATE ai_models SET is_active = 1 WHERE id = ? AND is_enabled = 1', [id])
+}
+
+export async function deleteAIModel(id) {
+  await pool.execute('DELETE FROM ai_models WHERE id = ? AND is_active = 0', [id])
+}
+
+// 更新模型健康状态
+export async function updateModelHealth(id, { status, error, responseMs }) {
+  const failIncr = status === 'healthy' ? 0 : undefined
+  if (status === 'healthy') {
+    await pool.execute(
+      'UPDATE ai_models SET health_status=?, last_check_at=NOW(), last_error=NULL, consecutive_fails=0, response_ms=? WHERE id=?',
+      [status, responseMs || null, id]
+    )
+  } else {
+    await pool.execute(
+      'UPDATE ai_models SET health_status=?, last_check_at=NOW(), last_error=?, consecutive_fails=consecutive_fails+1, response_ms=NULL WHERE id=?',
+      [status, (error || '').substring(0, 500), id]
+    )
+  }
+}
+
+// 获取所有启用的、有 Key 的免费模型（按健康状态+排序）
+export async function getHealthyFreeModels() {
+  const [rows] = await pool.execute(
+    `SELECT * FROM ai_models WHERE is_enabled=1 AND is_free=1 AND api_key!='' 
+     ORDER BY health_status='healthy' DESC, consecutive_fails ASC, sort_order ASC`
+  )
+  return rows.map(r => ({ ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }))
+}
+
+// 获取可用于 fallback 的模型列表（排除当前活跃模型）
+export async function getFallbackModels(excludeId) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM ai_models WHERE is_enabled=1 AND api_key!='' AND id!=?
+     ORDER BY is_free DESC, health_status='healthy' DESC, consecutive_fails ASC, sort_order ASC`,
+    [excludeId || 0]
+  )
+  return rows.map(r => ({ ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }))
+}
+
+// 获取所有模型（含健康信息，管理面板用）
+export async function getAIModelsWithHealth() {
+  const [rows] = await pool.execute('SELECT * FROM ai_models ORDER BY sort_order ASC, id ASC')
+  return rows.map(r => ({
+    ...r,
+    api_key: r.api_key ? safeDecrypt(r.api_key) : '',
+    has_key: !!(r.api_key && r.api_key.length > 0),
+  }))
+}
+
+// ========== DeepSeek 多账号余额管理 ==========
+
+export async function getDeepseekAccounts() {
+  const [rows] = await pool.execute('SELECT * FROM deepseek_accounts ORDER BY id ASC')
+  return rows.map(r => ({ ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }))
+}
+
+export async function getDeepseekAccountById(id) {
+  const [rows] = await pool.execute('SELECT * FROM deepseek_accounts WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, api_key: r.api_key ? safeDecrypt(r.api_key) : '' }
+}
+
+export async function createDeepseekAccount({ label, apiKey, warningThreshold }) {
+  const encKey = apiKey ? safeEncrypt(apiKey) : ''
+  const [result] = await pool.execute(
+    'INSERT INTO deepseek_accounts (label, api_key, warning_threshold) VALUES (?, ?, ?)',
+    [label || '', encKey, warningThreshold || 10.00]
+  )
+  return { id: result.insertId }
+}
+
+export async function updateDeepseekAccount(id, fields) {
+  const sets = []
+  const params = []
+  if (fields.label !== undefined) { sets.push('label=?'); params.push(fields.label) }
+  if (fields.apiKey !== undefined) { sets.push('api_key=?'); params.push(fields.apiKey ? safeEncrypt(fields.apiKey) : '') }
+  if (fields.isEnabled !== undefined) { sets.push('is_enabled=?'); params.push(fields.isEnabled ? 1 : 0) }
+  if (fields.warningThreshold !== undefined) { sets.push('warning_threshold=?'); params.push(fields.warningThreshold) }
+  if (sets.length === 0) return
+  params.push(id)
+  await pool.execute(`UPDATE deepseek_accounts SET ${sets.join(',')} WHERE id = ?`, params)
+}
+
+export async function deleteDeepseekAccount(id) {
+  await pool.execute('DELETE FROM deepseek_accounts WHERE id = ?', [id])
+}
+
+export async function updateDeepseekBalance(id, { totalBalance, grantedBalance, toppedUpBalance, isAvailable, error }) {
+  if (error) {
+    await pool.execute(
+      'UPDATE deepseek_accounts SET last_check_at=NOW(), last_error=?, is_available=0 WHERE id=?',
+      [(error || '').substring(0, 500), id]
+    )
+  } else {
+    await pool.execute(
+      'UPDATE deepseek_accounts SET total_balance=?, granted_balance=?, topped_up_balance=?, is_available=?, last_check_at=NOW(), last_error=NULL WHERE id=?',
+      [totalBalance, grantedBalance, toppedUpBalance, isAvailable ? 1 : 0, id]
+    )
+  }
+}
+
+// ========== 名片/联系人卡片管理 ==========
+
+export async function createContactCard(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO contact_cards (name, title, phone, wechat, email, qr_code, description, category, tags, target_audience, ai_recommend_keywords, sort_order, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.name || '技术支持', data.title || '', data.phone || '', data.wechat || '',
+      data.email || '', data.qrCode || '', data.description || '',
+      data.category || 'general', JSON.stringify(data.tags || []),
+      JSON.stringify(data.targetAudience || []), JSON.stringify(data.aiRecommendKeywords || []),
+      data.sortOrder || 0, data.status || 'active',
+    ]
+  )
+  return { id: result.insertId }
+}
+
+export async function updateContactCard(id, data) {
+  const sets = []; const params = []
+  if (data.name !== undefined) { sets.push('name=?'); params.push(data.name) }
+  if (data.title !== undefined) { sets.push('title=?'); params.push(data.title) }
+  if (data.phone !== undefined) { sets.push('phone=?'); params.push(data.phone) }
+  if (data.wechat !== undefined) { sets.push('wechat=?'); params.push(data.wechat) }
+  if (data.email !== undefined) { sets.push('email=?'); params.push(data.email) }
+  if (data.qrCode !== undefined) { sets.push('qr_code=?'); params.push(data.qrCode) }
+  if (data.description !== undefined) { sets.push('description=?'); params.push(data.description) }
+  if (data.category !== undefined) { sets.push('category=?'); params.push(data.category) }
+  if (data.tags !== undefined) { sets.push('tags=?'); params.push(JSON.stringify(data.tags)) }
+  if (data.targetAudience !== undefined) { sets.push('target_audience=?'); params.push(JSON.stringify(data.targetAudience)) }
+  if (data.aiRecommendKeywords !== undefined) { sets.push('ai_recommend_keywords=?'); params.push(JSON.stringify(data.aiRecommendKeywords)) }
+  if (data.sortOrder !== undefined) { sets.push('sort_order=?'); params.push(data.sortOrder) }
+  if (data.status !== undefined) { sets.push('status=?'); params.push(data.status) }
+  if (sets.length === 0) return null
+  params.push(id)
+  await pool.execute(`UPDATE contact_cards SET ${sets.join(', ')} WHERE id = ?`, params)
+  return getContactCardById(id)
+}
+
+export async function deleteContactCard(id) {
+  await pool.execute('DELETE FROM contact_cards WHERE id = ?', [id])
+}
+
+export async function getContactCardById(id) {
+  const [rows] = await pool.execute('SELECT * FROM contact_cards WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, tags: safeParse(r.tags), target_audience: safeParse(r.target_audience), ai_recommend_keywords: safeParse(r.ai_recommend_keywords) }
+}
+
+export async function getContactCards(filters = {}) {
+  let sql = 'SELECT * FROM contact_cards WHERE 1=1'
+  const params = []
+  if (filters.status) { sql += ' AND status = ?'; params.push(filters.status) }
+  if (filters.category) { sql += ' AND category = ?'; params.push(filters.category) }
+  sql += ' ORDER BY sort_order ASC, id DESC'
+  if (filters.limit) { sql += ' LIMIT ?'; params.push(parseInt(filters.limit)) }
+  const [rows] = await pool.execute(sql, params)
+  return rows.map(r => ({ ...r, tags: safeParse(r.tags), target_audience: safeParse(r.target_audience), ai_recommend_keywords: safeParse(r.ai_recommend_keywords) }))
+}
+
+export async function getActiveContactCards() {
+  return getContactCards({ status: 'active' })
+}
+
+export async function incrementCardMetric(id, field) {
+  const allowed = ['view_count', 'click_count']
+  if (!allowed.includes(field)) return
+  await pool.execute(`UPDATE contact_cards SET ${field} = ${field} + 1 WHERE id = ?`, [id])
+}
+
+// ========== AI行为日志 ==========
+
+export async function logAIActivity({ action, category = 'general', detail = '', tokens_used = 0, cost = 0, duration_ms = 0, status = 'success' }) {
+  try {
+    const [result] = await pool.execute(
+      'INSERT INTO ai_activity_log (action, category, detail, tokens_used, cost, duration_ms, status) VALUES (?,?,?,?,?,?,?)',
+      [action, category, detail, tokens_used, cost, duration_ms, status]
+    )
+    return { id: result.insertId }
+  } catch (err) {
+    console.error('[DB] AI活动日志写入失败:', err.message)
+    return null
+  }
+}
+
+export async function getAIActivityLog(limit = 50, offset = 0, category = null) {
+  let sql = 'SELECT * FROM ai_activity_log WHERE 1=1'
+  const params = []
+  if (category) { sql += ' AND category = ?'; params.push(category) }
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  params.push(parseInt(limit), parseInt(offset))
+  const [rows] = await pool.execute(sql, params)
+  return rows
+}
+
+export async function getAIActivityStats() {
+  const [rows] = await pool.execute(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(tokens_used) as total_tokens,
+      SUM(cost) as total_cost,
+      COUNT(CASE WHEN status='success' THEN 1 END) as success_count,
+      COUNT(CASE WHEN status='failed' THEN 1 END) as failed_count,
+      COUNT(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END) as last_24h,
+      SUM(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN tokens_used ELSE 0 END) as tokens_24h
+    FROM ai_activity_log
+  `)
+  return rows[0] || {}
+}
+
+// ========== 订单管理 ==========
+
+export async function createOrder({ orderNo, userId, productId, productName, price, persona, collectedData }) {
+  const [result] = await pool.execute(
+    `INSERT INTO orders (order_no, user_id, product_id, product_name, price, persona, collected_data, service_messages)
+     VALUES (?,?,?,?,?,?,?,?)`,
+    [orderNo, userId, productId, productName, price, JSON.stringify(persona || null), JSON.stringify(collectedData || {}), JSON.stringify([])]
+  )
+  return { id: result.insertId, orderNo }
+}
+
+export async function getOrderByNo(orderNo) {
+  const [rows] = await pool.execute('SELECT * FROM orders WHERE order_no = ?', [orderNo])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, persona: safeParse(r.persona), collected_data: safeParse(r.collected_data), service_messages: safeParse(r.service_messages) }
+}
+
+export async function getOrderById(id) {
+  const [rows] = await pool.execute('SELECT * FROM orders WHERE id = ?', [id])
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return { ...r, persona: safeParse(r.persona), collected_data: safeParse(r.collected_data), service_messages: safeParse(r.service_messages) }
+}
+
+export async function getUserOrders(userId) {
+  const [rows] = await pool.execute('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC', [userId])
+  return rows.map(r => ({ ...r, persona: safeParse(r.persona), collected_data: safeParse(r.collected_data), service_messages: safeParse(r.service_messages) }))
+}
+
+export async function updateOrderStatus(id, status) {
+  await pool.execute('UPDATE orders SET status = ? WHERE id = ?', [status, id])
+}
+
+export async function appendServiceMessage(orderId, message) {
+  const order = await getOrderById(orderId)
+  if (!order) return null
+  const msgs = order.service_messages || []
+  msgs.push(message)
+  await pool.execute('UPDATE orders SET service_messages = ? WHERE id = ?', [JSON.stringify(msgs), orderId])
+  return msgs
+}
+
+export async function getOrderServiceMessages(orderId) {
+  const order = await getOrderById(orderId)
+  return order ? (order.service_messages || []) : []
+}
+
+// ========== 投诉材料整理 ==========
+
+export async function saveComplaintDoc({ sessionId, userId, docTitle, complaintSummary, merchantInfo, violationDetail, evidenceList, timeline, appealPoints, fullDocument, inputTokens, outputTokens, cost }) {
+  const [result] = await pool.execute(
+    `INSERT INTO complaint_docs (session_id, user_id, doc_title, complaint_summary, merchant_info, violation_detail, evidence_list, timeline, appeal_points, full_document, input_tokens, output_tokens, cost)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [sessionId, userId, docTitle || '', complaintSummary || '', merchantInfo || '', violationDetail || '', evidenceList || '', timeline || '', appealPoints || '', fullDocument || '', inputTokens || 0, outputTokens || 0, cost || 0]
+  )
+  return result.insertId
+}
+
+export async function getComplaintDoc(sessionId) {
+  const [rows] = await pool.execute(
+    'SELECT * FROM complaint_docs WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+    [sessionId]
+  )
+  return rows.length > 0 ? rows[0] : null
 }

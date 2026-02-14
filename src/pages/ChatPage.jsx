@@ -1,22 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
 import TypingIndicator from '../components/TypingIndicator'
 import InfoPanel from '../components/InfoPanel'
 import AIAnalysisPanel from '../components/AIAnalysisPanel'
 import AppealTextPanel from '../components/AppealTextPanel'
+import ComplaintDocPanel from '../components/ComplaintDocPanel'
+import AppealGuidePanel from '../components/AppealGuidePanel'
 import UserCenter from '../components/UserCenter'
+import UserAvatar from '../components/UserAvatar'
 
-const WELCOME = `您好！我是您的微信商户号申诉顾问~
+const WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
 
-商户号出问题了别着急，我来帮您搞定。先简单聊几句，了解一下您的情况，然后帮您写申诉材料。
+不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
 
-💼 您是做什么生意的？
+💼 **先说说您的情况吧：**
 
-比如：卖衣服、做餐饮、搞游戏、做陪玩、卖课程、开超市……随便说就行，我能听懂~
+比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
 
-💡 右边面板会实时显示您提供的信息，随时能看能改。
-💡 有问题随时问我，比如"为什么要这个"。
+🛠️ **平台功能一览（顶部工具栏）：**
+📄 **申诉文案** — 一键生成可直接复制到微信后台的申诉材料
+📋 **投诉材料** — 生成完整申诉文书（可复制到Word）
+🗺️ **申诉指导** — 完整流程 + 投诉回复话术 + 95017电话话术 + 材料清单 + 进度追踪
+
+💡 有问题随时问我，比如"为什么要这个信息"。
 🔒 您的信息只用于本次咨询，不会泄露。`
 
 // ========== 视图模式 ==========
@@ -95,6 +102,10 @@ export default function ChatPage() {
   const [rechargeMethod, setRechargeMethod] = useState('wechat')
   const [rechargeRemark, setRechargeRemark] = useState('')
   const [rechargeSubmitting, setRechargeSubmitting] = useState(false)
+  // 真实支付状态
+  const [paymentPending, setPaymentPending] = useState(null) // { outTradeNo, method, codeUrl, amount }
+  const [paymentStatus, setPaymentStatus] = useState('') // pending | paid | failed
+  const paymentPollRef = useRef(null)
 
   // 清理 collectedData：去掉内部 _ 前缀字段，确保所有值都是字符串
   function sanitizeCollected(raw) {
@@ -115,16 +126,115 @@ export default function ChatPage() {
   const [showInfoPanel, setShowInfoPanel] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [showAppealPanel, setShowAppealPanel] = useState(false)
+  const [showComplaintDoc, setShowComplaintDoc] = useState(false)
+  const [showAppealGuide, setShowAppealGuide] = useState(false)
   const [showUserCenter, setShowUserCenter] = useState(false)
   const [analysisKey, setAnalysisKey] = useState(0) // force re-fetch analysis
   const [newChatAnim, setNewChatAnim] = useState(false) // new chat transition
   const [chatFading, setChatFading] = useState(false) // fade-out before reset
+  const [contactCard, setContactCard] = useState(null)
+  const [contactCards, setContactCards] = useState([])
+  const [showContact, setShowContact] = useState(false)
+  const [selectedCardIdx, setSelectedCardIdx] = useState(0)
+  const [riskLevel, setRiskLevel] = useState(null) // { level, label, description, factors, suggestion }
+  const [riskTransition, setRiskTransition] = useState(false)
+  const prevRiskRef = useRef(null)
+  // AI砍价
+  const [bargainProduct, setBargainProduct] = useState(null)
+  const [bargainHistory, setBargainHistory] = useState([])
+  const [bargainInput, setBargainInput] = useState('')
+  const [bargainLoading, setBargainLoading] = useState(false)
+  const [bargainDeal, setBargainDeal] = useState(null) // { finalPrice }
+  // 虚拟人设
+  const [virtualPersona, setVirtualPersona] = useState(null)
+  const [showPersonaCard, setShowPersonaCard] = useState(false)
+  // 商品详情购买弹窗
+  const [detailProduct, setDetailProduct] = useState(null)
+  const [purchasing, setPurchasing] = useState(false)
+  const chatNavigate = useNavigate()
+  const [proModeAnim, setProModeAnim] = useState(false) // 专业模式切换动画
+  const prevProModeRef = useRef(false)
+
+  // 专业模式：当系统开始收集核心信息时自动激活
+  const isProfessionalMode = infoFields.length > 0 || Object.keys(collectedInfo).length > 0
+
+  // 检测专业模式切换，触发过渡动画
+  useEffect(() => {
+    if (isProfessionalMode && !prevProModeRef.current) {
+      setProModeAnim(true)
+      setTimeout(() => setProModeAnim(false), 500)
+    }
+    prevProModeRef.current = isProfessionalMode
+  }, [isProfessionalMode])
 
   useEffect(() => {
-    if (view === 'chat') bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading, view])
+    fetch('/api/contact-card').then(r => r.json()).then(d => {
+      if (d.enabled) setContactCard(d)
+      if (d.cards?.length > 0) setContactCards(d.cards)
+    }).catch(() => {})
+  }, [])
 
-  // 发送完成后自动聚焦输入框（loading 变为 false 后 DOM 已更新，此时 focus 才生效）
+  // AI风险评估：当收集到违规相关信息时自动评估
+  useEffect(() => {
+    const hasRiskData = collectedInfo.violation_reason || collectedInfo.problem_type || collectedInfo.penalty_type
+    if (!hasRiskData) return
+    const dataKey = JSON.stringify({ v: collectedInfo.violation_reason, p: collectedInfo.problem_type, t: collectedInfo.penalty_type })
+    if (prevRiskRef.current === dataKey) return
+    prevRiskRef.current = dataKey
+    fetch('/api/risk-assess', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ collectedData: collectedInfo }),
+    }).then(r => r.json()).then(d => {
+      if (d.level) {
+        setRiskLevel(d)
+        setRiskTransition(true)
+        setTimeout(() => setRiskTransition(false), 600)
+      }
+    }).catch(() => {})
+  }, [collectedInfo])
+
+  // 智能名片展示：检测AI回复中的关键转化节点
+  const contactShownRef = useRef(false)
+  useEffect(() => {
+    if (contactShownRef.current || (!contactCard && contactCards.length === 0)) return
+    if (messages.length < 4) return // 至少2轮对话后才触发
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg?.role !== 'assistant') return
+    const text = lastMsg.content || ''
+    // 关键转化触发词：案件复杂/需要专业帮助/建议咨询/代办/难度高
+    const triggerPatterns = [
+      /案件.*复杂|难度.*高|极难|成功率.*低于|成功率.*[<＜].*50/,
+      /建议.*咨询.*专业|建议.*寻求.*专业|需要.*法律.*支持/,
+      /专业团队.*协助|一对一.*指导|代办/,
+      /如果.*觉得.*困难|如果.*需要.*帮助/,
+      /材料已.*生成|文案已.*生成|申诉材料.*准备/,
+      /所有信息.*收集完毕|信息.*收集.*完成/,
+    ]
+    if (triggerPatterns.some(p => p.test(text))) {
+      contactShownRef.current = true
+      setTimeout(() => setShowContact(true), 2000)
+    }
+  }, [messages, contactCard, contactCards])
+
+  // 组件卸载时清理支付轮询定时器
+  useEffect(() => {
+    return () => {
+      if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null }
+    }
+  }, [])
+
+  const scrollTimerRef = useRef(null)
+  useEffect(() => {
+    if (view === 'chat') {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 80)
+    }
+    return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current) }
+  }, [messages.length, view])
+
+  // 发送完成后自动聚焦输入框
   useEffect(() => {
     if (!loading && view === 'chat') {
       setTimeout(() => inputRef.current?.focus(), 50)
@@ -238,7 +348,7 @@ export default function ChatPage() {
   async function handleApiModeConfirm() {
     if (!user) return
     if (selectedApiMode === 'custom' && !customKey.trim()) {
-      setApiModeError('请输入您的 DeepSeek API Key'); return
+      setApiModeError('请输入您的 API Key'); return
     }
     setApiModeError(''); setApiModeSaving(true)
     try {
@@ -315,7 +425,8 @@ export default function ChatPage() {
               if (!infoFields.find(f => f.key === parsed.key)) {
                 setInfoFields(prev => [...prev, { key: parsed.key, label: parsed.label, group: parsed.group, icon: parsed.icon }])
               }
-              setShowInfoPanel(true)
+              // 仅桌面端自动展开信息面板，手机端静默收集不打断
+              if (window.innerWidth >= 1024) setShowInfoPanel(true)
               setAnalysisKey(prev => prev + 1)
             } else if (parsed.type === 'chunk') {
               streamingContent += parsed.content
@@ -362,6 +473,17 @@ export default function ChatPage() {
                   }
                   return updated
                 })
+              }
+            } else if (parsed.type === 'completeness') {
+              // 信息收集完成度通知
+              if (parsed.triggerReport) {
+                setAnalysisKey(prev => prev + 1)
+                // 收集完成后自动显示AI分析面板
+                if (window.innerWidth >= 1280) setShowAIPanel(true)
+                // 收集完成后延迟展示名片（关键转化节点）
+                if (contactCard || contactCards.length > 0) {
+                  setTimeout(() => setShowContact(true), 3000)
+                }
               }
             } else if (parsed.type === 'error') {
               const role = parsed.needRecharge ? 'system' : 'assistant'
@@ -439,6 +561,74 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  // ========== AI砍价 ==========
+  function openBargain(product) {
+    setBargainProduct(product)
+    setBargainHistory([])
+    setBargainInput('')
+    setBargainDeal(null)
+    setBargainLoading(true)
+    // AI先打招呼
+    fetch(`/api/mall/products/${product.id}/bargain`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: [], message: '你好，我想了解一下这个服务，价格能优惠吗？' }),
+    }).then(r => r.json()).then(d => {
+      setBargainHistory([
+        { role: 'user', content: '你好，我想了解一下这个服务，价格能优惠吗？' },
+        { role: 'assistant', content: d.reply },
+      ])
+    }).catch(() => {
+      setBargainHistory([{ role: 'assistant', content: '您好！欢迎咨询，这款服务性价比很高~' }])
+    }).finally(() => setBargainLoading(false))
+  }
+
+  async function sendBargain() {
+    const text = bargainInput.trim()
+    if (!text || bargainLoading || !bargainProduct) return
+    setBargainInput('')
+    const newHistory = [...bargainHistory, { role: 'user', content: text }]
+    setBargainHistory(newHistory)
+    setBargainLoading(true)
+    try {
+      const res = await fetch(`/api/mall/products/${bargainProduct.id}/bargain`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history: newHistory.slice(-8), message: text }),
+      })
+      const d = await res.json()
+      setBargainHistory(prev => [...prev, { role: 'assistant', content: d.reply }])
+      if (d.accepted && d.finalPrice) {
+        setBargainDeal({ finalPrice: d.finalPrice })
+      }
+    } catch {
+      setBargainHistory(prev => [...prev, { role: 'assistant', content: '网络不太好，再试试~' }])
+    } finally { setBargainLoading(false) }
+  }
+
+  async function handlePurchase(product) {
+    if (purchasing) return
+    setPurchasing(true)
+    try {
+      const res = await fetch('/api/orders/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ productId: product.id, collectedData: collectedInfo }),
+      })
+      const d = await res.json()
+      if (d.success) {
+        setDetailProduct(null)
+        setBargainProduct(null)
+        chatNavigate(`/service/${d.orderNo}`)
+      } else if (d.needRecharge) {
+        alert(`余额不足（当前 ¥${d.balance}，需要 ¥${d.price}），请先充值`)
+      } else {
+        alert(d.error || '购买失败')
+      }
+    } catch (err) {
+      alert('购买失败，请稍后重试')
+    }
+    setPurchasing(false)
+  }
+
   function handleNewChat() {
     // Smooth transition: fade out → reset → animate in
     setChatFading(true)
@@ -446,7 +636,8 @@ export default function ChatPage() {
       localStorage.removeItem('appeal_session_id')
       setSessionId(null)
       setMessages([{ role: 'assistant', content: WELCOME }])
-      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setAnalysisKey(0)
+      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setAnalysisKey(0); contactShownRef.current = false
+      setRiskLevel(null); prevRiskRef.current = null
       setView('chat')
       setChatFading(false)
       setNewChatAnim(true)
@@ -464,6 +655,53 @@ export default function ChatPage() {
     setMessages(prev => [...prev, { role: 'assistant', content: `✅ 已更新「${label}」为：${display}\n\n后续的申诉策略和材料会根据修改后的信息重新调整~` }])
   }
 
+  function handleExportChat() {
+    if (messages.length <= 1) return
+    const lines = []
+    lines.push('═══════════════════════════════════════')
+    lines.push('  商户号申诉顾问 - 对话记录导出')
+    lines.push(`  导出时间: ${new Date().toLocaleString('zh-CN')}`)
+    if (user?.nickname) lines.push(`  用户: ${user.nickname}`)
+    lines.push('═══════════════════════════════════════')
+    lines.push('')
+    messages.forEach((msg, i) => {
+      const role = msg.role === 'user' ? `【${user?.nickname || '我'}】` : '【AI顾问】'
+      // Strip markdown for clean text export
+      let text = msg.content || ''
+      text = text.replace(/\*\*([\s\S]+?)\*\*/g, '$1')
+      text = text.replace(/\*\*/g, '')
+      text = text.replace(/^#{1,6}\s+/gm, '')
+      text = text.replace(/`([^`]+)`/g, '$1')
+      text = text.replace(/\[(.+?)\]\(.+?\)/g, '$1')
+      lines.push(`${role}`)
+      lines.push(text)
+      lines.push('')
+    })
+    // Add collected info summary if available
+    const infoKeys = Object.keys(collectedInfo).filter(k => !k.startsWith('_') && collectedInfo[k])
+    if (infoKeys.length > 0) {
+      lines.push('═══════════════════════════════════════')
+      lines.push('  已收集的申诉信息')
+      lines.push('═══════════════════════════════════════')
+      const labels = { problem_type: '处罚类型', violation_reason: '违规原因', merchant_id: '商户号', merchant_name: '商户名称', company_name: '公司全称', license_no: '信用代码', legal_name: '法人姓名', legal_id_last4: '身份证后四位', industry: '所属行业', business_model: '经营模式', complaint_status: '投诉情况', refund_policy: '退款政策', bank_name: '开户银行', bank_account_last4: '账户后四位', contact_phone: '联系电话', appeal_history: '申诉历史', business_scenario: '经营场景', miniprogram_name: '小程序名称', miniprogram_appid: 'AppID', order_info: '订单信息' }
+      infoKeys.forEach(k => {
+        const label = labels[k] || k
+        const val = collectedInfo[k]
+        if (val) lines.push(`${label}: ${val}`)
+      })
+      lines.push('')
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `申诉对话记录_${new Date().toISOString().slice(0, 10)}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   function handleLogout() {
     saveToken('')
     localStorage.removeItem('appeal_user')
@@ -477,12 +715,62 @@ export default function ChatPage() {
     setRechargeAmount(null)
     setRechargeRemark('')
     setRechargeMethod('wechat')
+    setPaymentPending(null)
+    setPaymentStatus('')
+    if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null }
     try {
       const res = await fetch('/api/recharge/config')
       const data = await res.json()
       setRechargeConfig(data)
       if (data.amounts?.length) setRechargeAmount(data.amounts[0])
     } catch { setRechargeConfig(null) }
+  }
+
+  function closeRecharge() {
+    setShowRecharge(false)
+    setPaymentPending(null)
+    setPaymentStatus('')
+    if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null }
+  }
+
+  // 轮询支付状态
+  function startPaymentPolling(outTradeNo) {
+    if (paymentPollRef.current) clearInterval(paymentPollRef.current)
+    let pollCount = 0
+    const maxPolls = 120 // 最多轮询120次（约10分钟）
+    paymentPollRef.current = setInterval(async () => {
+      pollCount++
+      if (pollCount > maxPolls) {
+        clearInterval(paymentPollRef.current)
+        paymentPollRef.current = null
+        setPaymentStatus('timeout')
+        return
+      }
+      try {
+        const res = await fetch(`/api/recharge/status/${outTradeNo}`, { headers: getAuthHeaders() })
+        const data = await res.json()
+        if (data.status === 'paid') {
+          clearInterval(paymentPollRef.current)
+          paymentPollRef.current = null
+          setPaymentStatus('paid')
+          // 刷新用户信息获取最新余额
+          if (user) {
+            try {
+              const uRes = await fetch(`/api/user/${user.id}`, { headers: getAuthHeaders() })
+              const uData = await uRes.json()
+              if (uData.user) {
+                setUser(uData.user)
+                localStorage.setItem('appeal_user', JSON.stringify(uData.user))
+              }
+            } catch {}
+          }
+        } else if (data.status === 'failed') {
+          clearInterval(paymentPollRef.current)
+          paymentPollRef.current = null
+          setPaymentStatus('failed')
+        }
+      } catch { /* 网络错误，继续轮询 */ }
+    }, 5000) // 每5秒轮询一次
   }
 
   async function submitRecharge() {
@@ -495,8 +783,37 @@ export default function ChatPage() {
       })
       const data = await res.json()
       if (data.error) { alert(data.error); return }
-      alert('充值申请已提交！管理员确认后余额将自动到账。')
-      setShowRecharge(false)
+
+      if (data.realPayment && data.outTradeNo) {
+        // 真实支付模式
+        if (data.type === 'qrcode' && data.codeUrl) {
+          // 微信支付：展示二维码
+          setPaymentPending({ outTradeNo: data.outTradeNo, method: 'wechat', codeUrl: data.codeUrl, amount: rechargeAmount })
+          setPaymentStatus('pending')
+          startPaymentPolling(data.outTradeNo)
+        } else if (data.type === 'form' && data.formHtml) {
+          // 支付宝：新窗口打开支付页面
+          const win = window.open('', '_blank')
+          if (win) {
+            win.document.write(data.formHtml)
+            win.document.close()
+          }
+          setPaymentPending({ outTradeNo: data.outTradeNo, method: 'alipay', amount: rechargeAmount })
+          setPaymentStatus('pending')
+          startPaymentPolling(data.outTradeNo)
+        } else if (data.type === 'redirect' && data.payUrl) {
+          // 易支付/码支付：跳转到支付页面
+          window.open(data.payUrl, '_blank')
+          setPaymentPending({ outTradeNo: data.outTradeNo, method: rechargeMethod, amount: rechargeAmount })
+          setPaymentStatus('pending')
+          startPaymentPolling(data.outTradeNo)
+        }
+      } else {
+        // 手动充值模式（兜底）
+        const msg = data.message || '充值申请已提交！管理员确认后余额将自动到账。'
+        alert(msg)
+        closeRecharge()
+      }
     } catch { alert('提交失败，请稍后重试') }
     finally { setRechargeSubmitting(false) }
   }
@@ -729,7 +1046,7 @@ export default function ChatPage() {
                     </span>
                     <h3 className="text-sm font-bold text-gray-900">官方 API</h3>
                   </div>
-                  <p className="text-xs text-gray-400 ml-10">平台 DeepSeek AI 服务，按消息扣费</p>
+                  <p className="text-xs text-gray-400 ml-10">平台 AI 服务，免费模型不扣费</p>
                   <span className="inline-block mt-1.5 ml-10 text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-md font-medium">余额 ¥{parseFloat(user?.balance || 0).toFixed(2)}</span>
                   <p className="text-[10px] text-gray-300 ml-10 mt-1">充值后不支持退款，建议先用自己的API体验</p>
                 </div>
@@ -749,7 +1066,7 @@ export default function ChatPage() {
                     </span>
                     <h3 className="text-sm font-bold text-gray-900">自定义 API</h3>
                   </div>
-                  <p className="text-xs text-gray-400 ml-10">使用自己的 DeepSeek API Key</p>
+                  <p className="text-xs text-gray-400 ml-10">使用自己的 API Key（支持多种模型）</p>
                   <span className="inline-block mt-1.5 ml-10 text-xs bg-violet-50 text-violet-500 px-2 py-0.5 rounded-md font-medium">自有 Key · 免费</span>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1.5 ${selectedApiMode === 'custom' ? 'border-[#07C160] bg-[#07C160]' : 'border-gray-200'}`}>
@@ -760,9 +1077,9 @@ export default function ChatPage() {
 
             {selectedApiMode === 'custom' && (
               <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">您的 DeepSeek API Key</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">您的 API Key</label>
                 <input type="password" value={customKey} onChange={e => setCustomKey(e.target.value)}
-                  placeholder="sk-..." className="w-full px-4 py-2.5 rounded-xl border border-gray-200/80 bg-white text-sm focus:ring-2 focus:ring-violet-300/30 focus:border-violet-400 transition-all placeholder:text-gray-300" />
+                  placeholder="输入您的 API Key" className="w-full px-4 py-2.5 rounded-xl border border-gray-200/80 bg-white text-sm focus:ring-2 focus:ring-violet-300/30 focus:border-violet-400 transition-all placeholder:text-gray-300" />
               </div>
             )}
 
@@ -903,90 +1220,168 @@ export default function ChatPage() {
   const visibleSessions = getVisibleSessions()
 
   return (
-    <div className="h-screen h-dvh bg-[#f5f5f5] flex flex-col overflow-hidden"
+    <div className={`h-screen h-dvh flex flex-col overflow-hidden ${isProfessionalMode ? 'pro-mode' : ''} ${proModeAnim ? 'mode-switch-anim' : ''} ${riskLevel?.level ? `risk-${riskLevel.level}` : ''} ${riskTransition ? 'risk-transition' : ''}`}
+      style={{ background: riskLevel?.level ? `var(--risk-bg)` : (isProfessionalMode ? 'var(--pro-bg)' : '#f5f5f5') }}
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-      <header className="glass border-b border-black/[0.06] flex-shrink-0 safe-top">
+      <header className={`flex-shrink-0 safe-top transition-all duration-500 ${riskLevel?.level ? 'risk-header' : (isProfessionalMode ? 'pro-header' : 'glass border-b border-black/[0.06]')}`}>
         <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center shadow-sm flex-shrink-0 glow-green">
-              <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
-            </div>
+            {/* 头像：普通模式=绿色，专业模式=深色科技风 */}
+            {isProfessionalMode ? (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center flex-shrink-0 pro-avatar-glow relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
+                <svg className="w-[18px] h-[18px] text-white relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                </svg>
+              </div>
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center shadow-sm flex-shrink-0 glow-green">
+                <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+              </div>
+            )}
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 truncate tracking-tight">商户号申诉助手</h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {user?.api_mode === 'custom' ? (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-500 rounded-md font-medium">自定义API</span>
-                ) : (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${parseFloat(user?.balance || 0) > 0 ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-500'}`}>
-                    ¥{parseFloat(user?.balance || 0).toFixed(2)}
+              <div className="flex items-center gap-2">
+                <h1 className={`text-sm font-semibold truncate tracking-tight ${isProfessionalMode ? 'text-stone-800' : 'text-gray-900'}`}>
+                  {isProfessionalMode ? '申诉专业工作台' : '商户号申诉助手'}
+                </h1>
+                {isProfessionalMode && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-md font-bold border border-amber-200 tracking-wider">PRO</span>
+                )}
+                {riskLevel?.level && (
+                  <span className={`risk-badge risk-icon-pulse inline-flex items-center gap-1`}>
+                    {riskLevel.level === 'severe' ? '🔴' : riskLevel.level === 'high' ? '🟠' : riskLevel.level === 'medium' ? '🟡' : '🟢'}
+                    {riskLevel.label}
                   </span>
                 )}
-                {user?.api_mode === 'official' && parseFloat(user?.balance || 0) <= 0 && (
-                  <button onClick={openRecharge} className="text-[10px] text-orange-500 hover:text-orange-600 font-medium">充值</button>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {isProfessionalMode ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
+                    信息收集中 · {Object.keys(collectedInfo).filter(k => collectedInfo[k] && String(collectedInfo[k]).trim()).length}/{infoFields.length || infoTotal}
+                  </span>
+                ) : user?.api_mode === 'custom' ? (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-500 rounded-md font-medium">自定义API</span>
+                ) : parseFloat(user?.balance || 0) > 0 ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
+                    ¥{parseFloat(user?.balance || 0).toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-600">免费模型</span>
                 )}
-                {user && <span className="text-[10px] text-gray-300 truncate max-w-[80px]">{user.nickname}</span>}
+                {user && <span className={`text-[10px] truncate max-w-[80px] ${isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>{user.nickname}</span>}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {/* AI分析面板切换 */}
             <button onClick={() => setShowAIPanel(!showAIPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg xl:hidden ${showAIPanel ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="AI分析">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg xl:hidden ${
+                showAIPanel
+                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="AI分析">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
               </svg>
             </button>
             {/* 客户信息面板切换 */}
             <button onClick={() => setShowInfoPanel(!showInfoPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg lg:hidden ${showInfoPanel ? 'text-wechat-green bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="客户信息">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg lg:hidden ${
+                showInfoPanel
+                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-wechat-green bg-green-50')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="客户信息">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {hasInfoData && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-wechat-green rounded-full" />}
+              {hasInfoData && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${isProfessionalMode ? 'bg-amber-500' : 'bg-wechat-green'}`} />}
+            </button>
+            {/* 申诉全流程指导 */}
+            <button onClick={() => setShowAppealGuide(!showAppealGuide)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
+                showAppealGuide
+                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-indigo-500 bg-indigo-50')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="申诉指导·话术·95017">
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+              </svg>
+            </button>
+            {/* 投诉材料整理 */}
+            <button onClick={() => setShowComplaintDoc(!showComplaintDoc)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
+                showComplaintDoc
+                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="投诉材料整理">
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
             </button>
             {/* 申诉文案面板切换 */}
             <button onClick={() => setShowAppealPanel(!showAppealPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${showAppealPanel ? 'text-orange-500 bg-orange-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="申诉文案">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
+                showAppealPanel
+                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-orange-500 bg-orange-50')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="申诉文案">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
             </button>
-            {/* 用户中心 */}
+            {/* 联系技术人员 */}
+            {contactCard && (
+              <button onClick={() => setShowContact(true)}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50'}`} title="联系技术人员">
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
+                </svg>
+              </button>
+            )}
+            {/* 用户中心（头像） */}
             <button onClick={() => setShowUserCenter(true)}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="用户中心">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              className="w-8 h-8 flex items-center justify-center rounded-lg overflow-hidden hover:ring-2 hover:ring-offset-1 hover:ring-green-300 transition-all" title="用户中心">
+              <UserAvatar name={user?.nickname || '用户'} size={32} style={{ borderRadius: 8 }} />
             </button>
             <button onClick={openRecharge}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="充值">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="充值">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
             <button onClick={() => { if (window.innerWidth < 640) openDrawer(); else openMyHistory() }}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="历史对话">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="历史对话">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
             <button onClick={() => { setSelectedApiMode(user?.api_mode || 'official'); setCustomKey(''); setView('apiSelect') }}
-              className="w-8 h-8 hidden sm:flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="切换API">
+              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="切换API">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
+            <button onClick={handleExportChat}
+              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${
+                messages.length <= 1
+                  ? (isProfessionalMode ? 'text-stone-200 cursor-not-allowed' : 'text-gray-200 cursor-not-allowed')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+              }`} title="导出对话" disabled={messages.length <= 1}>
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </button>
             <button onClick={handleNewChat}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-wechat-green hover:bg-green-50 rounded-lg" title="新对话">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-wechat-green hover:bg-green-50'}`} title="新对话">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </button>
-            <div className="w-px h-4 bg-gray-200 mx-0.5 hidden sm:block" />
+            <div className={`w-px h-4 mx-0.5 hidden sm:block ${isProfessionalMode ? 'bg-amber-200/40' : 'bg-gray-200'}`} />
             <button onClick={handleLogout}
-              className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-lg" title="退出">
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-300 hover:text-red-400 hover:bg-red-50' : 'text-gray-300 hover:text-red-400 hover:bg-red-50'}`} title="退出">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
               </svg>
@@ -995,17 +1390,29 @@ export default function ChatPage() {
         </div>
       </header>
 
+      {/* 手机端静默数据收集进度条 */}
+      {isProfessionalMode && hasInfoData && (
+        <div className="lg:hidden flex-shrink-0">
+          <div className="h-1 bg-gray-100 relative overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-700 ease-out rounded-r-full"
+              style={{ width: `${Math.min(100, Math.round((Object.keys(collectedInfo).filter(k => collectedInfo[k] && String(collectedInfo[k]).trim()).length / Math.max(infoFields.length || infoTotal || 1, 1)) * 100))}%` }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
+          </div>
+        </div>
+      )}
+
       {/* 三栏布局：AI面板(左) | 聊天(中) | 客户信息(右) */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* 左侧AI分析面板 - xl桌面端显示，移动端覆盖 */}
         <div className={`
-          xl:relative xl:w-80 2xl:w-96 xl:border-r xl:border-gray-200/60 xl:block
+          xl:relative xl:w-80 2xl:w-96 xl:border-r xl:block
+          ${isProfessionalMode ? 'xl:border-amber-200/40' : 'xl:border-gray-200/60'}
           ${showAIPanel ? 'fixed inset-0 z-40 xl:static xl:inset-auto xl:z-auto' : 'hidden xl:block'}
         `}>
           {showAIPanel && <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] xl:hidden" onClick={() => setShowAIPanel(false)} />}
           <div className={`
-            ${showAIPanel ? 'absolute left-0 top-0 bottom-0 w-80 shadow-2xl xl:shadow-none xl:static xl:w-full' : ''}
+            ${showAIPanel ? 'absolute left-0 top-0 bottom-0 w-80 shadow-2xl xl:shadow-none xl:static xl:w-full panel-slide-left' : ''}
             h-full
           `}>
             <AIAnalysisPanel
@@ -1021,11 +1428,16 @@ export default function ChatPage() {
 
         {/* 中间聊天区域 */}
         <div className="flex-1 flex flex-col min-w-0">
-          <main className="flex-1 overflow-y-auto overscroll-contain bg-[#f5f5f5]">
+          <main onClick={e => {
+            const prodCard = e.target.closest('.product-rec-card')
+            if (prodCard) { const pid = prodCard.dataset.productId; if (pid) { fetch(`/api/mall/products/${pid}`).then(r=>r.json()).then(d=>{ if(d.product) setDetailProduct(d.product) }).catch(()=>{}) }; return }
+            const contactRecCard = e.target.closest('.contact-rec-card')
+            if (contactRecCard) { setShowContact(true); return }
+          }} className={`flex-1 overflow-y-auto overscroll-contain gpu-scroll ${isProfessionalMode ? 'pro-chat-bg pro-grid-bg' : 'bg-[#f5f5f5]'}`}>
             <div className={`max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
               {messages.map((msg, i) => (
                 <React.Fragment key={i}>
-                  <ChatMessage role={msg.role} content={msg.content} animate={i === messages.length - 1} timing={msg.timing} tokenUsage={msg.tokenUsage} />
+                  <ChatMessage role={msg.role} content={msg.content} animate={i === messages.length - 1} timing={msg.timing} tokenUsage={msg.tokenUsage} proMode={isProfessionalMode} />
                   {msg.retryable && (
                     <div className="flex justify-center py-2">
                       <button onClick={handleRetry} disabled={loading}
@@ -1039,24 +1451,75 @@ export default function ChatPage() {
                   )}
                 </React.Fragment>
               ))}
-              {loading && <TypingIndicator />}
+              {loading && <TypingIndicator proMode={isProfessionalMode} />}
               <div ref={bottomRef} />
             </div>
           </main>
 
-          <footer className="glass border-t border-black/[0.04] flex-shrink-0 safe-bottom">
+          <footer className={`flex-shrink-0 safe-bottom ${isProfessionalMode ? 'bg-white/80 backdrop-blur-xl border-t border-amber-200/40' : 'glass border-t border-black/[0.04]'}`}>
             <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5">
+              {/* 智能快捷回复：根据对话阶段动态切换 */}
+              {!input && !loading && (() => {
+                let quickReplies = []
+                const msgCount = messages.length
+                const lastMsg = messages[msgCount - 1]
+                const lastContent = (lastMsg?.content || '').toLowerCase()
+                const hasInfo = Object.keys(collectedInfo).length > 0
+                const infoCount = Object.keys(collectedInfo).filter(k => !k.startsWith('_') && collectedInfo[k]).length
+
+                if (msgCount <= 2) {
+                  // 阶段1：开场
+                  quickReplies = ['我做餐饮的，商户号被冻结了', '游戏行业，说我涉嫌赌博', '电商卖货，收款被限额', '做直播的，交易异常被封了', '我不太懂，帮我看看怎么办']
+                } else if (lastContent.includes('信息收集完毕') || lastContent.includes('收集完成')) {
+                  // 阶段4：收集完成后
+                  quickReplies = ['帮我生成申诉文案', '查看申诉流程指导', '我有投诉需要处理', '帮我分析成功率', '有没有类似的成功案例']
+                } else if (infoCount >= 10) {
+                  // 阶段3：收集后期
+                  quickReplies = ['跳过这个问题', '我不确定，先跳过', '这个信息我后面补充']
+                } else if (hasInfo && infoCount < 10) {
+                  // 阶段2：信息收集中
+                  quickReplies = ['不记得了', '没有', '暂时没有', '这个我不太清楚', '为什么要这个信息']
+                } else if (lastContent.includes('驳回') || lastContent.includes('被拒')) {
+                  // 特殊：讨论驳回
+                  quickReplies = ['帮我分析驳回原因', '怎么重新申诉', '需要补充什么材料', '帮我打95017怎么说']
+                } else if (lastContent.includes('投诉') || lastContent.includes('纠纷')) {
+                  // 特殊：讨论投诉
+                  quickReplies = ['怎么回复消费者投诉', '投诉处理完了还会影响吗', '退款后投诉会撤销吗']
+                } else if (msgCount > 2) {
+                  // 通用对话中
+                  quickReplies = ['怎么操作', '还有什么要注意的', '帮我总结一下', '有没有专业团队帮忙']
+                }
+
+                return quickReplies.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 mb-2 animate-fadeIn">
+                    {quickReplies.map(q => (
+                      <button key={q} onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50) }}
+                        className={`px-3 py-1.5 text-[11px] rounded-full transition-all whitespace-nowrap ${
+                          isProfessionalMode
+                            ? 'bg-white border border-amber-200/60 text-stone-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50/60'
+                            : 'bg-white border border-gray-200/80 text-gray-600 hover:border-[#07C160]/40 hover:text-[#07C160] hover:bg-green-50/50'
+                        }`}>
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                ) : null
+              })()}
               <div className="flex items-end gap-2">
                 <div className="flex-1 relative">
                   <textarea ref={inputRef} value={input} autoFocus
                     onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="输入消息..." rows={1} disabled={loading}
-                    className="w-full resize-none rounded-2xl border border-gray-200/60 bg-white/80 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#07C160]/15 focus:border-[#07C160]/40 focus:bg-white transition-all max-h-28 overflow-y-auto placeholder:text-gray-300"
+                    placeholder={isProfessionalMode ? '描述您的情况或回答问题...' : '输入消息...'} rows={1} disabled={loading}
+                    className={`w-full resize-none rounded-2xl px-4 py-2.5 text-sm transition-all max-h-28 overflow-y-auto ${
+                      isProfessionalMode
+                        ? 'border border-amber-200/60 bg-white/90 text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-300/30 focus:border-amber-300 focus:bg-white'
+                        : 'border border-gray-200/60 bg-white/80 placeholder:text-gray-300 focus:ring-2 focus:ring-[#07C160]/15 focus:border-[#07C160]/40 focus:bg-white'
+                    }`}
                     style={{ minHeight: '42px' }}
                     onInput={e => { e.target.style.height = '42px'; e.target.style.height = Math.min(e.target.scrollHeight, 112) + 'px' }}
                   />
                   {input.length > 200 && (
-                    <span className={`absolute right-3 bottom-1.5 text-[10px] ${input.length > 4500 ? 'text-red-400' : 'text-gray-300'}`}>
+                    <span className={`absolute right-3 bottom-1.5 text-[10px] ${input.length > 4500 ? 'text-red-400' : isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>
                       {input.length}/5000
                     </span>
                   )}
@@ -1064,8 +1527,10 @@ export default function ChatPage() {
                 <button onClick={handleSend} disabled={!input.trim() || loading}
                   className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
                     input.trim() && !loading
-                      ? 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:shadow-green-500/30 active:scale-90'
-                      : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                      ? (isProfessionalMode
+                          ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-500/30 active:scale-90'
+                          : 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:shadow-green-500/30 active:scale-90')
+                      : (isProfessionalMode ? 'bg-amber-50 text-amber-300 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed')
                   }`}>
                   {loading ? (
                     <svg className="w-[18px] h-[18px] animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -1082,12 +1547,13 @@ export default function ChatPage() {
 
         {/* 右侧客户信息面板 - lg桌面端显示，移动端覆盖 */}
         <div className={`
-          lg:relative lg:w-80 xl:w-80 2xl:w-96 lg:border-l lg:border-gray-200/60 lg:block
+          lg:relative lg:w-80 xl:w-80 2xl:w-96 lg:border-l lg:block
+          ${isProfessionalMode ? 'lg:border-amber-200/40' : 'lg:border-gray-200/60'}
           ${showInfoPanel ? 'fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto' : 'hidden lg:block'}
         `}>
           {showInfoPanel && <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] lg:hidden" onClick={() => setShowInfoPanel(false)} />}
           <div className={`
-            ${showInfoPanel ? 'absolute right-0 top-0 bottom-0 w-80 shadow-2xl lg:shadow-none lg:static lg:w-full' : ''}
+            ${showInfoPanel ? 'absolute right-0 top-0 bottom-0 w-80 shadow-2xl lg:shadow-none lg:static lg:w-full panel-slide-right' : ''}
             h-full
           `}>
             <InfoPanel
@@ -1103,6 +1569,35 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* 申诉全流程指导面板（覆盖层） */}
+      {showAppealGuide && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowAppealGuide(false)}>
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+          <div className="relative ml-auto" onClick={e => e.stopPropagation()}>
+            <AppealGuidePanel
+              sessionId={sessionId}
+              onClose={() => setShowAppealGuide(false)}
+              getAuthHeaders={getAuthHeaders}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 投诉材料整理面板（覆盖层） */}
+      {showComplaintDoc && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowComplaintDoc(false)}>
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+          <div className="relative ml-auto w-80 sm:w-96 h-full shadow-2xl animate-slide-in" onClick={e => e.stopPropagation()}>
+            <ComplaintDocPanel
+              sessionId={sessionId}
+              userId={user?.id}
+              onClose={() => setShowComplaintDoc(false)}
+              getAuthHeaders={getAuthHeaders}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 申诉文案面板（覆盖层） */}
       {showAppealPanel && (
@@ -1129,18 +1624,340 @@ export default function ChatPage() {
         />
       )}
 
+      {/* 名片弹窗（支持多名片切换） */}
+      {showContact && (contactCards.length > 0 || contactCard) && (() => {
+        const cards = contactCards.length > 0 ? contactCards : (contactCard ? [contactCard] : [])
+        const card = cards[selectedCardIdx] || cards[0]
+        if (!card) return null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[8px] p-4" onClick={() => setShowContact(false)}>
+            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-scale-in" style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+              <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 px-5 py-7 text-white text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_55%)]" />
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full" />
+                <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full" />
+                <button onClick={() => setShowContact(false)} className="absolute right-3 top-3 w-7 h-7 flex items-center justify-center text-white/60 hover:text-white rounded-lg hover:bg-white/10 z-10">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <div className="relative z-10">
+                  <div className="w-18 h-18 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3 shadow-lg" style={{width:72,height:72}}>
+                    <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold tracking-tight">{card.name}</h3>
+                  <p className="text-white/70 text-xs mt-1 font-medium">{card.title}</p>
+                  {card.category && card.category !== 'general' && (
+                    <span className="inline-block mt-2 px-2.5 py-0.5 bg-white/15 rounded-full text-[10px] font-medium">{card.category}</span>
+                  )}
+                  {cards.length > 1 && (
+                    <div className="flex justify-center gap-1.5 mt-3">
+                      {cards.map((c, i) => (
+                        <button key={i} onClick={() => { setSelectedCardIdx(i); if (c.id) fetch(`/api/contact-cards/${c.id}/click`, { method: 'POST' }).catch(() => {}) }}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${i === selectedCardIdx ? 'bg-white text-amber-600 shadow-sm' : 'bg-white/20 text-white/80 hover:bg-white/30'}`}>
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-2.5">
+                {card.description && <p className="text-[12px] text-gray-500 text-center leading-relaxed pb-1">{card.description}</p>}
+                {card.phone && (
+                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100/80 hover:shadow-sm transition-shadow">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-green-600 font-medium">电话</div>
+                      <div className="text-[14px] font-bold text-gray-800 tracking-wide">{card.phone}</div>
+                    </div>
+                    <a href={`tel:${card.phone}`} className="px-3.5 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">拨打</a>
+                  </div>
+                )}
+                {card.wechat && (
+                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100/80 hover:shadow-sm transition-shadow">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#07C160] to-[#06a050] flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.295.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348z"/></svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-emerald-600 font-medium">微信号</div>
+                      <div className="text-[14px] font-bold text-gray-800">{card.wechat}</div>
+                    </div>
+                    <button onClick={() => { navigator.clipboard?.writeText(card.wechat); }} className="px-3.5 py-1.5 bg-gradient-to-r from-[#07C160] to-[#06a050] text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">复制</button>
+                  </div>
+                )}
+                {card.email && (
+                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/80 hover:shadow-sm transition-shadow">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-blue-600 font-medium">邮箱</div>
+                      <div className="text-[14px] font-bold text-gray-800 truncate">{card.email}</div>
+                    </div>
+                    <a href={`mailto:${card.email}`} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">发邮件</a>
+                  </div>
+                )}
+                {card.qrCode && (
+                  <div className="text-center pt-2 pb-1">
+                    <p className="text-[10px] text-gray-400 mb-2">扫码添加微信</p>
+                    <img src={card.qrCode} alt="微信二维码" className="w-36 h-36 mx-auto rounded-xl border border-gray-100 shadow-sm" />
+                  </div>
+                )}
+                {!card.phone && !card.wechat && !card.email && (
+                  <p className="text-xs text-gray-400 text-center py-4">暂未配置联系方式</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* AI砍价弹窗 */}
+      {bargainProduct && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-[6px]" onClick={() => setBargainProduct(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col animate-scale-in" style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
+            {/* 商品头部 */}
+            <div className="px-5 py-3.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-t-2xl border-b border-amber-100">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-[15px] font-bold text-gray-900 truncate">{bargainProduct.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-lg font-bold text-red-500">¥{bargainDeal ? bargainDeal.finalPrice : bargainProduct.price}</span>
+                    {bargainDeal && <span className="text-xs text-gray-400 line-through">¥{bargainProduct.price}</span>}
+                    {bargainDeal && <span className="text-[10px] px-1.5 py-0.5 bg-red-50 text-red-500 rounded-full font-bold">已砍价</span>}
+                  </div>
+                </div>
+                <button onClick={() => setBargainProduct(null)} className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            {/* 砍价对话区 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[45vh]">
+              {bargainHistory.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-amber-500 text-white rounded-br-md'
+                      : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {bargainLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full typing-dot" />
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full typing-dot" />
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full typing-dot" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* 底部操作区 */}
+            <div className="px-4 py-3 border-t border-gray-100 safe-bottom">
+              {bargainDeal ? (
+                <div className="space-y-2">
+                  <div className="text-center">
+                    <p className="text-xs text-green-600 font-medium">🎉 成交价: ¥{bargainDeal.finalPrice}</p>
+                  </div>
+                  <button onClick={() => handlePurchase(bargainProduct)} disabled={purchasing}
+                    className="w-full py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl font-bold text-sm shadow-sm disabled:opacity-60">
+                    {purchasing ? '购买中...' : `立即下单 · ¥${bargainDeal.finalPrice}`}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input value={bargainInput} onChange={e => setBargainInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') sendBargain() }}
+                    placeholder="说说你的出价..." disabled={bargainLoading}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-300/50" />
+                  <button onClick={sendBargain} disabled={bargainLoading || !bargainInput.trim()}
+                    className="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium text-sm disabled:opacity-50 hover:bg-amber-600">
+                    发送
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 虚拟人设名片弹窗 */}
+      {showPersonaCard && virtualPersona && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[6px] p-4" onClick={() => setShowPersonaCard(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm animate-scale-in overflow-hidden" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 px-6 py-8 text-center text-white relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15),transparent_50%)]" />
+              <div className="relative z-10">
+                <div className="text-4xl mb-2">{virtualPersona.avatar}</div>
+                <h3 className="text-xl font-bold">{virtualPersona.name}</h3>
+                <p className="text-white/70 text-sm mt-1">{virtualPersona.title}</p>
+                {virtualPersona.expertise && (
+                  <div className="flex justify-center gap-1.5 mt-3 flex-wrap">
+                    {virtualPersona.expertise.map((e, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-white/20 rounded-full text-[10px] font-medium">{e}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-gray-600 leading-relaxed">{virtualPersona.greeting}</p>
+              {virtualPersona.personality && (
+                <p className="text-[11px] text-gray-400">性格特征: {virtualPersona.personality}</p>
+              )}
+              <button onClick={() => setShowPersonaCard(false)}
+                className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium text-sm shadow-sm hover:shadow-md transition-all">
+                开始沟通
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 商品详情+购买弹窗 */}
+      {detailProduct && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-[8px]" onClick={() => { if (!purchasing) setDetailProduct(null) }}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md animate-scale-in overflow-hidden" style={{ boxShadow: '0 -8px 60px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            {/* 商品头图区域 */}
+            <div className="relative bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 px-6 pt-6 pb-8 text-white overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.15),transparent_60%)]" />
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-white/5 rounded-full" />
+              <button onClick={() => setDetailProduct(null)} className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white rounded-xl hover:bg-white/10 z-10">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+              <div className="relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">{detailProduct.name}</h2>
+                {detailProduct.category && <span className="inline-block mt-2 px-2.5 py-0.5 bg-white/15 rounded-full text-[11px] font-medium">{detailProduct.category}</span>}
+              </div>
+            </div>
+            {/* 价格区域 */}
+            <div className="px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100/50">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-red-500">¥{detailProduct.price}</span>
+                {detailProduct.originalPrice && parseFloat(detailProduct.originalPrice) > parseFloat(detailProduct.price) && (
+                  <>
+                    <span className="text-sm text-gray-400 line-through">¥{detailProduct.originalPrice}</span>
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-md">省¥{(parseFloat(detailProduct.originalPrice) - parseFloat(detailProduct.price)).toFixed(0)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* 商品详情 */}
+            <div className="px-6 py-4 space-y-3 max-h-[30vh] overflow-y-auto">
+              {detailProduct.description && (
+                <p className="text-sm text-gray-600 leading-relaxed">{detailProduct.description}</p>
+              )}
+              {detailProduct.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {detailProduct.tags.map((tag, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[11px] rounded-md font-medium">{tag}</span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span>购买后由AI专属顾问1对1服务，帮您撰写申诉材料</span>
+              </div>
+            </div>
+            {/* 底部操作 */}
+            <div className="px-6 py-4 border-t border-gray-100 safe-bottom space-y-2.5">
+              <button onClick={() => handlePurchase(detailProduct)} disabled={purchasing}
+                className="w-full py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-2xl font-bold text-[15px] shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-60">
+                {purchasing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    购买中...
+                  </span>
+                ) : `立即购买 · ¥${detailProduct.price}`}
+              </button>
+              <button onClick={() => { setDetailProduct(null); setBargainProduct(detailProduct); setBargainHistory([]); setBargainDeal(null); setBargainInput('') }}
+                className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-2xl font-medium text-sm border border-amber-200/80 hover:bg-amber-100 transition-colors">
+                想砍个价？和AI聊聊
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 充值弹窗 */}
       {showRecharge && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[6px] p-4" onClick={() => setShowRecharge(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[6px] p-4" onClick={closeRecharge}>
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto animate-scale-in" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3.5 flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-gray-900">账户充值</h2>
-              <button onClick={() => setShowRecharge(false)} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-500 rounded-lg hover:bg-gray-100">
+              <button onClick={closeRecharge} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-500 rounded-lg hover:bg-gray-100">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
             <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-            {!rechargeConfig?.enabled ? (
+
+            {/* 支付结果展示 */}
+            {paymentStatus === 'paid' ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">支付成功</h3>
+                <p className="text-sm text-gray-500 mb-4">¥{paymentPending?.amount} 已到账，余额已更新</p>
+                <button onClick={closeRecharge} className="px-8 py-2.5 bg-gradient-to-br from-[#07C160] to-[#06ae56] text-white rounded-xl font-medium text-sm">完成</button>
+              </div>
+            ) : paymentStatus === 'failed' ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">支付失败</h3>
+                <p className="text-sm text-gray-500 mb-4">订单已取消或支付超时</p>
+                <button onClick={() => { setPaymentPending(null); setPaymentStatus('') }} className="px-8 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm">重新充值</button>
+              </div>
+            ) : paymentStatus === 'timeout' ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">等待支付超时</h3>
+                <p className="text-sm text-gray-500 mb-4">如已支付，余额将在稍后自动到账</p>
+                <button onClick={() => { setPaymentPending(null); setPaymentStatus('') }} className="px-8 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm">重新充值</button>
+              </div>
+
+            /* 真实支付等待中：展示二维码 */
+            ) : paymentPending ? (
+              <div className="p-5 space-y-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-1">请使用{paymentPending.method === 'wechat' ? '微信' : '支付宝'}扫码支付</p>
+                  <p className="text-2xl font-bold text-gray-900 mb-3">¥{paymentPending.amount}</p>
+                  {paymentPending.codeUrl ? (
+                    <div className="mx-auto w-52 h-52 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center p-2">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentPending.codeUrl)}`}
+                        alt="支付二维码" className="w-full h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="mx-auto w-52 h-52 bg-gray-50 rounded-xl flex items-center justify-center">
+                      <p className="text-sm text-gray-400">请在新窗口完成支付</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                  <div className="animate-spin w-4 h-4 border-2 border-gray-300 border-t-[#07C160] rounded-full" />
+                  <span>等待支付确认...</span>
+                </div>
+                <p className="text-[10px] text-gray-300 text-center">支付成功后将自动确认，无需手动操作</p>
+                <p className="text-[10px] text-center text-gray-400">订单号: {paymentPending.outTradeNo}</p>
+              </div>
+
+            /* 默认：选择金额和支付方式 */
+            ) : !rechargeConfig?.enabled ? (
               <div className="p-6 text-center text-gray-400 text-sm">充值功能暂未开放</div>
             ) : (
               <div className="p-5 space-y-5">
@@ -1158,25 +1975,57 @@ export default function ChatPage() {
                 <div>
                   <label className="block text-[12px] font-medium text-gray-500 mb-2">支付方式</label>
                   <div className="flex gap-2">
-                    {rechargeConfig.qrWechat && (
+                    {(rechargeConfig.paymentChannels?.wechat || rechargeConfig.qrWechat) && (
                       <button onClick={() => setRechargeMethod('wechat')}
                         className={`flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all ${rechargeMethod === 'wechat' ? 'bg-green-50 border-2 border-wechat-green text-green-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
                         <span className="w-4 h-4 bg-wechat-green rounded-full inline-block" /> 微信支付
                       </button>
                     )}
-                    {rechargeConfig.qrAlipay && (
+                    {(rechargeConfig.paymentChannels?.alipay || rechargeConfig.qrAlipay) && (
                       <button onClick={() => setRechargeMethod('alipay')}
                         className={`flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all ${rechargeMethod === 'alipay' ? 'bg-blue-50 border-2 border-blue-500 text-blue-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
                         <span className="w-4 h-4 bg-blue-500 rounded-full inline-block" /> 支付宝
                       </button>
                     )}
-                    {!rechargeConfig.qrWechat && !rechargeConfig.qrAlipay && (
-                      <p className="text-xs text-gray-400">管理员暂未配置收款二维码，请联系管理员充值</p>
+                  </div>
+                  {/* 易支付/码支付渠道 */}
+                  {(rechargeConfig.paymentChannels?.epay || rechargeConfig.paymentChannels?.codepay) && (
+                    <div className="flex gap-2 mt-2">
+                      {rechargeConfig.paymentChannels?.epay && (
+                        <>
+                          <button onClick={() => setRechargeMethod('epay_alipay')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1 transition-all ${rechargeMethod === 'epay_alipay' ? 'bg-blue-50 border-2 border-blue-400 text-blue-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
+                            <span className="text-sm">💰</span> 易支付·支付宝
+                          </button>
+                          <button onClick={() => setRechargeMethod('epay_wxpay')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1 transition-all ${rechargeMethod === 'epay_wxpay' ? 'bg-green-50 border-2 border-green-400 text-green-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
+                            <span className="text-sm">💰</span> 易支付·微信
+                          </button>
+                        </>
+                      )}
+                      {rechargeConfig.paymentChannels?.codepay && (
+                        <>
+                          <button onClick={() => setRechargeMethod('codepay_alipay')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1 transition-all ${rechargeMethod === 'codepay_alipay' ? 'bg-blue-50 border-2 border-blue-400 text-blue-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
+                            <span className="text-sm">📱</span> 码支付·支付宝
+                          </button>
+                          <button onClick={() => setRechargeMethod('codepay_wxpay')}
+                            className={`flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1 transition-all ${rechargeMethod === 'codepay_wxpay' ? 'bg-green-50 border-2 border-green-400 text-green-700' : 'bg-gray-50 border border-gray-200 text-gray-600'}`}>
+                            <span className="text-sm">📱</span> 码支付·微信
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {/* 无支付方式提示 */}
+                  <div className="mt-1">
+                    {!rechargeConfig.paymentChannels?.wechat && !rechargeConfig.qrWechat && !rechargeConfig.paymentChannels?.alipay && !rechargeConfig.qrAlipay && !rechargeConfig.paymentChannels?.epay && !rechargeConfig.paymentChannels?.codepay && (
+                      <p className="text-xs text-gray-400">管理员暂未配置支付方式，请联系管理员充值</p>
                     )}
                   </div>
                 </div>
-                {/* 二维码展示 */}
-                {((rechargeMethod === 'wechat' && rechargeConfig.qrWechat) || (rechargeMethod === 'alipay' && rechargeConfig.qrAlipay)) && (
+                {/* 手动充值模式：展示静态二维码 */}
+                {!rechargeConfig.realPayment && ((rechargeMethod === 'wechat' && rechargeConfig.qrWechat) || (rechargeMethod === 'alipay' && rechargeConfig.qrAlipay)) && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 mb-2">请扫码支付 <strong className="text-lg text-gray-800">¥{rechargeAmount}</strong></p>
                     <img src={rechargeMethod === 'wechat' ? rechargeConfig.qrWechat : rechargeConfig.qrAlipay}
@@ -1186,18 +2035,24 @@ export default function ChatPage() {
                 {rechargeConfig.instructions && (
                   <p className="text-xs text-gray-500 bg-yellow-50 rounded-lg p-3 border border-yellow-100">{rechargeConfig.instructions}</p>
                 )}
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">付款备注（交易单号或截图说明）</label>
-                  <input type="text" value={rechargeRemark} onChange={e => setRechargeRemark(e.target.value)}
-                    placeholder="请输入支付后的交易单号或备注"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-wechat-green/30" />
-                </div>
+                {!rechargeConfig.realPayment && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">付款备注（交易单号或截图说明）</label>
+                    <input type="text" value={rechargeRemark} onChange={e => setRechargeRemark(e.target.value)}
+                      placeholder="请输入支付后的交易单号或备注"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-wechat-green/30" />
+                  </div>
+                )}
                 <button onClick={submitRecharge} disabled={!rechargeAmount || rechargeSubmitting}
                   className="w-full py-2.5 bg-gradient-to-br from-[#07C160] to-[#06ae56] text-white rounded-xl font-medium text-[13px] disabled:opacity-50 shadow-sm transition-all">
-                  {rechargeSubmitting ? '提交中...' : `提交充值申请 · ¥${rechargeAmount || 0}`}
+                  {rechargeSubmitting ? '创建支付订单...' : rechargeConfig.realPayment ? `立即支付 · ¥${rechargeAmount || 0}` : `提交充值申请 · ¥${rechargeAmount || 0}`}
                 </button>
-                <p className="text-[10px] text-gray-300 text-center">提交后管理员将尽快确认，余额自动到账</p>
-                <p className="text-[10px] text-gray-300 text-center mt-1">充值余额用于消耗AI Token，充值后不支持退款/提现。您也可以使用自己的DeepSeek API Key免费使用。</p>
+                {rechargeConfig.realPayment ? (
+                  <p className="text-[10px] text-gray-300 text-center">支付成功后余额自动到账，无需等待审核</p>
+                ) : (
+                  <p className="text-[10px] text-gray-300 text-center">提交后管理员将尽快确认，余额自动到账</p>
+                )}
+                <p className="text-[10px] text-gray-300 text-center mt-1">充值余额用于消耗AI Token，充值后不支持退款/提现。当前免费模型无需余额即可使用。</p>
               </div>
             )}
           </div>

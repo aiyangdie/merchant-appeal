@@ -42,7 +42,7 @@ export default function QualityDashboard({ data }) {
   const totalSentiment = (data.sentiment || []).reduce((s, x) => s + parseInt(x.cnt || 0), 0)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-gray-700">🎯 AI 服务质量仪表板</span>
@@ -52,7 +52,7 @@ export default function QualityDashboard({ data }) {
 
       {/* AI Auto Summary */}
       {o.totalAnalyses > 0 && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-4">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-semibold text-indigo-700">🤖 AI智能总结</span>
           </div>
@@ -108,8 +108,8 @@ export default function QualityDashboard({ data }) {
 
       {/* Sentiment Distribution */}
       {totalSentiment > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">用户情绪分布</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">用户情绪分布</h3>
           <div className="flex gap-2 flex-wrap">
             {(data.sentiment || []).map(s => {
               const pct = totalSentiment > 0 ? Math.round((parseInt(s.cnt) / totalSentiment) * 100) : 0
@@ -132,8 +132,8 @@ export default function QualityDashboard({ data }) {
 
       {/* 7-Day Trend */}
       {data.trend?.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">近7日质量趋势</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">近7日质量趋势</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -168,8 +168,8 @@ export default function QualityDashboard({ data }) {
 
       {/* Industry Quality Breakdown */}
       {data.qualityByIndustry?.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">行业服务质量对比</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">行业服务质量对比</h3>
           <div className="space-y-2">
             {data.qualityByIndustry.map((ind, i) => (
               <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50/80 border border-gray-100/50">
@@ -202,10 +202,10 @@ export default function QualityDashboard({ data }) {
       )}
 
       {/* Top & Low Analyses Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Quality */}
         {data.topAnalyses?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-4">
+          <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-3">
               <h3 className="text-xs font-semibold text-green-700">🏆 最佳对话 TOP5</h3>
               <span className="text-[10px] text-green-500 bg-green-50 px-1.5 py-0.5 rounded">AI自动评选</span>
@@ -216,7 +216,7 @@ export default function QualityDashboard({ data }) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-green-600 w-5">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-700 truncate">{a.industry || '未知'} · {a.problem_type || '-'}</div>
+                      <div className="font-medium text-gray-700 truncate">{a.industry || '未分类'}{a.problem_type ? ` · ${a.problem_type}` : ''}</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         专业<b className="text-indigo-600">{a.professionalism_score}</b> 完整<b className="text-green-600">{a.completion_rate}%</b> 申诉<b className="text-amber-600">{a.appeal_success_rate}%</b> 满意<b className="text-pink-600">{a.user_satisfaction}</b>
                         {a.total_turns > 0 && <span className="ml-1">· {a.total_turns}轮</span>}
@@ -241,7 +241,7 @@ export default function QualityDashboard({ data }) {
 
         {/* Needs Improvement */}
         {data.lowAnalyses?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-4">
+          <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-3">
               <h3 className="text-xs font-semibold text-orange-700">⚠️ 待改进对话</h3>
               <span className="text-[10px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded">AI自动诊断</span>
@@ -252,7 +252,7 @@ export default function QualityDashboard({ data }) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-orange-500 w-5">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-700 truncate">{a.industry || '未知'} · {a.problem_type || '-'}</div>
+                      <div className="font-medium text-gray-700 truncate">{a.industry || '未分类'}{a.problem_type ? ` · ${a.problem_type}` : ''}</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         专业<b className="text-indigo-600">{a.professionalism_score}</b> 完整<b className="text-green-600">{a.completion_rate}%</b> 申诉<b className="text-amber-600">{a.appeal_success_rate}%</b> 满意<b className="text-pink-600">{a.user_satisfaction}</b>
                         {a.total_turns > 0 && <span className="ml-1">· {a.total_turns}轮</span>}
@@ -282,7 +282,11 @@ export default function QualityDashboard({ data }) {
                     </div>
                   )}
                   {!a.suggestions?.length && !a.ai_highlights?.worstMoment && !a.drop_off_point && (
-                    <div className="mt-1 ml-7 text-[10px] text-gray-400 italic">AI正在分析改进方向...</div>
+                    <div className="mt-1 ml-7 text-[10px] text-gray-400 italic">
+                      {a.total_turns > 0
+                        ? `${a.total_turns}轮对话 · 收集${a.fields_collected || 0}字段 · 完成${Math.round(a.completion_rate || 0)}% — 待AI深度诊断`
+                        : 'AI正在分析改进方向...'}
+                    </div>
                   )}
                 </div>
               ))}
@@ -293,8 +297,8 @@ export default function QualityDashboard({ data }) {
 
       {/* Drop-off Analysis */}
       {data.topDropOffs?.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">🚪 用户流失热点</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">🚪 用户流失热点</h3>
           <div className="flex flex-wrap gap-2">
             {data.topDropOffs.map((d, i) => (
               <div key={i} className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-100 text-xs">
@@ -308,8 +312,8 @@ export default function QualityDashboard({ data }) {
 
       {/* Mall Stats */}
       {(data.mall?.totalProducts > 0 || data.mall?.totalRecommendations > 0) && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">🛒 智能商城效果</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">🛒 智能商城效果</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="text-center p-2 rounded-lg bg-indigo-50">
               <div className="text-lg font-bold text-indigo-600">{data.mall.totalProducts}</div>

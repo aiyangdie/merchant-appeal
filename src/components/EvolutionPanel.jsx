@@ -112,6 +112,8 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   const [ruleForm, setRuleForm] = useState({ category: 'collection_strategy', ruleKey: '', ruleName: '', ruleContent: '{}', status: 'active' })
   const [editingRule, setEditingRule] = useState(null) // {id, ruleName, ruleContent}
   const [selectedRuleIds, setSelectedRuleIds] = useState(new Set())
+  const [aiRuleAssist, setAiRuleAssist] = useState(false)
+  const [aiRuleDesc, setAiRuleDesc] = useState('')
 
   // Analyses data
   const [analyses, setAnalyses] = useState([])
@@ -137,11 +139,11 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
       const data = await (await adminFetch('/api/admin/evolution/quality-dashboard')).json()
       setQualityData(data)
     } catch (e) { console.error(e) }
-    setLoading(false)
+    finally { setLoading(false) }
   }, [adminFetch])
 
   const fetchOverview = useCallback(async () => {
-    setLoading(true)
+    if (!ruleStats && !analysisStats) setLoading(true)
     try {
       const [rs, as, un] = await Promise.allSettled([
         adminFetch('/api/admin/evolution/rules/stats').then(r => r.json()),
@@ -156,7 +158,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchRules = useCallback(async () => {
-    setLoading(true)
+    if (rules.length === 0) setLoading(true)
     try {
       const params = new URLSearchParams()
       if (ruleFilter.category) params.set('category', ruleFilter.category)
@@ -168,7 +170,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch, ruleFilter])
 
   const fetchAnalyses = useCallback(async () => {
-    setLoading(true)
+    if (analyses.length === 0) setLoading(true)
     try {
       const [aData, sData] = await Promise.allSettled([
         adminFetch('/api/admin/evolution/analyses?limit=50').then(r => r.json()),
@@ -181,7 +183,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchMetrics = useCallback(async () => {
-    setLoading(true)
+    if (metrics.length === 0) setLoading(true)
     try {
       const data = await (await adminFetch('/api/admin/evolution/metrics?days=30')).json()
       setMetrics(data.metrics || [])
@@ -190,7 +192,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchChangelog = useCallback(async () => {
-    setLoading(true)
+    if (changelog.length === 0) setLoading(true)
     try {
       const data = await (await adminFetch('/api/admin/evolution/changelog?limit=50')).json()
       setChangelog(data.log || [])
@@ -199,7 +201,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchClusters = useCallback(async () => {
-    setLoading(true)
+    if (clusters.length === 0) setLoading(true)
     try {
       const [c, s] = await Promise.allSettled([
         adminFetch('/api/admin/evolution/clusters').then(r => r.json()),
@@ -212,7 +214,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchExperiments = useCallback(async () => {
-    setLoading(true)
+    if (experiments.length === 0) setLoading(true)
     try {
       const data = await (await adminFetch('/api/admin/evolution/experiments')).json()
       setExperiments(data.experiments || [])
@@ -221,7 +223,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   }, [adminFetch])
 
   const fetchHealth = useCallback(async () => {
-    setLoading(true)
+    if (!engineHealth) setLoading(true)
     try {
       const [h, ts] = await Promise.allSettled([
         adminFetch('/api/admin/evolution/health').then(r => r.json()),
@@ -384,6 +386,29 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('批量操作失败: ' + e.message) }
   }
 
+  async function handleAIAssistRule() {
+    if (!aiRuleDesc.trim()) { showToast('请输入规则描述'); return }
+    setAiRuleAssist(true)
+    try {
+      const data = await (await adminFetch('/api/admin/ai-assist', {
+        method: 'POST', body: JSON.stringify({ type: 'rule', description: aiRuleDesc.trim() }),
+      })).json()
+      if (data.rule) {
+        setRuleForm(f => ({
+          ...f,
+          ruleKey: data.rule.ruleKey || f.ruleKey,
+          ruleName: data.rule.ruleName || f.ruleName,
+          category: data.rule.category || f.category,
+          ruleContent: JSON.stringify(data.rule.ruleContent || {}, null, 2),
+        }))
+        showToast('✅ AI已生成规则内容')
+      } else {
+        showToast('AI生成失败: ' + (data.error || '未知错误'))
+      }
+    } catch (e) { showToast('AI辅助失败: ' + e.message) }
+    setAiRuleAssist(false)
+  }
+
   // Inline edit
   async function handleSaveEdit() {
     if (!editingRule) return
@@ -404,25 +429,27 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
   return (
     <div className="h-full flex flex-col">
       {/* Sub-tab navigation */}
-      <div className="flex items-center gap-1 px-4 py-3 border-b border-gray-100 bg-white/80 backdrop-blur-sm overflow-x-auto">
+      <div className="flex items-center gap-1.5 px-4 lg:px-6 py-3 border-b border-gray-100 bg-white/80 backdrop-blur-sm overflow-x-auto no-scrollbar">
         {SUB_TABS.map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-              subTab === t.key ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50'
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+              subTab === t.key ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'
             }`}>
             <span>{t.icon}</span> {t.label}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {loading && <div className="text-center py-8 text-gray-400">加载中...</div>}
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5 gpu-scroll">
+        {loading && !qualityData && !ruleStats && rules.length === 0 && analyses.length === 0 && metrics.length === 0 && changelog.length === 0 && clusters.length === 0 && experiments.length === 0 && !engineHealth && (
+          <div className="text-center py-8 text-gray-400">加载中...</div>
+        )}
 
         {/* ===== QUALITY DASHBOARD ===== */}
-        {subTab === 'quality' && !loading && <QualityDashboard data={qualityData} />}
+        {subTab === 'quality' && <QualityDashboard data={qualityData} />}
 
         {/* ===== OVERVIEW ===== */}
-        {subTab === 'overview' && !loading && (
+        {subTab === 'overview' && (
           <>
             {/* Quick actions */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -530,7 +557,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== RULES ===== */}
-        {subTab === 'rules' && !loading && (
+        {subTab === 'rules' && (
           <>
             <div className="flex items-center gap-2 flex-wrap">
               <select value={ruleFilter.category} onChange={e => setRuleFilter(f => ({ ...f, category: e.target.value }))}
@@ -572,6 +599,21 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
             {showRuleForm && (
               <div className="bg-indigo-50/50 rounded-xl border border-indigo-100 p-4 space-y-3">
                 <h3 className="font-semibold text-sm text-indigo-700">创建新规则</h3>
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-medium text-purple-700">🤖 AI辅助生成</span>
+                    <span className="text-[10px] text-purple-400">用自然语言描述规则，AI自动填充表单</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={aiRuleDesc} onChange={e => setAiRuleDesc(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-purple-200 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+                      placeholder="如：当用户是餐饮行业时，优先收集营业执照和食品经营许可证" />
+                    <button onClick={handleAIAssistRule} disabled={aiRuleAssist}
+                      className={`px-4 py-1.5 text-xs rounded-lg font-medium whitespace-nowrap transition-all ${aiRuleAssist ? 'bg-purple-200 text-purple-700 animate-pulse cursor-wait' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
+                      {aiRuleAssist ? '⏳ 生成中...' : '✨ AI生成'}
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] text-gray-500 mb-1 block">类型</label>
@@ -720,7 +762,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== ANALYSES ===== */}
-        {subTab === 'analyses' && !loading && (
+        {subTab === 'analyses' && (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard label="总分析" value={analysisStats?.totals?.total || 0} />
@@ -803,7 +845,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== METRICS ===== */}
-        {subTab === 'metrics' && !loading && (
+        {subTab === 'metrics' && (
           <>
             <div className="flex justify-end">
               <button onClick={handleAggregate}
@@ -857,7 +899,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== CLUSTERS (知识聚合) ===== */}
-        {subTab === 'clusters' && !loading && (
+        {subTab === 'clusters' && (
           <>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-700">🔬 知识聚合簇</span>
@@ -918,55 +960,200 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== EXPERIMENTS (探索实验) ===== */}
-        {subTab === 'experiments' && !loading && (
+        {subTab === 'experiments' && (
           <>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-700">🧪 AI 自主探索实验</span>
-              <button onClick={async () => { showToast('正在探索...'); try { await adminFetch('/api/admin/evolution/explore', { method: 'POST' }); showToast('探索周期完成'); fetchExperiments() } catch(e) { showToast('失败') } }}
-                className="px-3 py-1.5 text-xs bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 font-medium">
-                手动探索
-              </button>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="text-sm font-semibold text-gray-700">🧪 A/B 对比实验</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">AI自主探索高频建议 → 创建实验性规则 → 对比效果 → 自动判定</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={async () => {
+                  showToast('正在评估规则效果...')
+                  try { await adminFetch('/api/admin/evolution/evaluate', { method: 'POST' }); showToast('规则效果评估完成') } catch { showToast('评估失败') }
+                }}
+                  className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium">
+                  评估规则
+                </button>
+                <button onClick={async () => {
+                  showToast('正在自动升降级...')
+                  try {
+                    const r = await (await adminFetch('/api/admin/evolution/auto-promote', { method: 'POST' })).json()
+                    showToast(`升级${r.promoted || 0}条, 归档${r.archived || 0}条`)
+                  } catch { showToast('失败') }
+                }}
+                  className="px-3 py-1.5 text-xs bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 font-medium">
+                  自动升降级
+                </button>
+                <button onClick={async () => {
+                  showToast('正在探索...')
+                  try { await adminFetch('/api/admin/evolution/explore', { method: 'POST' }); showToast('探索周期完成'); fetchExperiments() } catch { showToast('失败') }
+                }}
+                  className="px-3 py-1.5 text-xs bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 font-medium">
+                  手动探索
+                </button>
+              </div>
             </div>
+
+            {/* Experiment summary stats */}
+            {experiments.length > 0 && (
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
+                  <div className="text-lg font-bold text-blue-700">{experiments.filter(e => e.status === 'running').length}</div>
+                  <div className="text-[10px] text-blue-500">运行中</div>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 text-center border border-green-100">
+                  <div className="text-lg font-bold text-green-700">{experiments.filter(e => e.status === 'completed').length}</div>
+                  <div className="text-[10px] text-green-500">已完成</div>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
+                  <div className="text-lg font-bold text-emerald-700">{experiments.filter(e => e.winner === 'a').length}</div>
+                  <div className="text-[10px] text-emerald-500">实验组胜出</div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                  <div className="text-lg font-bold text-gray-600">{experiments.reduce((s, e) => s + (e.sample_a || 0) + (e.sample_b || 0), 0)}</div>
+                  <div className="text-[10px] text-gray-400">总样本数</div>
+                </div>
+              </div>
+            )}
+
             {experiments.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">暂无探索实验，系统每2小时自动探索</div>
+              <div className="text-center py-12">
+                <div className="text-4xl mb-3">🧪</div>
+                <div className="text-sm text-gray-500 mb-1">暂无探索实验</div>
+                <div className="text-xs text-gray-400">系统每2小时自动从对话分析中发现高频建议，创建A/B实验</div>
+                <div className="text-xs text-gray-400 mt-1">点击「手动探索」可立即触发一轮</div>
+              </div>
             ) : (
-              <div className="space-y-2">
-                {experiments.map(exp => (
-                  <div key={exp.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                        exp.status === 'running' ? 'bg-blue-100 text-blue-700' :
-                        exp.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        exp.status === 'aborted' ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-600'
-                      }`}>{exp.status === 'running' ? '运行中' : exp.status === 'completed' ? '已完成' : exp.status === 'aborted' ? '已终止' : '失败'}</span>
-                      <span className="text-sm font-medium text-gray-800">{exp.experiment_name}</span>
-                      {exp.winner && <span className={`text-[11px] px-2 py-0.5 rounded-full ${exp.winner === 'a' ? 'bg-green-50 text-green-600' : exp.winner === 'b' ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
-                        {exp.winner === 'a' ? '实验组胜出' : exp.winner === 'b' ? '基准组胜出' : '不确定'}
-                      </span>}
-                      <span className="ml-auto text-[10px] text-gray-400">{timeAgo(exp.started_at)}</span>
-                    </div>
-                    {exp.hypothesis && <div className="text-xs text-gray-500 mb-2">{exp.hypothesis}</div>}
-                    <div className="grid grid-cols-2 gap-3 text-center">
-                      <div className="bg-blue-50/50 rounded-lg p-2">
-                        <div className="text-[10px] text-gray-400 mb-1">实验组 (A)</div>
-                        <div className="text-sm font-bold text-blue-600">{exp.sample_a || 0} 样本</div>
-                        {exp.result_a?.avgCompletion !== undefined && <div className="text-[11px] text-gray-500">完成率 {parseFloat(exp.result_a.avgCompletion).toFixed(0)}%</div>}
+              <div className="space-y-3">
+                {experiments.map(exp => {
+                  const aComp = exp.result_a?.avgCompletion || 0
+                  const bComp = exp.result_b?.avgCompletion || 0
+                  const aSat = exp.result_a?.avgSatisfaction || 0
+                  const bSat = exp.result_b?.avgSatisfaction || 0
+                  const maxComp = Math.max(aComp, bComp, 1)
+                  const diff = aComp - bComp
+
+                  return (
+                    <div key={exp.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${
+                      exp.status === 'running' ? 'border-blue-200' :
+                      exp.winner === 'a' ? 'border-green-200' :
+                      exp.winner === 'b' ? 'border-orange-200' : 'border-gray-100'
+                    }`}>
+                      <div className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            exp.status === 'running' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                            exp.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            exp.status === 'aborted' ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-600'
+                          }`}>{exp.status === 'running' ? '● 运行中' : exp.status === 'completed' ? '✓ 已完成' : exp.status === 'aborted' ? '⊘ 已终止' : '✗ 失败'}</span>
+                          <span className="text-sm font-semibold text-gray-800">{exp.experiment_name}</span>
+                          {exp.winner && <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            exp.winner === 'a' ? 'bg-green-50 text-green-600 border border-green-200' :
+                            exp.winner === 'b' ? 'bg-orange-50 text-orange-600 border border-orange-200' :
+                            'bg-gray-50 text-gray-500 border border-gray-200'
+                          }`}>
+                            {exp.winner === 'a' ? '🏆 实验组胜出' : exp.winner === 'b' ? '基准组胜出' : '不确定'}
+                          </span>}
+                          <span className="ml-auto text-[10px] text-gray-400">{timeAgo(exp.started_at)}</span>
+                        </div>
+                        {exp.hypothesis && <div className="text-xs text-gray-500 mb-3 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">💡 {exp.hypothesis}</div>}
+
+                        {/* A/B comparison bars */}
+                        <div className="space-y-2.5">
+                          {/* Completion rate comparison */}
+                          <div>
+                            <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                              <span>完成率对比</span>
+                              {diff !== 0 && (exp.sample_a > 0 || exp.sample_b > 0) && (
+                                <span className={diff > 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                                  {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-blue-500 w-6 font-medium">A</span>
+                                <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full transition-all flex items-center justify-end pr-1"
+                                    style={{ width: `${maxComp > 0 ? (aComp / maxComp * 100) : 0}%`, minWidth: aComp > 0 ? '20px' : '0' }}>
+                                    {aComp > 10 && <span className="text-[8px] text-white font-bold">{aComp.toFixed(0)}%</span>}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] text-gray-500 w-16 text-right">{exp.sample_a || 0} 样本</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-gray-500 w-6 font-medium">B</span>
+                                <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-gray-400 rounded-full transition-all flex items-center justify-end pr-1"
+                                    style={{ width: `${maxComp > 0 ? (bComp / maxComp * 100) : 0}%`, minWidth: bComp > 0 ? '20px' : '0' }}>
+                                    {bComp > 10 && <span className="text-[8px] text-white font-bold">{bComp.toFixed(0)}%</span>}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] text-gray-500 w-16 text-right">{exp.sample_b || 0} 样本</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Satisfaction comparison */}
+                          {(aSat > 0 || bSat > 0) && (
+                            <div>
+                              <div className="text-[10px] text-gray-400 mb-1">满意度对比</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-blue-50/50 rounded-lg px-2.5 py-1.5 text-center border border-blue-100/50">
+                                  <div className="text-xs font-bold text-blue-600">{aSat.toFixed(0)}%</div>
+                                  <div className="text-[9px] text-blue-400">实验组</div>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
+                                  <div className="text-xs font-bold text-gray-600">{bSat.toFixed(0)}%</div>
+                                  <div className="text-[9px] text-gray-400">基准组</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Progress to auto-judge */}
+                          {exp.status === 'running' && (
+                            <div>
+                              <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>自动判定进度 (需要A,B各≥10样本)</span>
+                                <span>{Math.min(exp.sample_a || 0, 10) + Math.min(exp.sample_b || 0, 10)}/20</span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-purple-500 rounded-full transition-all"
+                                  style={{ width: `${Math.min(100, (Math.min(exp.sample_a || 0, 10) + Math.min(exp.sample_b || 0, 10)) / 20 * 100)}%` }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-2">
-                        <div className="text-[10px] text-gray-400 mb-1">基准组 (B)</div>
-                        <div className="text-sm font-bold text-gray-600">{exp.sample_b || 0} 样本</div>
-                        {exp.result_b?.avgCompletion !== undefined && <div className="text-[11px] text-gray-500">完成率 {parseFloat(exp.result_b.avgCompletion).toFixed(0)}%</div>}
-                      </div>
+
+                      {/* Rule link + actions */}
+                      {exp.rule_id && (
+                        <div className="bg-gray-50 border-t border-gray-100 px-4 py-2 flex items-center justify-between">
+                          <span className="text-[10px] text-gray-400">关联规则 #{exp.rule_id}</span>
+                          {exp.status === 'running' && (
+                            <button onClick={async () => {
+                              if (!confirm('确认终止此实验？')) return
+                              try {
+                                await adminFetch(`/api/admin/evolution/experiments/${exp.id}/abort`, { method: 'POST' })
+                                showToast('实验已终止')
+                                fetchExperiments()
+                              } catch { showToast('操作失败') }
+                            }} className="text-[10px] text-red-500 hover:text-red-700">终止实验</button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </>
         )}
 
         {/* ===== HEALTH (引擎健康) ===== */}
-        {subTab === 'health' && !loading && (
+        {subTab === 'health' && (
           <>
             {/* Overall status */}
             {engineHealth && (
@@ -1048,7 +1235,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
         )}
 
         {/* ===== CHANGELOG ===== */}
-        {subTab === 'changelog' && !loading && (
+        {subTab === 'changelog' && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             {changelog.length === 0 ? (
               <div className="text-center py-12 text-gray-400 text-sm">暂无变更记录</div>
