@@ -1,4 +1,4 @@
-# 🛡️ 微信商户号申诉专业助手
+# 🛡️ 微信商户号申诉专业助手 v2.0
 
 ### Merchant Appeal Assistant — AI-Powered Smart Appeal Solution
 
@@ -271,40 +271,100 @@ npm run start    # 启动服务器
 
 ```
 merchant-appeal/
-├── public/                          # 静态资源
-├── src/                             # 前端源码
-│   ├── components/
-│   │   ├── ChatMessage.jsx          # 聊天消息组件（含延迟/Token显示）
-│   │   ├── InfoPanel.jsx            # 信息收集面板
-│   │   ├── AIAnalysisPanel.jsx      # AI 分析面板
-│   │   ├── AnalysisVisualView.jsx   # 分析可视化视图
-│   │   ├── ReportCard.jsx           # 申诉报告卡片
-│   │   ├── AppealTextPanel.jsx      # 申诉文案面板（含进度跟踪+反馈）
-│   │   ├── TokenPanel.jsx           # Token消耗可视化面板
-│   │   ├── UserCenter.jsx           # 用户中心（充值/用量）
-│   │   └── ErrorBoundary.jsx        # 错误边界
-│   ├── pages/
-│   │   ├── ChatPage.jsx             # 主对话页面（含技术名片弹窗）
-│   │   ├── AdminPage.jsx            # 管理后台（仪表盘+会话+用户+设置+Token+进化）
-│   │   └── AdminLogin.jsx           # 管理员登录页
-│   ├── App.jsx                      # 路由配置
-│   ├── main.jsx                     # 入口
-│   └── index.css                    # 全局样式（TailwindCSS）
-├── server/                          # 后端源码
-│   ├── index.js                     # Express 主入口（134K，100+API路由）
-│   ├── ai.js                        # 多模型AI调用（提取/评估/扩展）
-│   ├── localAI.js                   # 本地规则引擎（对话流程+知识库+报告）
-│   ├── knowledgeBase.js             # 行业知识库+违规类型+材料清单
-│   ├── evolution.js                 # AI自进化引擎V3（分析/规则/打标/聚合/A|B测试）
-│   ├── modelHealth.js               # 模型健康检测+故障自动切换
-│   ├── mall.js                      # 智能商城推荐引擎
-│   ├── db.js                        # MySQL 数据访问层（25+表，自动建表+迁移）
-│   ├── tokenizer.js                 # Token 统计与计费
-│   └── crypto.js                    # AES-256 加解密
-├── .env.example                     # 环境变量模板
-├── DEPLOY.md                        # 生产部署指南（宝塔面板）
-├── package.json
-└── vite.config.js
+├── public/                              # 静态资源
+├── src/                                 # 前端源码（React 18 + TailwindCSS）
+│   ├── components/                      # UI 组件（21个）
+│   │   ├── ChatMessage.jsx              # 聊天消息（Markdown渲染+延迟/Token显示）
+│   │   ├── InfoPanel.jsx                # 信息收集面板（9组分类+动态扩展）
+│   │   ├── AIAnalysisPanel.jsx          # AI 深度分析面板
+│   │   ├── AnalysisVisualView.jsx       # 分析结果可视化
+│   │   ├── AppealGuidePanel.jsx         # 🆕 申诉指导面板（流程+进度追踪+反馈闭环+重申策略）
+│   │   ├── AppealTextPanel.jsx          # 申诉文案面板（进度跟踪+反馈）
+│   │   ├── ComplaintDocPanel.jsx        # 🆕 投诉材料整理面板
+│   │   ├── ReportCard.jsx              # 申诉报告卡片
+│   │   ├── TokenPanel.jsx              # Token消耗可视化面板
+│   │   ├── MallPanel.jsx               # 智能商城面板
+│   │   ├── QualityDashboard.jsx        # 质量评分仪表盘
+│   │   ├── EvolutionPanel.jsx          # AI进化引擎面板
+│   │   ├── UserCenter.jsx              # 用户中心（余额/充值/用量/申诉记录）
+│   │   ├── UserAvatar.jsx              # 🆕 用户头像组件
+│   │   ├── ContactCardsPanel.jsx       # 🆕 联系人名片面板
+│   │   ├── AIActivityPanel.jsx         # 🆕 AI活动监控面板
+│   │   ├── AIModelsPanel.jsx           # 🆕 AI模型管理面板
+│   │   ├── MonitorPanel.jsx            # 🆕 系统监控面板
+│   │   ├── BackupPanel.jsx             # 🆕 备份管理面板
+│   │   ├── TypingIndicator.jsx         # AI输入动画
+│   │   └── ErrorBoundary.jsx           # 错误边界
+│   ├── pages/                           # 页面级组件（4个）
+│   │   ├── ChatPage.jsx                # 主对话页面（智能快捷回复+对话导出）
+│   │   ├── AdminPage.jsx               # 管理后台（仪表盘+会话+用户+设置+进化+监控）
+│   │   ├── AdminLogin.jsx              # 管理员登录页
+│   │   └── ServicePage.jsx             # 🆕 客服服务页面
+│   ├── App.jsx                          # 路由配置（React Router 6）
+│   ├── main.jsx                         # 应用入口
+│   └── index.css                        # 全局样式（TailwindCSS）
+├── server/                              # 后端源码（Express + MVC架构）
+│   ├── index.js                         # Express 主入口（100+API路由）
+│   ├── ai.js                            # 多模型AI调用层（System Prompt+动态注入）
+│   ├── localAI.js                       # 本地规则引擎（对话流程+知识库+报告）
+│   ├── knowledgeBase.js                 # 行业知识库+违规类型+材料清单
+│   ├── evolution.js                     # AI自进化引擎V3
+│   ├── modelHealth.js                   # 模型健康检测+故障自动切换
+│   ├── mall.js                          # 智能商城推荐引擎
+│   ├── db.js                            # MySQL数据访问层（25+表，自动建表+迁移）
+│   ├── tokenizer.js                     # Token统计与计费
+│   ├── monitor.js                       # 🆕 系统监控服务
+│   ├── payment.js                       # 🆕 支付系统
+│   ├── backup.js                        # 🆕 备份管理
+│   ├── app.js                           # 🆕 Express应用初始化
+│   ├── controllers/                     # 🆕 MVC控制器层
+│   │   ├── aiController.js              #   AI对话控制器
+│   │   ├── appealController.js          #   申诉业务控制器
+│   │   ├── sessionController.js         #   会话管理控制器
+│   │   ├── userController.js            #   用户管理控制器
+│   │   └── rechargeController.js        #   充值管理控制器
+│   ├── models/                          # 🆕 数据模型层（10个）
+│   │   ├── Appeal.js                    #   申诉模型
+│   │   ├── Session.js                   #   会话模型
+│   │   ├── User.js                      #   用户模型
+│   │   ├── Message.js                   #   消息模型
+│   │   ├── Order.js                     #   订单模型
+│   │   ├── Product.js                   #   商品模型
+│   │   ├── TokenUsage.js               #   Token用量模型
+│   │   ├── RechargeOrder.js            #   充值订单模型
+│   │   ├── KnowledgeBase.js            #   知识库模型
+│   │   └── SystemConfig.js             #   系统配置模型
+│   ├── services/                        # 🆕 业务服务层
+│   │   ├── appealService.js             #   申诉业务逻辑
+│   │   ├── sessionService.js            #   会话业务逻辑
+│   │   ├── userService.js               #   用户业务逻辑
+│   │   └── messageService.js            #   消息业务逻辑
+│   ├── routes/                          # 🆕 路由层
+│   │   ├── index.js                     #   路由汇总
+│   │   ├── aiRoutes.js                  #   AI相关路由
+│   │   ├── appealRoutes.js              #   申诉相关路由
+│   │   ├── sessionRoutes.js             #   会话相关路由
+│   │   ├── userRoutes.js                #   用户相关路由
+│   │   └── paymentRoutes.js             #   支付相关路由
+│   ├── middleware/                       # 🆕 中间件层
+│   │   ├── auth.js                      #   JWT认证中间件
+│   │   └── errorHandler.js              #   全局错误处理
+│   ├── config/                          # 🆕 配置层
+│   │   ├── database.js                  #   数据库连接配置
+│   │   ├── initDb.js                    #   数据库初始化
+│   │   └── seedData.js                  #   种子数据
+│   ├── ai/                              # 🆕 AI子模块
+│   │   ├── core/llm.js                  #   LLM调用核心
+│   │   └── rag/ragService.js            #   RAG检索增强生成
+│   └── utils/                           # 🆕 工具库
+│       ├── crypto.js                    #   AES-256加解密
+│       ├── jsonHelper.js                #   JSON安全解析
+│       └── logger.js                    #   日志工具
+├── .env.example                         # 环境变量模板
+├── DEPLOY.md                            # 生产部署指南（宝塔面板）
+├── PROJECT_AUDIT.md                     # 项目审计报告
+├── package.json                         # v2.0.0
+└── vite.config.js                       # Vite构建配置
 ```
 
 ---
@@ -340,6 +400,11 @@ merchant-appeal/
 | GET | `/api/sessions/:id/deep-analysis` | 深度分析报告 |
 | POST | `/api/sessions/:id/generate-appeal-text` | 生成申诉文案 |
 | POST | `/api/sessions/:id/appeal-feedback` | 标记申诉结果(通过/驳回) |
+| GET | `/api/sessions/:id/appeal-progress` | 🆕 获取申诉进度状态 |
+| POST | `/api/sessions/:id/resubmit-strategy` | 🆕 获取驳回后重申策略 |
+| POST | `/api/sessions/:id/generate-complaint-reply` | 🆕 生成投诉回复话术 |
+| GET | `/api/sessions/:id/appeal-guide` | 🆕 获取申诉指导方案 |
+| GET | `/api/user/:id/appeal-records` | 🆕 用户申诉记录列表 |
 | GET | `/api/contact-card` | 获取技术人员名片(公开) |
 | POST | `/api/recharge` | 用户充值 |
 | GET | `/api/user/:id/usage` | 个人消费明细 |
@@ -487,9 +552,26 @@ merchant-appeal/
 
 ---
 
-## �🗺️ 路线图
+## 🗺️ 路线图
 
-### 已完成
+### v2.0 新增（当前版本）
+- [x] **服务端MVC架构重构**（controllers/models/services/routes/middleware分层）
+- [x] **申诉指导面板**（完整申诉流程+进度追踪+结果反馈闭环）
+- [x] **驳回后智能重申策略**（6类驳回原因匹配+改进行动+补充材料+文案建议）
+- [x] **投诉材料整理面板**（投诉回复话术生成）
+- [x] **用户申诉记录**（历史申诉状态一览+6色状态徽章）
+- [x] **智能快捷回复**（7阶段动态切换：开场/收集中/收集后期/完成/驳回/投诉/通用）
+- [x] **对话导出功能**（导出为.txt文件，含对话记录+收集信息摘要）
+- [x] **AI对话体验全面优化**（问题精简50%+、确认语自然化、过渡语去套路化）
+- [x] **AI System Prompt优化**（风格指令精简、诊断段落去emoji、动态注入精简）
+- [x] **RAG检索增强生成**（知识库语义检索+上下文注入）
+- [x] **系统监控面板**（服务器状态+API调用统计）
+- [x] **备份管理**（数据库备份+恢复）
+- [x] **支付系统**（订单管理+支付流程）
+- [x] **客服服务页面**（专属顾问对话）
+- [x] **AI活动/模型监控面板**（实时监控AI调用状态）
+
+### v1.0 已完成
 - [x] AI 智能对话引擎（多模型驱动：DeepSeek/智谱/通义/Moonshot等15+）
 - [x] 统一字段提取（反幻觉四重防线）
 - [x] 行业自适应系统（30+ 行业 + 动态字段）
@@ -502,16 +584,16 @@ merchant-appeal/
 - [x] Token 计费系统（双模式 + 可视化面板）
 - [x] 全功能管理后台（仪表盘 + 品牌设计）
 - [x] SSE 流式响应
-- [x] **AI 自进化引擎 V3**（对话分析→规则生成→效果评估→自动升降级）
-- [x] **模型健康检测**（30分钟巡检 + 故障自动切换 + 免费模型回退）
-- [x] **申诉进度跟踪**（生成→提交→审核→通过/驳回 + 反馈闭环）
-- [x] **成功率统计面板**（按行业/按违规类型 + 7天趋势 + 进化引擎学习）
-- [x] **利润分析仪表盘**（充值收入/AI成本/毛利润/利润率）
-- [x] **Token 超细化面板**（盈亏分析/IO比例/系统vs用户/按功能分类）
-- [x] **技术人员名片系统**（管理员配置 + 用户端弹窗展示）
-- [x] **AI 自动打标系统**（难度/用户类型/结果/行为模式）
-- [x] **知识聚合簇**（行业模式/违规模式/成功因素/A|B实验）
-- [x] **智能商城推荐**（基于用户画像的增值服务推荐）
+- [x] AI 自进化引擎 V3（对话分析→规则生成→效果评估→自动升降级）
+- [x] 模型健康检测（30分钟巡检 + 故障自动切换 + 免费模型回退）
+- [x] 申诉进度跟踪（生成→提交→审核→通过/驳回 + 反馈闭环）
+- [x] 成功率统计面板（按行业/按违规类型 + 7天趋势 + 进化引擎学习）
+- [x] 利润分析仪表盘（充值收入/AI成本/毛利润/利润率）
+- [x] Token 超细化面板（盈亏分析/IO比例/系统vs用户/按功能分类）
+- [x] 技术人员名片系统（管理员配置 + 用户端弹窗展示）
+- [x] AI 自动打标系统（难度/用户类型/结果/行为模式）
+- [x] 知识聚合簇（行业模式/违规模式/成功因素/A|B实验）
+- [x] 智能商城推荐（基于用户画像的增值服务推荐）
 
 ### 规划中
 - [ ] 微信小程序端
