@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { encrypt, decrypt, safeEncrypt, safeDecrypt, hmacHash } from './utils/crypto.js'
 
 // 敏感配置字段 — 存储时加密、读取时解密
-const SENSITIVE_SYS_KEYS = ['deepseek_api_key', 'zhipu_api_key']
+const SENSITIVE_SYS_KEYS = ['deepseek_api_key', 'zhipu_api_key', 'siliconflow_api_key']
 const SENSITIVE_PAY_KEYS = [
   'wx_api_key', 'wx_api_v3_key', 'wx_private_key', 'wx_serial_no',
   'ali_private_key', 'ali_public_key',
@@ -78,6 +78,11 @@ export async function initDatabase() {
   try {
     await pool.execute('ALTER TABLE messages MODIFY content MEDIUMTEXT NOT NULL')
   } catch { /* 忽略 */ }
+  // 迁移：sessions表添加订单绑定字段
+  try {
+    await pool.execute('ALTER TABLE sessions ADD COLUMN order_no VARCHAR(100) DEFAULT NULL AFTER user_id')
+    await pool.execute('ALTER TABLE sessions ADD COLUMN order_data JSON DEFAULT NULL AFTER order_no')
+  } catch { /* 列已存在，忽略 */ }
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS messages (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -808,14 +813,16 @@ export async function initDatabase() {
     ['enable_chat',         '1',                        '启用聊天功能（1=开启 0=关闭）',   'general', 5],
     ['announcement',        '',                         '前台公告内容（留空不显示）',      'general', 6],
     ['copyright_text',      '© 2026 微信商户号申诉助手', '版权信息',                     'general', 7],
-    ['ai_provider',         'zhipu',                   'AI服务商（deepseek / zhipu）',  'ai',      9],
+    ['ai_provider',         'siliconflow',             'AI服务商（deepseek / zhipu / siliconflow）',  'ai',      9],
     ['deepseek_api_key',    '',                         'DeepSeek API Key',             'ai',      10],
     ['deepseek_model',      'deepseek-chat',            'DeepSeek 模型名称',             'ai',      11],
     ['zhipu_api_key',       '',                         '智谱AI API Key（GLM免费模型）',  'ai',      12],
     ['zhipu_model',         'glm-4.7-flash',            '智谱AI 模型名称',               'ai',      13],
-    ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      14],
-    ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      15],
-    ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      16],
+    ['siliconflow_api_key', '',                         'SiliconFlow API Key',          'ai',      14],
+    ['siliconflow_model',   'deepseek-ai/DeepSeek-V3',  'SiliconFlow 模型名称',          'ai',      15],
+    ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      16],
+    ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      17],
+    ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      18],
     ['recharge_enabled',    '1',                       '启用用户充值功能',               'recharge', 20],
     ['recharge_amounts',    '10,30,50,100,200,500',    '预设充值金额（逗号分隔）',        'recharge', 21],
     ['recharge_min_amount', '10',                      '最低充值金额（元）',              'recharge', 22],
@@ -919,13 +926,14 @@ function safeParse(val) {
 
 // ========== 会话 ==========
 
-export async function createSession(id, userId = null) {
+export async function createSession(id, userId = null, orderNo = null, orderData = null) {
   await pool.execute(
-    'INSERT INTO sessions (id, user_id, collected_data, step) VALUES (?, ?, ?, ?)',
-    [id, userId, JSON.stringify({}), 0]
+    'INSERT INTO sessions (id, user_id, order_no, order_data, collected_data, step) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, userId, orderNo, orderData ? JSON.stringify(orderData) : null, JSON.stringify({}), 0]
   )
   const [rows] = await pool.execute('SELECT * FROM sessions WHERE id = ?', [id])
   rows[0].collected_data = safeParse(rows[0].collected_data)
+  rows[0].order_data = safeParse(rows[0].order_data)
   return rows[0]
 }
 
@@ -933,7 +941,15 @@ export async function getSession(id) {
   const [rows] = await pool.execute('SELECT * FROM sessions WHERE id = ?', [id])
   if (rows.length === 0) return null
   rows[0].collected_data = safeParse(rows[0].collected_data)
+  rows[0].order_data = safeParse(rows[0].order_data)
   return rows[0]
+}
+
+export async function updateSessionOrder(id, orderNo, orderData) {
+  await pool.execute(
+    'UPDATE sessions SET order_no = ?, order_data = ? WHERE id = ?',
+    [orderNo, orderData ? JSON.stringify(orderData) : null, id]
+  )
 }
 
 export async function updateSession(id, step, collectedData) {

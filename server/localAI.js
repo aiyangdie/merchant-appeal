@@ -1530,8 +1530,11 @@ function generateConfirmation(key, value, rawInput, data = {}) {
 /**
  * 构建信息收集阶段 DeepSeek 的富上下文
  * 让 AI 了解完整的收集进度、已有分析、行业知识，从而像真人顾问一样自然对话
+ * @param {object} data 收集的数据
+ * @param {number} currentStep 当前步骤
+ * @param {object} orderInfo 绑定的订单信息（可选）
  */
-export function buildCollectionContext(data, currentStep) {
+export function buildCollectionContext(data, currentStep, orderInfo = null) {
   const collected = []
   const remaining = []
 
@@ -1553,6 +1556,21 @@ export function buildCollectionContext(data, currentStep) {
     const show = remaining.slice(0, 4)
     ctx += `\n【待收集（按优先级）】\n${show.join('\n')}\n`
     if (remaining.length > 4) ctx += `...还有${remaining.length - 4}项\n`
+  }
+
+  // 订单上下文 - 如果绑定了订单，AI需要知道
+  if (orderInfo) {
+    const orderAmount = orderInfo.total_amount > 10000 ? (orderInfo.total_amount / 100).toFixed(2) : orderInfo.total_amount
+    ctx += `\n\n===== 当前处理订单 =====\n`
+    ctx += `【订单信息】\n`
+    ctx += `• 订单号: ${orderInfo.order_no || '未知'}\n`
+    if (orderInfo.buyer_nick || orderInfo.customer_name) ctx += `• 买家昵称: ${orderInfo.buyer_nick || orderInfo.customer_name}\n`
+    if (orderInfo.receiver_mobile || orderInfo.buyer_phone || orderInfo.customer_phone) ctx += `• 联系电话: ${orderInfo.receiver_mobile || orderInfo.buyer_phone || orderInfo.customer_phone}\n`
+    if (orderInfo.goods?.title || orderInfo.product_name) ctx += `• 商品名称: ${orderInfo.goods?.title || orderInfo.product_name}\n`
+    ctx += `• 订单金额: ¥${orderAmount}\n`
+    if (orderInfo.status) ctx += `• 订单状态: ${orderInfo.status}\n`
+    if (orderInfo.receiver_address) ctx += `• 收货地址: ${orderInfo.receiver_address}\n`
+    ctx += `\n请根据以上订单信息，结合商户违规情况，为用户提供专业的申诉建议。\n`
   }
 
   // 风险评估
@@ -1638,9 +1656,29 @@ export function buildCollectionContext(data, currentStep) {
  * 构建 AI 生成报告所需的上下文 prompt
  * @param {object} collectedData 收集的商户信息
  * @param {Array} successCases 相关成功案例（从知识库查询）
+ * @param {object} orderInfo 绑定的订单信息（可选）
  */
-export function buildReportPrompt(collectedData, successCases = []) {
+export function buildReportPrompt(collectedData, successCases = [], orderInfo = null) {
   const d = collectedData
+
+  // 订单上下文 - 如果绑定了订单
+  let orderSection = ''
+  if (orderInfo) {
+    const orderAmount = orderInfo.total_amount > 10000 ? (orderInfo.total_amount / 100).toFixed(2) : orderInfo.total_amount
+    orderSection = `
+## 当前处理订单信息
+
+- **订单号**: ${orderInfo.order_no || '未知'}
+${orderInfo.buyer_nick || orderInfo.customer_name ? `- **买家昵称**: ${orderInfo.buyer_nick || orderInfo.customer_name}` : ''}
+${orderInfo.receiver_mobile || orderInfo.buyer_phone || orderInfo.customer_phone ? `- **联系电话**: ${orderInfo.receiver_mobile || orderInfo.buyer_phone || orderInfo.customer_phone}` : ''}
+${orderInfo.goods?.title || orderInfo.product_name ? `- **商品名称**: ${orderInfo.goods?.title || orderInfo.product_name}` : ''}
+- **订单金额**: ¥${orderAmount}
+${orderInfo.status ? `- **订单状态**: ${orderInfo.status}` : ''}
+${orderInfo.receiver_address ? `- **收货地址**: ${orderInfo.receiver_address}` : ''}
+
+请在生成申诉材料时，结合以上订单信息给出更有针对性的建议。
+`
+  }
 
   // 匹配行业知识
   const ind = matchIndustry(d.industry || '')

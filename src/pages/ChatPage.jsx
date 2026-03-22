@@ -42,6 +42,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sessionId, setSessionId] = useState(null)
+  const sessionIdRef = useRef(null)  // 添加 ref 来存储最新的 sessionId
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
   const bottomRef = useRef(null)
@@ -118,6 +119,35 @@ export default function ChatPage() {
     return clean
   }
 
+  // 智能格式化金额（订单数据金额单位不一致，有的已是元，有的需要转换）
+  function formatOrderAmount(order) {
+    // 优先使用 _fen 字段（最准确）
+    if (order.pay_amount_fen) {
+      return parseFloat(order.pay_amount_fen / 100).toFixed(2)
+    }
+    if (order.total_amount_fen) {
+      return parseFloat(order.total_amount_fen / 100).toFixed(2)
+    }
+    // 如果金额大于10000，说明是分单位
+    let amount = order.pay_amount || order.total_amount || 0
+    if (amount > 10000) {
+      amount = amount / 100
+    }
+    return parseFloat(amount).toFixed(2)
+  }
+
+  // 获取订单状态颜色
+  function getOrderStatusStyle(status, orderStatus) {
+    // orderStatus: 12=待发货, 23=已退款, 其他=未知
+    if (orderStatus === 12) {
+      return { bg: 'bg-green-100', text: 'text-green-700', label: status || '待发货' }
+    }
+    if (orderStatus === 23 || status?.includes('退款') || status?.includes('关闭')) {
+      return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '已关闭' }
+    }
+    return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '未知' }
+  }
+
   // 信息收集面板
   const [collectedInfo, setCollectedInfo] = useState({})
   const [infoFields, setInfoFields] = useState([])
@@ -151,6 +181,99 @@ export default function ChatPage() {
   // 商品详情购买弹窗
   const [detailProduct, setDetailProduct] = useState(null)
   const [purchasing, setPurchasing] = useState(false)
+  // 订单绑定
+  const [showOrderPanel, setShowOrderPanel] = useState(false)
+  const [boundOrder, setBoundOrder] = useState(null)
+  const [orderList, setOrderList] = useState([])
+  const [orderListLoading, setOrderListLoading] = useState(false)
+  const [orderNoInput, setOrderNoInput] = useState('')
+  const [orderNoLoading, setOrderNoLoading] = useState(false)
+  const [orderSearchResults, setOrderSearchResults] = useState([])
+
+  const searchOrder = async (keyword) => {
+    // 如果没有session，先创建一个
+    if (!sessionIdRef.current) {
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ userId: user?.id })
+        })
+        const data = await res.json()
+        if (data.sessionId) {
+          setSessionId(data.sessionId)
+          sessionIdRef.current = data.sessionId
+          localStorage.setItem('appeal_session_id', data.sessionId)
+        }
+      } catch (e) {
+        console.error('创建session失败:', e)
+        return
+      }
+    }
+    setOrderNoLoading(true)
+    try {
+      const res = await fetch(`/api/orders/from-system?keyword=${encodeURIComponent(keyword)}&page_size=20`, { headers: getAuthHeaders() })
+      const data = await res.json()
+      if (data.success && data.data) {
+        // 显示所有订单，按状态排序（待发货优先）
+        const sorted = data.data.sort((a, b) => {
+          if (a.order_status === 12 && b.order_status !== 12) return -1
+          if (b.order_status === 12 && a.order_status !== 12) return 1
+          return 0
+        })
+        setOrderSearchResults(sorted)
+      } else {
+        setOrderSearchResults([])
+      }
+    } catch { setOrderSearchResults([]) }
+    setOrderNoLoading(false)
+  }
+
+  const selectOrder = async (order) => {
+    setOrderSearchResults([])
+    setOrderNoInput('')
+    
+    // 确保有 sessionId，如果没有则创建（同时绑定订单）
+    let currentSessionId = sessionIdRef.current
+    if (!currentSessionId) {
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ 
+            userId: user?.id,
+            orderNo: order.order_no,
+            orderData: order
+          })
+        })
+        const data = await res.json()
+        if (data.sessionId) {
+          currentSessionId = data.sessionId
+          setSessionId(data.sessionId)
+          sessionIdRef.current = data.sessionId
+          localStorage.setItem('appeal_session_id', data.sessionId)
+          setBoundOrder(order)
+          return // 创建时已绑定订单，直接返回
+        }
+      } catch (e) {
+        console.error('创建session失败:', e)
+        return
+      }
+    } else {
+      // 已有会话，绑定订单
+      try {
+        await fetch(`/api/sessions/${currentSessionId}/bind-order`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ order_no: order.order_no, order_data: order })
+        })
+      } catch (e) {
+        console.error('绑定订单失败:', e)
+      }
+    }
+    setBoundOrder(order)
+  }
+
   const chatNavigate = useNavigate()
   const [proModeAnim, setProModeAnim] = useState(false) // 专业模式切换动画
   const prevProModeRef = useRef(false)
@@ -173,6 +296,43 @@ export default function ChatPage() {
       if (d.cards?.length > 0) setContactCards(d.cards)
     }).catch(() => {})
   }, [])
+
+  // 加载会话绑定的订单
+  useEffect(() => {
+    if (!sessionId) return
+    fetch(`/api/sessions/${sessionId}/order`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data) {
+          setBoundOrder(d.data)
+        }
+      })
+      .catch(() => {})
+  }, [sessionId])
+
+  // 打开订单面板时自动加载订单列表
+  useEffect(() => {
+    if (showOrderPanel && orderList.length === 0) {
+      setOrderListLoading(true)
+      fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success && d.data) {
+            // 显示所有订单，按状态排序（待发货优先）
+            const sorted = d.data.sort((a, b) => {
+              if (a.order_status === 12 && b.order_status !== 12) return -1
+              if (b.order_status === 12 && a.order_status !== 12) return 1
+              return 0
+            })
+            setOrderList(sorted)
+          } else {
+            setOrderList([])
+          }
+        })
+        .catch(() => setOrderList([]))
+        .finally(() => setOrderListLoading(false))
+    }
+  }, [showOrderPanel])
 
   // AI风险评估：当收集到违规相关信息时自动评估
   useEffect(() => {
@@ -292,6 +452,7 @@ export default function ChatPage() {
       ]).then(([msgData, infoData]) => {
         if (msgData?.messages?.length > 0) {
           setSessionId(saved)
+          sessionIdRef.current = saved  // 同步更新 ref
           setMessages(msgData.messages)
           if (infoData) {
             setCollectedInfo(sanitizeCollected(infoData.collectedData))
@@ -375,7 +536,7 @@ export default function ChatPage() {
     const MAX_RETRIES = 2
     const res = await fetch('/api/chat/stream', {
       method: 'POST', headers: getAuthHeaders(),
-      body: JSON.stringify({ sessionId, content: text, userId: user?.id }),
+      body: JSON.stringify({ sessionId: sessionIdRef.current, content: text, userId: user?.id }),  // 使用 ref
     })
 
     if (!res.ok) {
@@ -415,6 +576,7 @@ export default function ChatPage() {
             if (parsed.type === 'start') {
               if (parsed.sessionId && parsed.sessionId !== sessionId) {
                 setSessionId(parsed.sessionId)
+                sessionIdRef.current = parsed.sessionId  // 同步更新 ref
                 localStorage.setItem('appeal_session_id', parsed.sessionId)
               }
               if (parsed.totalSteps) setInfoTotal(parsed.totalSteps)
@@ -635,6 +797,8 @@ export default function ChatPage() {
     setTimeout(() => {
       localStorage.removeItem('appeal_session_id')
       setSessionId(null)
+      sessionIdRef.current = null  // 清除 ref
+      setBoundOrder(null)  // 清除绑定的订单
       setMessages([{ role: 'assistant', content: WELCOME }])
       setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setAnalysisKey(0); contactShownRef.current = false
       setRiskLevel(null); prevRiskRef.current = null
@@ -1345,6 +1509,34 @@ export default function ChatPage() {
               className="w-8 h-8 flex items-center justify-center rounded-lg overflow-hidden hover:ring-2 hover:ring-offset-1 hover:ring-green-300 transition-all" title="用户中心">
               <UserAvatar name={user?.nickname || '用户'} size={32} style={{ borderRadius: 8 }} />
             </button>
+            {/* 订单绑定 */}
+            <button onClick={async () => {
+              // 如果没有session，先创建一个
+              if (!sessionId) {
+                try {
+                  const res = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user?.id })
+                  })
+                  const data = await res.json()
+                  if (data.sessionId) {
+                    setSessionId(data.sessionId)
+                    sessionIdRef.current = data.sessionId
+                    localStorage.setItem('appeal_session_id', data.sessionId)
+                  }
+                } catch (e) {
+                  console.error('创建session失败:', e)
+                }
+              }
+              setShowOrderPanel(true)
+            }}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${boundOrder ? (isProfessionalMode ? 'text-amber-600 bg-amber-50' : 'text-wechat-green bg-green-50') : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')}`} title={boundOrder ? '已绑定订单' : '绑定订单'}>
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              {boundOrder && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wechat-green rounded-full" />}
+            </button>
             <button onClick={openRecharge}
               className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="充值">
               <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1435,6 +1627,98 @@ export default function ChatPage() {
             if (contactRecCard) { setShowContact(true); return }
           }} className={`flex-1 overflow-y-auto overscroll-contain gpu-scroll ${isProfessionalMode ? 'pro-chat-bg pro-grid-bg' : 'bg-[#f5f5f5]'}`}>
             <div className={`max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
+              {/* 已绑定订单信息卡片 */}
+              {boundOrder && (() => {
+                const boundImage = boundOrder.goods?.images?.[0] || boundOrder.product_image || ''
+                return (
+                <div className={`mb-3 p-3 rounded-xl border-2 ${isProfessionalMode ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200' : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'}`}>
+                  <div className="flex gap-3">
+                    {boundImage && (
+                      <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                        <img src={boundImage} alt="商品图" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isProfessionalMode ? 'bg-amber-100' : 'bg-green-100'}`}>
+                            <svg className={`w-3.5 h-3.5 ${isProfessionalMode ? 'text-amber-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                          </div>
+                          <div>
+                            <p className={`text-xs font-medium ${isProfessionalMode ? 'text-amber-700' : 'text-green-700'}`}>关联订单</p>
+                            <p className="text-xs text-gray-400">{boundOrder.order_no}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => setShowOrderPanel(true)} className={`text-xs px-2 py-1 rounded-lg ${isProfessionalMode ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'}`}>更换</button>
+                      </div>
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                        <div><span className="text-gray-400">买家: </span><span className="text-gray-700 font-medium">{boundOrder.buyer_nick || boundOrder.customer_name || '未知'}</span></div>
+                        <div><span className="text-gray-400">📞 </span><span className="text-gray-700 font-medium">{boundOrder.receiver_mobile || boundOrder.buyer_phone || boundOrder.customer_phone || '无'}</span></div>
+                        <div className="col-span-2"><span className="text-gray-400">商品: </span><span className="text-gray-700 font-medium truncate">{boundOrder.goods?.title || boundOrder.product_name || '未知商品'}</span></div>
+                        <div><span className="text-gray-400">金额: </span><span className={`font-bold ${isProfessionalMode ? 'text-amber-600' : 'text-green-600'}`}>¥{formatOrderAmount(boundOrder)}</span></div>
+                        <div><span className="text-gray-400">状态: </span><span className="text-gray-600">{boundOrder.status || '未知'}</span></div>
+                        {boundOrder.receiver_address && (
+                          <div className="col-span-2"><span className="text-gray-400">📍 </span><span className="text-gray-500 truncate">{boundOrder.receiver_address}</span></div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                )
+              })()}
+              {/* 订单号输入区域 - 支持多种方式搜索 */}
+              {!boundOrder && (
+                <div className={`mb-3 p-3 rounded-xl border-2 ${isProfessionalMode ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isProfessionalMode ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                      <svg className={`w-4 h-4 ${isProfessionalMode ? 'text-amber-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <p className={`text-xs font-medium ${isProfessionalMode ? 'text-amber-700' : 'text-blue-700'}`}>查询我的订单</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={orderNoInput}
+                      onChange={(e) => { setOrderNoInput(e.target.value); setOrderSearchResults([]) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && orderNoInput.trim()) { searchOrder(orderNoInput.trim()) } }}
+                      placeholder="订单号/姓名/手机号（回车搜索）"
+                      className={`flex-1 px-3 py-2 text-xs rounded-lg border ${isProfessionalMode ? 'border-amber-200 bg-white focus:ring-amber-300' : 'border-blue-200 bg-white focus:ring-blue-300'} focus:outline-none focus:ring-2`}
+                    />
+                    <button
+                      onClick={() => { if (orderNoInput.trim()) searchOrder(orderNoInput.trim()) }}
+                      disabled={orderNoLoading || !orderNoInput.trim()}
+                      className={`px-4 py-2 text-xs font-medium text-white rounded-lg disabled:opacity-50 ${isProfessionalMode ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'}`}>
+                      {orderNoLoading ? '...' : '🔍'}
+                    </button>
+                  </div>
+                  {/* 搜索结果列表 */}
+                  {orderSearchResults.length > 0 && (
+                    <div className="mt-2 bg-white rounded-lg border border-gray-100 max-h-48 overflow-y-auto">
+                      {orderSearchResults.map((order, idx) => {
+                        const statusStyle = getOrderStatusStyle(order.status, order.order_status)
+                        return (
+                        <div key={idx} onClick={() => selectOrder(order)}
+                          className="p-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 last:border-b-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-700 truncate">{order.buyer_nick || order.customer_name || '未知买家'}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>{statusStyle.label}</span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                📞{order.receiver_mobile || order.customer_phone || '无'} | {order.goods?.title || order.product_name || '商品'}
+                              </div>
+                            </div>
+                            <div className="text-xs font-bold text-orange-500 ml-2">¥{formatOrderAmount(order)}</div>
+                          </div>
+                        </div>
+                      )
+                      })}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1.5">输入订单号、买家姓名或手机号快速查找</p>
+                </div>
+              )}
               {messages.map((msg, i) => (
                 <React.Fragment key={i}>
                   <ChatMessage role={msg.role} content={msg.content} animate={i === messages.length - 1} timing={msg.timing} tokenUsage={msg.tokenUsage} proMode={isProfessionalMode} />
@@ -1622,6 +1906,170 @@ export default function ChatPage() {
           onRecharge={() => { setShowUserCenter(false); openRecharge() }}
           getAuthHeaders={getAuthHeaders}
         />
+      )}
+
+      {/* 订单绑定面板 */}
+      {showOrderPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[6px]" onClick={() => setShowOrderPanel(false)}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-scale-in" style={{ boxShadow: '0 -8px 60px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            {/* 头部 */}
+            <div className="px-6 py-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-t-3xl border-b border-orange-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-sm">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">绑定闲鱼订单</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">选择要关联的订单，获取客户信息</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowOrderPanel(false)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            {/* 已绑定订单显示 */}
+            {boundOrder && (() => {
+              const panelImage = boundOrder.goods?.images?.[0] || boundOrder.product_image || ''
+              return (
+              <div className="px-6 py-3 bg-green-50 border-b border-green-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                    <span className="text-sm font-medium text-green-700">已绑定订单</span>
+                  </div>
+                  <button onClick={() => { setBoundOrder(null); fetch(`/api/sessions/${sessionId}/bind-order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: null, order_data: null }) }).catch(() => {}) }} className="text-xs text-red-500 hover:text-red-600 font-medium">解除绑定</button>
+                </div>
+                <div className="mt-2 flex gap-3 bg-white rounded-lg p-2">
+                  {panelImage && (
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                      <img src={panelImage} alt="商品图" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 text-xs text-gray-500">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                      <div>买家: {boundOrder.buyer_nick || boundOrder.customer_name || '未知'}</div>
+                      <div>📞 {boundOrder.receiver_mobile || boundOrder.buyer_phone || boundOrder.customer_phone || '无'}</div>
+                      <div className="col-span-2 truncate">商品: {boundOrder.goods?.title || boundOrder.product_name || '未知'}</div>
+                      <div>¥{formatOrderAmount(boundOrder)}</div>
+                      <div>{boundOrder.status || '未知'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )
+            })()}
+            {/* 订单列表 */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {orderListLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin w-8 h-8 border-2 border-orange-300 border-t-orange-500 rounded-full" />
+                  <span className="ml-3 text-sm text-gray-500">加载订单中...</span>
+                </div>
+              ) : orderList.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">暂无订单数据</p>
+                  <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { setOrderList([]) } } catch {} setOrderListLoading(false) }} className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md">
+                    刷新订单列表
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {orderList.map((order, idx) => {
+                    const orderImage = order.goods?.images?.[0] || order.product_image || ''
+                    const statusStyle = getOrderStatusStyle(order.status, order.order_status)
+                    return (
+                    <div key={idx} onClick={async () => {
+                      // 确保有 sessionId，如果没有则创建（同时绑定订单）
+                      let sid = sessionIdRef.current
+                      if (!sid) {
+                        try {
+                          const res = await fetch('/api/sessions', { 
+                            method: 'POST', 
+                            headers: getAuthHeaders(), 
+                            body: JSON.stringify({ 
+                              userId: user?.id,
+                              orderNo: order.order_no,
+                              orderData: order
+                            }) 
+                          })
+                          const data = await res.json()
+                          if (data.sessionId) {
+                            sid = data.sessionId
+                            setSessionId(sid)
+                            sessionIdRef.current = sid
+                            localStorage.setItem('appeal_session_id', sid)
+                            setBoundOrder(order)
+                            setShowOrderPanel(false)
+                            return // 创建时已绑定订单，直接返回
+                          }
+                        } catch (e) { console.error('创建session失败:', e); return }
+                      }
+                      // 已有会话，绑定订单
+                      if (sid) {
+                        try {
+                          await fetch(`/api/sessions/${sid}/bind-order`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ order_no: order.order_no, order_data: order }) })
+                          setBoundOrder(order)
+                          setShowOrderPanel(false)
+                        } catch (e) { alert('绑定失败') }
+                      }
+                    }}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${boundOrder?.order_no === order.order_no ? 'border-orange-400 bg-orange-50' : 'border-gray-100 bg-white hover:border-orange-200'}`}>
+                      <div className="flex gap-3">
+                        {orderImage && (
+                          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                            <img src={orderImage} alt="商品图" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-sm font-bold text-gray-900 truncate">{order.buyer_nick || order.customer_name || '未知买家'}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${statusStyle.bg} ${statusStyle.text}`}>{statusStyle.label}</span>
+                              </div>
+                              <p className="text-xs text-gray-500 truncate">{order.goods?.title || order.product_name || '商品信息'}</p>
+                            </div>
+                            <div className="text-right ml-2">
+                              <p className="text-sm font-bold text-orange-600">¥{formatOrderAmount(order)}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{order.goods?.quantity || 1}件</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span>📞 {order.receiver_mobile || order.buyer_phone || order.customer_phone || '无'}</span>
+                            <span>📅 {order.order_time ? new Date(order.order_time).toLocaleDateString() : '未知'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {boundOrder?.order_no === order.order_no && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-orange-600 font-medium">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                          当前绑定
+                        </div>
+                      )}
+                    </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            {/* 底部操作 */}
+            <div className="px-6 py-4 border-t border-gray-100 safe-bottom">
+              <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { alert(data.error || '获取订单失败') } } catch (e) { alert('连接失败') } setOrderListLoading(false) }} disabled={orderListLoading}
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-60">
+                {orderListLoading ? '加载中...' : '获取闲鱼订单'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 名片弹窗（支持多名片切换） */}

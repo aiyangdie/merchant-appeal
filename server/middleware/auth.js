@@ -4,7 +4,8 @@ import logger from '../utils/logger.js';
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  logger.warn('⚠️ Security Warning: JWT_SECRET is not defined in environment variables.');
+  logger.error('FATAL: JWT_SECRET environment variable is required. Server cannot start securely.');
+  process.exit(1);
 }
 
 export function signToken(payload) {

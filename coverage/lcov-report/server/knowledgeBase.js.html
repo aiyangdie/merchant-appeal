@@ -1,0 +1,2470 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/knowledgeBase.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">server</a> knowledgeBase.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/196</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/205</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/8</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/132</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a>
+<a name='L517'></a><a href='#L517'>517</a>
+<a name='L518'></a><a href='#L518'>518</a>
+<a name='L519'></a><a href='#L519'>519</a>
+<a name='L520'></a><a href='#L520'>520</a>
+<a name='L521'></a><a href='#L521'>521</a>
+<a name='L522'></a><a href='#L522'>522</a>
+<a name='L523'></a><a href='#L523'>523</a>
+<a name='L524'></a><a href='#L524'>524</a>
+<a name='L525'></a><a href='#L525'>525</a>
+<a name='L526'></a><a href='#L526'>526</a>
+<a name='L527'></a><a href='#L527'>527</a>
+<a name='L528'></a><a href='#L528'>528</a>
+<a name='L529'></a><a href='#L529'>529</a>
+<a name='L530'></a><a href='#L530'>530</a>
+<a name='L531'></a><a href='#L531'>531</a>
+<a name='L532'></a><a href='#L532'>532</a>
+<a name='L533'></a><a href='#L533'>533</a>
+<a name='L534'></a><a href='#L534'>534</a>
+<a name='L535'></a><a href='#L535'>535</a>
+<a name='L536'></a><a href='#L536'>536</a>
+<a name='L537'></a><a href='#L537'>537</a>
+<a name='L538'></a><a href='#L538'>538</a>
+<a name='L539'></a><a href='#L539'>539</a>
+<a name='L540'></a><a href='#L540'>540</a>
+<a name='L541'></a><a href='#L541'>541</a>
+<a name='L542'></a><a href='#L542'>542</a>
+<a name='L543'></a><a href='#L543'>543</a>
+<a name='L544'></a><a href='#L544'>544</a>
+<a name='L545'></a><a href='#L545'>545</a>
+<a name='L546'></a><a href='#L546'>546</a>
+<a name='L547'></a><a href='#L547'>547</a>
+<a name='L548'></a><a href='#L548'>548</a>
+<a name='L549'></a><a href='#L549'>549</a>
+<a name='L550'></a><a href='#L550'>550</a>
+<a name='L551'></a><a href='#L551'>551</a>
+<a name='L552'></a><a href='#L552'>552</a>
+<a name='L553'></a><a href='#L553'>553</a>
+<a name='L554'></a><a href='#L554'>554</a>
+<a name='L555'></a><a href='#L555'>555</a>
+<a name='L556'></a><a href='#L556'>556</a>
+<a name='L557'></a><a href='#L557'>557</a>
+<a name='L558'></a><a href='#L558'>558</a>
+<a name='L559'></a><a href='#L559'>559</a>
+<a name='L560'></a><a href='#L560'>560</a>
+<a name='L561'></a><a href='#L561'>561</a>
+<a name='L562'></a><a href='#L562'>562</a>
+<a name='L563'></a><a href='#L563'>563</a>
+<a name='L564'></a><a href='#L564'>564</a>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a>
+<a name='L568'></a><a href='#L568'>568</a>
+<a name='L569'></a><a href='#L569'>569</a>
+<a name='L570'></a><a href='#L570'>570</a>
+<a name='L571'></a><a href='#L571'>571</a>
+<a name='L572'></a><a href='#L572'>572</a>
+<a name='L573'></a><a href='#L573'>573</a>
+<a name='L574'></a><a href='#L574'>574</a>
+<a name='L575'></a><a href='#L575'>575</a>
+<a name='L576'></a><a href='#L576'>576</a>
+<a name='L577'></a><a href='#L577'>577</a>
+<a name='L578'></a><a href='#L578'>578</a>
+<a name='L579'></a><a href='#L579'>579</a>
+<a name='L580'></a><a href='#L580'>580</a>
+<a name='L581'></a><a href='#L581'>581</a>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a>
+<a name='L604'></a><a href='#L604'>604</a>
+<a name='L605'></a><a href='#L605'>605</a>
+<a name='L606'></a><a href='#L606'>606</a>
+<a name='L607'></a><a href='#L607'>607</a>
+<a name='L608'></a><a href='#L608'>608</a>
+<a name='L609'></a><a href='#L609'>609</a>
+<a name='L610'></a><a href='#L610'>610</a>
+<a name='L611'></a><a href='#L611'>611</a>
+<a name='L612'></a><a href='#L612'>612</a>
+<a name='L613'></a><a href='#L613'>613</a>
+<a name='L614'></a><a href='#L614'>614</a>
+<a name='L615'></a><a href='#L615'>615</a>
+<a name='L616'></a><a href='#L616'>616</a>
+<a name='L617'></a><a href='#L617'>617</a>
+<a name='L618'></a><a href='#L618'>618</a>
+<a name='L619'></a><a href='#L619'>619</a>
+<a name='L620'></a><a href='#L620'>620</a>
+<a name='L621'></a><a href='#L621'>621</a>
+<a name='L622'></a><a href='#L622'>622</a>
+<a name='L623'></a><a href='#L623'>623</a>
+<a name='L624'></a><a href='#L624'>624</a>
+<a name='L625'></a><a href='#L625'>625</a>
+<a name='L626'></a><a href='#L626'>626</a>
+<a name='L627'></a><a href='#L627'>627</a>
+<a name='L628'></a><a href='#L628'>628</a>
+<a name='L629'></a><a href='#L629'>629</a>
+<a name='L630'></a><a href='#L630'>630</a>
+<a name='L631'></a><a href='#L631'>631</a>
+<a name='L632'></a><a href='#L632'>632</a>
+<a name='L633'></a><a href='#L633'>633</a>
+<a name='L634'></a><a href='#L634'>634</a>
+<a name='L635'></a><a href='#L635'>635</a>
+<a name='L636'></a><a href='#L636'>636</a>
+<a name='L637'></a><a href='#L637'>637</a>
+<a name='L638'></a><a href='#L638'>638</a>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a>
+<a name='L646'></a><a href='#L646'>646</a>
+<a name='L647'></a><a href='#L647'>647</a>
+<a name='L648'></a><a href='#L648'>648</a>
+<a name='L649'></a><a href='#L649'>649</a>
+<a name='L650'></a><a href='#L650'>650</a>
+<a name='L651'></a><a href='#L651'>651</a>
+<a name='L652'></a><a href='#L652'>652</a>
+<a name='L653'></a><a href='#L653'>653</a>
+<a name='L654'></a><a href='#L654'>654</a>
+<a name='L655'></a><a href='#L655'>655</a>
+<a name='L656'></a><a href='#L656'>656</a>
+<a name='L657'></a><a href='#L657'>657</a>
+<a name='L658'></a><a href='#L658'>658</a>
+<a name='L659'></a><a href='#L659'>659</a>
+<a name='L660'></a><a href='#L660'>660</a>
+<a name='L661'></a><a href='#L661'>661</a>
+<a name='L662'></a><a href='#L662'>662</a>
+<a name='L663'></a><a href='#L663'>663</a>
+<a name='L664'></a><a href='#L664'>664</a>
+<a name='L665'></a><a href='#L665'>665</a>
+<a name='L666'></a><a href='#L666'>666</a>
+<a name='L667'></a><a href='#L667'>667</a>
+<a name='L668'></a><a href='#L668'>668</a>
+<a name='L669'></a><a href='#L669'>669</a>
+<a name='L670'></a><a href='#L670'>670</a>
+<a name='L671'></a><a href='#L671'>671</a>
+<a name='L672'></a><a href='#L672'>672</a>
+<a name='L673'></a><a href='#L673'>673</a>
+<a name='L674'></a><a href='#L674'>674</a>
+<a name='L675'></a><a href='#L675'>675</a>
+<a name='L676'></a><a href='#L676'>676</a>
+<a name='L677'></a><a href='#L677'>677</a>
+<a name='L678'></a><a href='#L678'>678</a>
+<a name='L679'></a><a href='#L679'>679</a>
+<a name='L680'></a><a href='#L680'>680</a>
+<a name='L681'></a><a href='#L681'>681</a>
+<a name='L682'></a><a href='#L682'>682</a>
+<a name='L683'></a><a href='#L683'>683</a>
+<a name='L684'></a><a href='#L684'>684</a>
+<a name='L685'></a><a href='#L685'>685</a>
+<a name='L686'></a><a href='#L686'>686</a>
+<a name='L687'></a><a href='#L687'>687</a>
+<a name='L688'></a><a href='#L688'>688</a>
+<a name='L689'></a><a href='#L689'>689</a>
+<a name='L690'></a><a href='#L690'>690</a>
+<a name='L691'></a><a href='#L691'>691</a>
+<a name='L692'></a><a href='#L692'>692</a>
+<a name='L693'></a><a href='#L693'>693</a>
+<a name='L694'></a><a href='#L694'>694</a>
+<a name='L695'></a><a href='#L695'>695</a>
+<a name='L696'></a><a href='#L696'>696</a>
+<a name='L697'></a><a href='#L697'>697</a>
+<a name='L698'></a><a href='#L698'>698</a>
+<a name='L699'></a><a href='#L699'>699</a>
+<a name='L700'></a><a href='#L700'>700</a>
+<a name='L701'></a><a href='#L701'>701</a>
+<a name='L702'></a><a href='#L702'>702</a>
+<a name='L703'></a><a href='#L703'>703</a>
+<a name='L704'></a><a href='#L704'>704</a>
+<a name='L705'></a><a href='#L705'>705</a>
+<a name='L706'></a><a href='#L706'>706</a>
+<a name='L707'></a><a href='#L707'>707</a>
+<a name='L708'></a><a href='#L708'>708</a>
+<a name='L709'></a><a href='#L709'>709</a>
+<a name='L710'></a><a href='#L710'>710</a>
+<a name='L711'></a><a href='#L711'>711</a>
+<a name='L712'></a><a href='#L712'>712</a>
+<a name='L713'></a><a href='#L713'>713</a>
+<a name='L714'></a><a href='#L714'>714</a>
+<a name='L715'></a><a href='#L715'>715</a>
+<a name='L716'></a><a href='#L716'>716</a>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a>
+<a name='L726'></a><a href='#L726'>726</a>
+<a name='L727'></a><a href='#L727'>727</a>
+<a name='L728'></a><a href='#L728'>728</a>
+<a name='L729'></a><a href='#L729'>729</a>
+<a name='L730'></a><a href='#L730'>730</a>
+<a name='L731'></a><a href='#L731'>731</a>
+<a name='L732'></a><a href='#L732'>732</a>
+<a name='L733'></a><a href='#L733'>733</a>
+<a name='L734'></a><a href='#L734'>734</a>
+<a name='L735'></a><a href='#L735'>735</a>
+<a name='L736'></a><a href='#L736'>736</a>
+<a name='L737'></a><a href='#L737'>737</a>
+<a name='L738'></a><a href='#L738'>738</a>
+<a name='L739'></a><a href='#L739'>739</a>
+<a name='L740'></a><a href='#L740'>740</a>
+<a name='L741'></a><a href='#L741'>741</a>
+<a name='L742'></a><a href='#L742'>742</a>
+<a name='L743'></a><a href='#L743'>743</a>
+<a name='L744'></a><a href='#L744'>744</a>
+<a name='L745'></a><a href='#L745'>745</a>
+<a name='L746'></a><a href='#L746'>746</a>
+<a name='L747'></a><a href='#L747'>747</a>
+<a name='L748'></a><a href='#L748'>748</a>
+<a name='L749'></a><a href='#L749'>749</a>
+<a name='L750'></a><a href='#L750'>750</a>
+<a name='L751'></a><a href='#L751'>751</a>
+<a name='L752'></a><a href='#L752'>752</a>
+<a name='L753'></a><a href='#L753'>753</a>
+<a name='L754'></a><a href='#L754'>754</a>
+<a name='L755'></a><a href='#L755'>755</a>
+<a name='L756'></a><a href='#L756'>756</a>
+<a name='L757'></a><a href='#L757'>757</a>
+<a name='L758'></a><a href='#L758'>758</a>
+<a name='L759'></a><a href='#L759'>759</a>
+<a name='L760'></a><a href='#L760'>760</a>
+<a name='L761'></a><a href='#L761'>761</a>
+<a name='L762'></a><a href='#L762'>762</a>
+<a name='L763'></a><a href='#L763'>763</a>
+<a name='L764'></a><a href='#L764'>764</a>
+<a name='L765'></a><a href='#L765'>765</a>
+<a name='L766'></a><a href='#L766'>766</a>
+<a name='L767'></a><a href='#L767'>767</a>
+<a name='L768'></a><a href='#L768'>768</a>
+<a name='L769'></a><a href='#L769'>769</a>
+<a name='L770'></a><a href='#L770'>770</a>
+<a name='L771'></a><a href='#L771'>771</a>
+<a name='L772'></a><a href='#L772'>772</a>
+<a name='L773'></a><a href='#L773'>773</a>
+<a name='L774'></a><a href='#L774'>774</a>
+<a name='L775'></a><a href='#L775'>775</a>
+<a name='L776'></a><a href='#L776'>776</a>
+<a name='L777'></a><a href='#L777'>777</a>
+<a name='L778'></a><a href='#L778'>778</a>
+<a name='L779'></a><a href='#L779'>779</a>
+<a name='L780'></a><a href='#L780'>780</a>
+<a name='L781'></a><a href='#L781'>781</a>
+<a name='L782'></a><a href='#L782'>782</a>
+<a name='L783'></a><a href='#L783'>783</a>
+<a name='L784'></a><a href='#L784'>784</a>
+<a name='L785'></a><a href='#L785'>785</a>
+<a name='L786'></a><a href='#L786'>786</a>
+<a name='L787'></a><a href='#L787'>787</a>
+<a name='L788'></a><a href='#L788'>788</a>
+<a name='L789'></a><a href='#L789'>789</a>
+<a name='L790'></a><a href='#L790'>790</a>
+<a name='L791'></a><a href='#L791'>791</a>
+<a name='L792'></a><a href='#L792'>792</a>
+<a name='L793'></a><a href='#L793'>793</a>
+<a name='L794'></a><a href='#L794'>794</a>
+<a name='L795'></a><a href='#L795'>795</a>
+<a name='L796'></a><a href='#L796'>796</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// ========== 内置知识库：成功案例 + 违规原因专业知识 ==========
+&nbsp;
+// 内置成功案例（覆盖常见处罚类型和行业）
+export const BUILT_IN_CASES = <span class="cstat-no" title="statement not covered" >[</span>
+  {
+    id: 'builtin_1',
+    title: '餐饮行业交易拦截申诉成功',
+    industry: '餐饮',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 1,
+    success_summary: '提供门店实景照片+3笔真实外卖订单凭证+美团店铺截图，一次申诉通过',
+    key_strategy: '重点证明交易真实性，提供外卖平台店铺链接和近期真实订单的完整交易链路',
+    appeal_points: [
+      '提供门头照+内景照+厨房照共6张',
+      '提供3笔微信支付订单号对应的美团/饿了么订单截图',
+      '附上食品经营许可证和卫生许可证',
+      '说明近期交易量增长是因为新店开业促销活动'
+    ],
+    timeline: '提交后3个工作日通过'
+  },
+  {
+    id: 'builtin_2',
+    title: '电商零售交易限额申诉成功',
+    industry: '电商',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '说明双十一大促导致交易波动，提供店铺后台数据和物流发货记录',
+    key_strategy: '用数据说话，提供历史交易趋势对比图，证明交易量增长有合理商业原因',
+    appeal_points: [
+      '提供小程序商城后台30天交易数据截图',
+      '附上5笔订单的完整链路：下单-发货-物流-签收',
+      '提供进货合同和供应商发票',
+      '说明交易量激增原因是参加了平台促销活动'
+    ],
+    timeline: '提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_3',
+    title: '教育培训关闭支付权限(交易纠纷)申诉成功',
+    industry: '教育',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '全部投诉原路退款+消费者撤诉+完善退费政策，二次申诉通过',
+    key_strategy: '先处理所有投诉（原路全额退款），让消费者在微信投诉界面留言撤诉，再提交申诉',
+    appeal_points: [
+      '逐一联系所有投诉用户，协商退款并取得谅解',
+      '提供每笔投诉的退款凭证截图',
+      '引导消费者在微信投诉页面留言"已解决，撤销投诉"',
+      '提交完善的退费政策文件：7天无理由退费、课程不满意随时退',
+      '附上办学许可证和师资证明'
+    ],
+    timeline: '首次驳回，补充退款凭证后二次申诉5个工作日通过'
+  },
+  {
+    id: 'builtin_4',
+    title: '生活服务关闭支付权限(跨类目经营)申诉成功',
+    industry: '生活服务',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌跨类目经营',
+    difficulty: 3,
+    success_summary: '补充营业执照经营范围证明+下架不符商品+变更经营类目',
+    key_strategy: '承认问题并积极整改，下架超出类目的商品/服务，申请变更为正确类目',
+    appeal_points: [
+      '提供最新营业执照，标注经营范围中包含实际经营的业务',
+      '截图证明已下架所有不符合注册类目的商品/服务',
+      '如经营范围确实不包含，先去工商变更经营范围再申诉',
+      '提交整改报告，说明已梳理全部商品确保与类目一致',
+      '附上门店实景照片证明实际经营场景'
+    ],
+    timeline: '提交后7个工作日通过'
+  },
+  {
+    id: 'builtin_5',
+    title: '美妆零售关闭支付权限(交易异常)申诉成功',
+    industry: '零售',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '解释新店开业交易激增原因+提供品牌授权+进货凭证',
+    key_strategy: '用完整的供应链证据证明商品来源正规，用营销活动解释交易量波动',
+    appeal_points: [
+      '提供品牌授权书或正规渠道进货合同',
+      '附上近期5笔订单的发货单+物流单+签收截图',
+      '提供产品质检报告',
+      '说明新店开业期间做了朋友圈推广和优惠活动导致订单激增',
+      '提供门店实景照片和商品陈列照片'
+    ],
+    timeline: '提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_6',
+    title: '数码产品资金冻结申诉成功',
+    industry: '零售',
+    problem_type: '资金冻结',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 4,
+    success_summary: '提供结算账户信息+全部交易流水+进货发票，资金180天后全额解冻',
+    key_strategy: '资金冻结案件重点是证明资金来源合法，提供结算账户开户信息配合验证',
+    appeal_points: [
+      '提供结算账户开户银行+账户后四位配合身份验证',
+      '导出全部交易流水并标注每笔订单对应的商品',
+      '提供进货发票和供应商合同证明货源正规',
+      '拨打95017转3提供商户号+结算账户后四位催促审核',
+      '提交法人手持身份证+营业执照照片'
+    ],
+    timeline: '申诉通过后资金分批解冻，共耗时约15个工作日'
+  },
+  {
+    id: 'builtin_7',
+    title: '食品行业关闭支付权限(被驳回后二次申诉)成功',
+    industry: '餐饮',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 4,
+    success_summary: '首次驳回原因是"投诉未妥善处理"，补充退款凭证和撤诉截图后通过',
+    key_strategy: '被驳回后先打95017转3询问具体驳回原因，针对性补充材料，切勿盲目重复提交',
+    appeal_points: [
+      '拨打95017转3，提供商户号查询具体驳回原因',
+      '针对"投诉未妥善处理"：逐一联系投诉用户办理退款',
+      '收集每笔退款的微信转账截图作为凭证',
+      '引导用户在投诉页面确认"已解决"',
+      '重新提交时在整改说明中详细列出每笔投诉的处理结果',
+      '两次申诉间隔了5天，避免频繁提交'
+    ],
+    timeline: '首次申诉被驳回，间隔5天二次申诉后4个工作日通过'
+  },
+  {
+    id: 'builtin_8',
+    title: '保健品行业关闭支付权限(多级分销)申诉成功',
+    industry: '健康',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌多级分销返利',
+    difficulty: 4,
+    success_summary: '证明分销模式为一级分佣非多级，提供分销规则截图和佣金结构说明',
+    key_strategy: '重点证明不是多级分销：只有一级推荐奖励，无门槛费，非传销模式',
+    appeal_points: [
+      '提供分销系统后台截图，证明只有一级分佣',
+      '提交分销规则文档：无入门费、无囤货要求、可随时退出',
+      '提供佣金结构说明：仅推荐人获得一次性佣金，无多层级',
+      '附上产品质检报告和经营资质',
+      '整改说明：已调整分销规则，确保符合微信规范'
+    ],
+    timeline: '提交后7个工作日通过'
+  },
+  {
+    id: 'builtin_9',
+    title: '服装零售信用卡套现嫌疑申诉成功',
+    industry: '零售',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌信用卡套现',
+    difficulty: 3,
+    success_summary: '提供真实交易凭证证明非套现，附上发货物流记录',
+    key_strategy: '用真实的商品交易链路证明每笔大额交易都有对应的真实商品和物流',
+    appeal_points: [
+      '提供5笔大额订单的完整交易链路：订单详情-商品照片-发货单-物流单号-签收记录',
+      '附上进货合同和供应商发票',
+      '说明大额交易原因（如批发客户、企业团购等）',
+      '提供客户沟通记录截图证明交易真实性',
+      '提交门店实景照和商品库存照片'
+    ],
+    timeline: '提交后5个工作日限额恢复正常'
+  },
+  {
+    id: 'builtin_10',
+    title: '科技公司延迟结算申诉成功',
+    industry: '科技',
+    problem_type: '资金冻结',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '提供软件著作权+服务合同+客户验收报告，证明SaaS订阅收入合法',
+    key_strategy: 'SaaS/技术服务类需要用合同和交付证明来解释订阅制收费模式的合理性',
+    appeal_points: [
+      '提供软件著作权证书',
+      '附上3-5份客户服务合同（脱敏处理）',
+      '提供客户验收报告或使用反馈',
+      '说明SaaS订阅制收费模式：按月/年收费，非一次性大额交易',
+      '提供结算账户信息配合资金验证'
+    ],
+    timeline: '提交后5个工作日结算恢复正常'
+  },
+  {
+    id: 'builtin_11',
+    title: '微商/社交电商交易拦截申诉成功',
+    industry: '微商',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供朋友圈经营记录+客户聊天截图+发货物流凭证，证明社交电商模式真实',
+    key_strategy: '微商模式的关键是证明交易真实性：每笔交易都有真实的客户沟通、下单、发货记录',
+    appeal_points: [
+      '提供朋友圈/社群经营的截图记录（近1个月）',
+      '提供3-5笔订单的完整链路：客户微信聊天→转账/付款→发货单→物流单号→签收',
+      '提供进货渠道证明（供应商聊天记录、进货单、转账记录）',
+      '说明交易量增长原因（如参加团购活动、节日促销等）',
+      '如有实体仓库，提供仓库库存照片'
+    ],
+    timeline: '提交后3-5个工作日通过'
+  },
+  {
+    id: 'builtin_12',
+    title: '游戏陪玩/代练交易限额申诉成功',
+    industry: '游戏',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供陪玩平台入驻证明+接单记录+客户评价，证明服务真实',
+    key_strategy: '游戏服务类需重点证明有真实的服务交付，每笔收款都对应真实的陪玩/代练服务',
+    appeal_points: [
+      '提供陪玩平台（比心、捞月狗等）的入驻截图和接单记录',
+      '提供5笔订单对应的服务记录：接单截图+游戏对局截图+客户评价',
+      '说明收费标准和服务模式',
+      '如果是独立接单，提供客户沟通记录和转账对应的服务内容'
+    ],
+    timeline: '提交后3个工作日限额恢复'
+  },
+  {
+    id: 'builtin_13',
+    title: '直播带货支付权限关闭申诉成功',
+    industry: '直播',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '提供直播回放+下单截图+发货记录，证明直播带货交易真实',
+    key_strategy: '直播电商的核心证据是直播回放录屏+实时下单记录+发货物流，形成完整证据链',
+    appeal_points: [
+      '提供近期3场直播回放截图或录屏片段',
+      '提供直播间商品列表和价格截图',
+      '提供5笔订单的完整链路：直播间下单→订单详情→发货→物流→签收',
+      '提供供应商合作合同或进货凭证',
+      '说明直播频次、场均观众、场均GMV等经营数据'
+    ],
+    timeline: '提交后5-7个工作日通过'
+  },
+  {
+    id: 'builtin_14',
+    title: '知识付费/在线教育交易纠纷申诉成功',
+    industry: '教育',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '处理全部退款+完善售后政策+提供课程交付证明，二次申诉通过',
+    key_strategy: '知识付费要证明课程真实交付、已处理所有投诉退款、有完善的退费机制',
+    appeal_points: [
+      '逐一处理所有退款申请，提供退款凭证',
+      '提供课程内容截图/录屏证明课程真实存在且有价值',
+      '提供学员评价和学习记录截图',
+      '制定完善的退费政策：7天无理由退费、课程不满意全额退款',
+      '附上教师资质证明（如有）'
+    ],
+    timeline: '处理退款后二次申诉5个工作日通过'
+  },
+  {
+    id: 'builtin_15',
+    title: '跨境代购商户号封禁申诉成功',
+    industry: '代购',
+    problem_type: '商户号封禁',
+    violation_reason: '涉嫌欺诈',
+    difficulty: 5,
+    success_summary: '提供海关清关单+正品购买凭证+品牌授权，经法人视频认证后解封',
+    key_strategy: '代购/跨境类封禁最难，需要海关凭证+正品证明+法人亲自认证的全套材料',
+    appeal_points: [
+      '提供海关进口报关单/清关单',
+      '提供海外购买凭证（商场小票、电商订单截图）',
+      '提供品牌授权书或代理协议（如有）',
+      '提供商品防伪验证截图',
+      '准备法人视频认证：法人本人+身份证+营业执照出镜',
+      '间隔7天以上再提交二次申诉'
+    ],
+    timeline: '首次驳回，间隔7天后提交完善材料+法人视频认证后10个工作日通过'
+  },
+  {
+    id: 'builtin_16',
+    title: '盲盒/潮玩收款限额申诉成功',
+    industry: '盲盒',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供商品实拍+发货记录+经营资质，证明盲盒销售业务真实合规',
+    key_strategy: '盲盒类重点证明商品真实存在、价值合理、非赌博性质',
+    appeal_points: [
+      '提供盲盒商品实拍照片（含包装和内容物）',
+      '提供采购合同和进货发票',
+      '说明盲盒定价机制和商品价值范围，证明非赌博性质',
+      '提供5笔订单的发货物流截图',
+      '附上营业执照（经营范围含玩具/礼品销售）'
+    ],
+    timeline: '提交后3个工作日限额恢复'
+  },
+  {
+    id: 'builtin_17',
+    title: '内容违规(虚假宣传)支付权限关闭申诉成功',
+    industry: '美容',
+    problem_type: '支付权限关闭',
+    violation_reason: '内容违规',
+    difficulty: 3,
+    success_summary: '下架所有违规宣传内容+提供整改前后对比截图+制定内容审核制度后通过',
+    key_strategy: '内容违规的关键是先彻底整改再申诉，提供整改前后对比截图和内容管理制度',
+    appeal_points: [
+      '截图保存所有被标记的违规内容（作为整改前证据）',
+      '逐一修改所有违规宣传用语（去除"最""第一""100%有效"等绝对化用语）',
+      '提供整改后的页面截图（与整改前形成对比）',
+      '制定《内容发布审核管理制度》并提交',
+      '提供卫生许可证和从业人员资质证明'
+    ],
+    timeline: '整改完成后提交申诉，5个工作日通过'
+  },
+  {
+    id: 'builtin_18',
+    title: '虚假交易(刷单嫌疑)收款限额申诉成功',
+    industry: '电商',
+    problem_type: '收款限额',
+    violation_reason: '虚假交易',
+    difficulty: 4,
+    success_summary: '提供10笔订单完整物流签收链路+不同收货地址证明买家非同一人+客户评价截图',
+    key_strategy: '虚假交易申诉核心是用物流签收和不同收货地址证明买卖双方无关联',
+    appeal_points: [
+      '提供10笔被质疑订单的完整链路：下单→付款→发货→物流→签收照片',
+      '标注每笔订单的收货地址（证明分布在不同城市/地区）',
+      '提供与买家的微信聊天记录（证明真实沟通）',
+      '提供进货凭证和仓库实拍照片',
+      '如确实有刷单行为，坦诚承认并说明已停止+处罚涉事人员'
+    ],
+    timeline: '提交后7个工作日限额恢复'
+  },
+  {
+    id: 'builtin_19',
+    title: '跨类目经营(注册餐饮实际卖服装)申诉成功',
+    industry: '零售',
+    problem_type: '支付权限关闭',
+    violation_reason: '跨类目经营',
+    difficulty: 3,
+    success_summary: '先变更工商经营范围+下架不符商品+申请变更商户类目后二次申诉通过',
+    key_strategy: '跨类目必须先整改（变更工商+下架+变更类目）再申诉，顺序不能反',
+    appeal_points: [
+      '去工商局变更营业执照经营范围（增加实际经营类目）',
+      '立即下架所有不符合原注册类目的商品',
+      '在商户平台申请变更商户类目为实际经营类目',
+      '提供变更后的营业执照+已下架截图+类目变更申请截图',
+      '提交整改报告说明已梳理全部商品并确保合规'
+    ],
+    timeline: '工商变更5-10天+申诉提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_20',
+    title: '多级分销返利(社交电商)支付权限关闭申诉成功',
+    industry: '电商',
+    problem_type: '支付权限关闭',
+    violation_reason: '多级分销',
+    difficulty: 4,
+    success_summary: '关闭多级佣金功能+修改分销规则为一级+提供整改后后台截图通过',
+    key_strategy: '多级分销申诉的前提是先整改为一级分销，提供整改前后对比证据',
+    appeal_points: [
+      '立即关闭二级及以上佣金功能（后台操作截图）',
+      '修改分销规则文档：明确仅一级推荐奖励',
+      '提供整改后的分销后台截图（显示仅一级佣金结构）',
+      '提交《分销规则合规说明》：无入门费、无囤货、可随时退出',
+      '提供分销员协议模板（体现合规条款）'
+    ],
+    timeline: '整改完成后提交，7个工作日通过'
+  },
+  {
+    id: 'builtin_21',
+    title: '财税代办行业交易纠纷申诉成功',
+    industry: '财税服务',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '处理全部投诉退款+提供服务合同+说明B2B服务模式+完善退款政策后通过',
+    key_strategy: 'B2B服务类投诉多源于沟通误解，重点证明服务真实交付且已妥善处理所有投诉',
+    appeal_points: [
+      '逐一联系投诉客户，协商退款并取得谅解',
+      '提供每笔退款的微信转账凭证',
+      '引导客户在投诉页面确认"已解决"',
+      '提供5份以上服务合同（脱敏处理）证明业务真实',
+      '提交完善的退款政策：明确退款条件、时效、流程',
+      '说明已优化服务流程：新增服务前确认环节+进度跟踪系统'
+    ],
+    timeline: '处理投诉后提交，5个工作日通过'
+  },
+  {
+    id: 'builtin_22',
+    title: '医疗器械行业资金冻结(洗钱嫌疑)申诉成功',
+    industry: '医疗',
+    problem_type: '资金冻结',
+    violation_reason: '洗钱风险',
+    difficulty: 5,
+    success_summary: '提供医疗器械经营许可+全部交易合同发票+银行流水对账+法人声明后解冻',
+    key_strategy: '洗钱嫌疑需要每笔交易都有合同+发票+物流三方印证，医疗行业还需资质证明',
+    appeal_points: [
+      '提供《医疗器械经营许可证》和相关资质',
+      '每笔被标记交易提供：采购合同+增值税发票+物流签收单',
+      '导出银行流水与微信交易逐笔对账',
+      '提供法人亲笔签名的《资金合法声明书》',
+      '提交公司反洗钱内控制度文件',
+      '聘请律师出具法律意见书（加分项）'
+    ],
+    timeline: '提交后10个工作日审核通过，资金分批解冻共15天'
+  }
+]
+&nbsp;
+// 违规原因专业知识库（按违规原因分类）
+export const VIOLATION_KNOWLEDGE = <span class="cstat-no" title="statement not covered" >{</span>
+  '交易异常': {
+    aliases: ['交易异常', '异常交易', '交易波动', '交易量异常'],
+    severity: 3,
+    description: '微信风控系统检测到交易模式异常，如短时间内交易量激增、交易金额异常、交易时间异常等',
+    appeal_key_points: [
+      '用数据解释交易量变化的合理原因（促销、季节性、新店开业等）',
+      '提供3-5笔真实订单的完整交易链路证据',
+      '提供门店/仓库实景照片证明有真实经营场景',
+      '如有进货合同/发票，务必提供'
+    ],
+    required_materials: ['营业执照', '法人身份证', '门店照片', '交易凭证(3-5笔)', '业务模式说明'],
+    common_rejection_reasons: ['交易凭证不足', '无法证明交易真实性', '业务模式说明不清晰'],
+    success_key: '关键是让审核人员相信每笔交易都有真实的商品/服务交付',
+    estimated_success_rate: '首次申诉70-85%'
+  },
+  '交易纠纷': {
+    aliases: ['交易纠纷', '消费者投诉', '投诉率', '纠纷', '用户投诉'],
+    severity: 3,
+    description: '消费者投诉率超标或存在大量未处理的交易纠纷',
+    appeal_key_points: [
+      '先处理所有未解决的投诉（原路全额退款是最有效的方式）',
+      '引导消费者在微信投诉页面留言"已解决，撤销投诉"',
+      '提交完善的退款/售后政策文件',
+      '在整改说明中逐条列出每笔投诉的处理结果'
+    ],
+    required_materials: ['退款凭证', '消费者撤诉截图', '完善的退款政策', '投诉处理记录表', '整改措施说明'],
+    common_rejection_reasons: ['仍有未处理投诉', '退款凭证不完整', '消费者未确认撤诉'],
+    success_key: '必须100%处理完所有投诉，最好让消费者在投诉页面确认"已解决"',
+    estimated_success_rate: '投诉全部处理后80-90%'
+  },
+  '跨类目经营': {
+    aliases: ['跨类目', '类目不符', '经营范围不符', '超范围经营', '未开放类目', '无资质经营'],
+    severity: 3,
+    description: '实际经营内容与注册的商户类目不一致，或经营了微信未开放的类目',
+    appeal_key_points: [
+      '如果营业执照经营范围包含实际业务：提供执照证明',
+      '如果不包含：先去工商变更经营范围，再申诉',
+      '下架所有不符合注册类目的商品/服务',
+      '申请变更商户类目为实际经营类目'
+    ],
+    required_materials: ['最新营业执照', '已下架截图', '类目变更申请', '整改报告', '门店实景照片'],
+    common_rejection_reasons: ['仍有超出类目的商品在售', '营业执照经营范围不含', '未提供整改证据'],
+    success_key: '先整改再申诉，确保所有在售商品/服务都在注册类目范围内',
+    estimated_success_rate: '整改到位后75-85%'
+  },
+  '信用卡套现': {
+    aliases: ['套现', '信用卡套现', '信用卡', '大额交易'],
+    severity: 4,
+    description: '交易模式疑似信用卡套现：大额交易无对应商品、交易双方关联、交易后快速退款等',
+    appeal_key_points: [
+      '提供每笔大额交易对应的真实商品/服务交付证据',
+      '提供发货单、物流单号、签收记录的完整链路',
+      '解释大额交易的合理商业原因（批发、团购等）',
+      '提供进货合同和供应商发票证明货源真实'
+    ],
+    required_materials: ['完整交易链路(5笔以上)', '进货合同/发票', '物流发货记录', '客户沟通记录', '门店/仓库照片'],
+    common_rejection_reasons: ['交易链路不完整', '无法证明商品真实交付', '交易对手关联性存疑'],
+    success_key: '每笔被质疑的交易都需要有从下单到签收的完整证据链',
+    estimated_success_rate: '证据充分时60-75%'
+  },
+  '商户欺诈': {
+    aliases: ['欺诈', '诈骗', '虚假宣传', '假货', '售假'],
+    severity: 5,
+    description: '被判定为欺诈行为，如销售假冒伪劣商品、虚假宣传、收款不发货等',
+    appeal_key_points: [
+      '提供商品正品证明（品牌授权书、进货发票、质检报告）',
+      '提供真实发货记录和物流信息',
+      '如有虚假宣传嫌疑，提供已修改的宣传材料截图',
+      '处理所有消费者投诉并提供退款凭证'
+    ],
+    required_materials: ['品牌授权/进货证明', '质检报告', '发货物流记录', '退款处理凭证', '整改后宣传截图'],
+    common_rejection_reasons: ['无法提供正品证明', '仍有未处理投诉', '宣传内容仍有违规'],
+    success_key: '欺诈类最难申诉，必须有铁证证明商品为正品且已完全整改',
+    estimated_success_rate: '40-60%（难度最高）'
+  },
+  '赌博风险': {
+    aliases: ['赌博', '博彩', '棋牌', '彩票'],
+    severity: 5,
+    description: '交易模式疑似赌博或博彩类业务',
+    appeal_key_points: [
+      '如果确实不涉及赌博，提供完整的业务模式说明',
+      '提供产品/服务截图证明经营内容合法',
+      '如果是棋牌/游戏类，证明无真实货币兑换功能',
+      '提供软件著作权或游戏版号'
+    ],
+    required_materials: ['业务模式详细说明', '产品截图/演示', '软件著作权/版号', '营业执照', '法人声明书'],
+    common_rejection_reasons: ['业务模式说明不够详细', '产品功能疑似涉赌', '无法提供资质证明'],
+    success_key: '赌博类极难申诉，如确实不涉赌需要非常详细的业务证明',
+    estimated_success_rate: '30-50%（极难）'
+  },
+  '多级分销': {
+    aliases: ['分销', '多级分销', '传销', '返利', '拉人头'],
+    severity: 4,
+    description: '分销模式被判定为多级分销或类传销模式',
+    appeal_key_points: [
+      '证明分销模式为一级分佣，非多级（只有直接推荐人获得佣金）',
+      '证明无入门费、无囤货要求、可随时退出',
+      '提供分销系统后台截图和佣金结构说明',
+      '整改分销规则确保符合微信规范'
+    ],
+    required_materials: ['分销规则文档', '分销后台截图', '佣金结构说明', '整改报告', '营业执照'],
+    common_rejection_reasons: ['分销层级超过一级', '存在入门费机制', '佣金结构不透明'],
+    success_key: '微信只允许一级分销，必须证明分销层级不超过一层',
+    estimated_success_rate: '整改后65-80%'
+  },
+  '色情风险': {
+    aliases: ['色情', '涉黄', '低俗', '不雅'],
+    severity: 5,
+    description: '内容或交易涉嫌色情、低俗',
+    appeal_key_points: [
+      '如果是误判，提供产品/服务的完整展示截图',
+      '清理所有可能被误判的内容',
+      '提供业务模式说明证明经营内容合法',
+      '提交整改报告'
+    ],
+    required_materials: ['产品/内容截图', '已整改证据', '业务模式说明', '营业执照', '整改承诺书'],
+    common_rejection_reasons: ['仍有疑似违规内容', '整改不彻底', '业务模式说明不清'],
+    success_key: '必须彻底清理所有可能被误判的内容，提供清理前后对比截图',
+    estimated_success_rate: '30-50%（极难）'
+  },
+  '洗钱风险': {
+    aliases: ['洗钱', '反洗钱', '资金来源', '可疑交易', '大额可疑'],
+    severity: 5,
+    description: '交易模式被反洗钱系统标记，涉嫌利用商户号进行资金清洗',
+    appeal_key_points: [
+      '提供所有大额交易对应的真实合同和发票',
+      '证明资金流向清晰可追溯，每笔进出都有商业背景',
+      '提供公司银行流水与微信交易的对账报告',
+      '如涉及跨境业务，提供外汇许可和海关报关单',
+      '提供公司反洗钱内控制度文件'
+    ],
+    required_materials: ['商业合同', '银行流水对账', '发票/收据', '反洗钱内控制度', '法人声明书', '外汇许可（跨境）'],
+    common_rejection_reasons: ['资金流向不清晰', '交易缺乏商业背景', '无法提供合同/发票支撑'],
+    success_key: '每笔被标记交易都需要有合同+发票+物流/服务交付证明的三方印证',
+    estimated_success_rate: '35-55%（极难，需法律专业支持）'
+  },
+  '内容违规': {
+    aliases: ['内容违规', '违反法律法规', '违法内容', '敏感内容', '政治敏感', '侵权内容'],
+    severity: 4,
+    description: '发布的商品描述、宣传文案或页面内容违反相关法规或平台规则',
+    appeal_key_points: [
+      '立即下架/修改所有被标记的违规内容',
+      '提供修改前后的对比截图，证明已彻底整改',
+      '如是误判（如合规医疗器械被判为违禁品），提供相关资质证明',
+      '建立内容审核机制，提交内容管理制度文件',
+      '承诺后续所有上架内容经过合规审核'
+    ],
+    required_materials: ['违规内容整改截图', '整改报告', '内容审核制度', '相关资质证明（如有）', '法人承诺书'],
+    common_rejection_reasons: ['仍有违规内容未清理', '整改不彻底', '缺少相关经营资质'],
+    success_key: '先彻底整改再申诉，提供清理前后对比截图和内容管理制度',
+    estimated_success_rate: '55-75%（整改到位后较乐观）'
+  },
+  '虚假交易': {
+    aliases: ['虚假交易', '刷单', '虚假订单', '自买自卖', '虚构交易'],
+    severity: 4,
+    description: '交易被判定为虚假，如自买自卖、刷单刷量、无真实商品交付的空壳交易',
+    appeal_key_points: [
+      '提供被质疑交易的完整证据链：下单→付款→发货→物流→签收',
+      '证明买卖双方无关联关系（非同一人/同一公司/亲属）',
+      '提供物流实际配送记录和签收照片',
+      '如确实有刷单行为，承认并说明已停止、已处罚涉事人员',
+      '提供真实客户的评价和复购记录'
+    ],
+    required_materials: ['完整交易链路(5笔以上)', '物流签收记录', '客户沟通记录', '进货凭证', '商品实拍照', '整改报告'],
+    common_rejection_reasons: ['交易链路不完整', '买卖双方存在关联', '物流信息异常'],
+    success_key: '用无可辩驳的物流和签收证据证明交易真实存在',
+    estimated_success_rate: '50-70%（取决于证据完整度）'
+  },
+  '异地收款': {
+    aliases: ['异地收款', '异地交易', '收款地点异常', '地理位置异常'],
+    severity: 2,
+    description: '商户注册地与实际收款地不一致，触发地理位置风控',
+    appeal_key_points: [
+      '说明异地收款的合理原因（分支机构、外出展销、出差等）',
+      '提供异地经营的证明材料（分店执照、展会邀请函等）',
+      '如有多地经营，提供各地门店照片和员工证明',
+      '说明业务模式本身就需要多地收款（如物流、上门服务等）'
+    ],
+    required_materials: ['异地经营证明', '分店/分支机构证明', '业务模式说明', '门店照片（各地）'],
+    common_rejection_reasons: ['无法解释异地收款原因', '缺少异地经营证明'],
+    success_key: '合理解释异地收款的商业原因，提供辅助证明',
+    estimated_success_rate: '80-90%（通常容易解决）'
+  }
+}
+&nbsp;
+// 根据违规原因匹配知识
+export function <span class="fstat-no" title="function not covered" >matchViolation(</span>text) {
+<span class="cstat-no" title="statement not covered" >  if (!text) <span class="cstat-no" title="statement not covered" >return null</span></span>
+  const t = <span class="cstat-no" title="statement not covered" >text.toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  for (const [key, info] of Object.entries(VIOLATION_KNOWLEDGE)) {</span>
+<span class="cstat-no" title="statement not covered" >    if (info.aliases.some(<span class="fstat-no" title="function not covered" >a </span>=&gt; <span class="cstat-no" title="statement not covered" >t.includes(a))</span>) <span class="cstat-no" title="statement not covered" >return { key, ...info }</span></span>
+  }
+<span class="cstat-no" title="statement not covered" >  return null</span>
+}
+&nbsp;
+// 根据处罚类型和行业匹配最相关的内置案例
+export function <span class="fstat-no" title="function not covered" >matchBuiltInCases(</span>problemType, industry, violationReason) {
+  const pt = <span class="cstat-no" title="statement not covered" >(problemType || '').toLowerCase()</span>
+  const ind = <span class="cstat-no" title="statement not covered" >(industry || '').toLowerCase()</span>
+  const vr = <span class="cstat-no" title="statement not covered" >(violationReason || '').toLowerCase()</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return BUILT_IN_CASES</span>
+    .map(<span class="fstat-no" title="function not covered" >c </span>=&gt; {
+      let score = <span class="cstat-no" title="statement not covered" >0</span>
+      const cpt = <span class="cstat-no" title="statement not covered" >(c.problem_type || '').toLowerCase()</span>
+      const cind = <span class="cstat-no" title="statement not covered" >(c.industry || '').toLowerCase()</span>
+      const cvr = <span class="cstat-no" title="statement not covered" >(c.violation_reason || '').toLowerCase()</span>
+      // 处罚类型匹配权重最高
+<span class="cstat-no" title="statement not covered" >      if (pt &amp;&amp; cpt.includes(pt)) <span class="cstat-no" title="statement not covered" >score += 5</span></span>
+<span class="cstat-no" title="statement not covered" >      if (pt &amp;&amp; pt.includes(cpt)) <span class="cstat-no" title="statement not covered" >score += 3</span></span>
+      // 违规原因匹配
+<span class="cstat-no" title="statement not covered" >      if (vr &amp;&amp; cvr.includes(vr)) <span class="cstat-no" title="statement not covered" >score += 4</span></span>
+<span class="cstat-no" title="statement not covered" >      if (vr &amp;&amp; vr.includes(cvr)) <span class="cstat-no" title="statement not covered" >score += 2</span></span>
+      // 行业匹配
+<span class="cstat-no" title="statement not covered" >      if (ind &amp;&amp; cind.includes(ind)) <span class="cstat-no" title="statement not covered" >score += 2</span></span>
+<span class="cstat-no" title="statement not covered" >      if (ind &amp;&amp; ind.includes(cind)) <span class="cstat-no" title="statement not covered" >score += 1</span></span>
+<span class="cstat-no" title="statement not covered" >      return { ...c, _score: score }</span>
+    })
+    .filter(<span class="fstat-no" title="function not covered" >c </span>=&gt; <span class="cstat-no" title="statement not covered" >c._score &gt; 0)</span>
+    .sort(<span class="fstat-no" title="function not covered" >(a</span>, b) =&gt; <span class="cstat-no" title="statement not covered" >b._score - a._score)</span>
+    .slice(0, 3)
+}
+&nbsp;
+// 风险评分引擎：根据收集的数据评估申诉难度和成功率
+export function <span class="fstat-no" title="function not covered" >assessRisk(</span>collectedData) {
+  const d = <span class="cstat-no" title="statement not covered" >collectedData</span>
+  let riskScore = <span class="cstat-no" title="statement not covered" >50 </span>// 基准分50，越高越难
+  let factors = <span class="cstat-no" title="statement not covered" >[]</span>
+  let tips = <span class="cstat-no" title="statement not covered" >[]</span>
+&nbsp;
+  // 1. 处罚类型评估
+  const pt = <span class="cstat-no" title="statement not covered" >(d.problem_type || '').toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  if (pt.includes('封禁')) { <span class="cstat-no" title="statement not covered" >riskScore += 30; <span class="cstat-no" title="statement not covered" ></span>factors.push('商户号封禁是最严重的处罚') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (pt.includes('冻结')) { <span class="cstat-no" title="statement not covered" >riskScore += 20; <span class="cstat-no" title="statement not covered" ></span>factors.push('资金冻结案件难度较高') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (pt.includes('关闭')) { <span class="cstat-no" title="statement not covered" >riskScore += 15; <span class="cstat-no" title="statement not covered" ></span>factors.push('支付权限关闭需要充分的申诉材料') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (pt.includes('限额')) { <span class="cstat-no" title="statement not covered" >riskScore += 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('交易限额相对较容易申诉') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (pt.includes('拦截')) { <span class="cstat-no" title="statement not covered" >riskScore -= 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('交易拦截通常较容易解决') </span>}</span>
+&nbsp;
+  // 2. 违规原因评估
+  const vr = <span class="cstat-no" title="statement not covered" >(d.violation_reason || '').toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('赌博') || vr.includes('色情')) { <span class="cstat-no" title="statement not covered" >riskScore += 25; <span class="cstat-no" title="statement not covered" ></span>factors.push('涉赌/涉黄类违规申诉极难') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('洗钱') || vr.includes('反洗钱')) { <span class="cstat-no" title="statement not covered" >riskScore += 25; <span class="cstat-no" title="statement not covered" ></span>factors.push('涉嫌洗钱极难申诉，建议寻求法律支持') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('欺诈') || vr.includes('诈骗') || vr.includes('售假')) { <span class="cstat-no" title="statement not covered" >riskScore += 20; <span class="cstat-no" title="statement not covered" ></span>factors.push('欺诈类违规需要大量正品证明') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('虚假交易') || vr.includes('刷单')) { <span class="cstat-no" title="statement not covered" >riskScore += 18; <span class="cstat-no" title="statement not covered" ></span>factors.push('虚假交易需提供完整物流签收证据') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('套现')) { <span class="cstat-no" title="statement not covered" >riskScore += 15; <span class="cstat-no" title="statement not covered" ></span>factors.push('套现嫌疑需要完整交易链路证明') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('分销') || vr.includes('传销')) { <span class="cstat-no" title="statement not covered" >riskScore += 10; <span class="cstat-no" title="statement not covered" ></span>factors.push('分销模式需证明仅一级分佣') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('内容违规') || vr.includes('违反法律')) { <span class="cstat-no" title="statement not covered" >riskScore += 10; <span class="cstat-no" title="statement not covered" ></span>factors.push('内容违规需彻底整改后申诉') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('跨类目') || vr.includes('类目')) { <span class="cstat-no" title="statement not covered" >riskScore += 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('跨类目经营需整改后申诉') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('纠纷') || vr.includes('投诉')) { <span class="cstat-no" title="statement not covered" >riskScore += 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('交易纠纷需先处理所有投诉') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('异地') || vr.includes('地点异常')) { <span class="cstat-no" title="statement not covered" >riskScore -= 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('异地收款通常较容易解释') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (vr.includes('异常')) { <span class="cstat-no" title="statement not covered" >riskScore += 0; <span class="cstat-no" title="statement not covered" ></span>factors.push('交易异常是最常见的处罚原因') </span>}</span>
+&nbsp;
+  // 2.5 敏感行业评估（来自行业智能检测）
+<span class="cstat-no" title="statement not covered" >  if (d._sensitive_industry) {</span>
+    const sr = <span class="cstat-no" title="statement not covered" >d._sensitive_risk || ''</span>
+<span class="cstat-no" title="statement not covered" >    if (sr === '极高') { <span class="cstat-no" title="statement not covered" >riskScore += 25; <span class="cstat-no" title="statement not covered" ></span>factors.push(`行业属于「${d._sensitive_industry}」，风险极高`) </span>}</span>
+    else <span class="cstat-no" title="statement not covered" >if (sr === '高') { <span class="cstat-no" title="statement not covered" >riskScore += 15; <span class="cstat-no" title="statement not covered" ></span>factors.push(`行业属于「${d._sensitive_industry}」，风险较高`) </span>}</span>
+    else <span class="cstat-no" title="statement not covered" >if (sr === '中高') { <span class="cstat-no" title="statement not covered" >riskScore += 10; <span class="cstat-no" title="statement not covered" ></span>factors.push(`行业属于「${d._sensitive_industry}」，需注意合规`) </span>}</span>
+    else <span class="cstat-no" title="statement not covered" >if (sr === '中') { <span class="cstat-no" title="statement not covered" >riskScore += 5; <span class="cstat-no" title="statement not covered" ></span>factors.push(`行业属于「${d._sensitive_industry}」，建议准备资质证明`) </span>}</span>
+<span class="cstat-no" title="statement not covered" >    tips.push('敏感行业申诉需要更充分的合规证明和业务真实性证据')</span>
+  }
+&nbsp;
+  // 3. 投诉情况评估
+  const cs = <span class="cstat-no" title="statement not covered" >(d.complaint_status || '').toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  if (cs.includes('很多') || cs.includes('大量') || cs.includes('多')) { <span class="cstat-no" title="statement not covered" >riskScore += 10; <span class="cstat-no" title="statement not covered" ></span>factors.push('投诉较多会增加申诉难度'); <span class="cstat-no" title="statement not covered" ></span>tips.push('建议先处理完所有投诉再申诉') </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (cs.includes('没有') || cs.includes('无') || cs.includes('已处理')) { <span class="cstat-no" title="statement not covered" >riskScore -= 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('无投诉或已处理是好信号') </span>}</span>
+&nbsp;
+  // 4. 申诉历史评估
+  const ah = <span class="cstat-no" title="statement not covered" >(d.appeal_history || '').toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  if (ah.includes('驳回') || ah.includes('失败') || ah.includes('拒绝')) {</span>
+<span class="cstat-no" title="statement not covered" >    riskScore += 15; <span class="cstat-no" title="statement not covered" ></span>factors.push('有被驳回历史，需针对性改进')</span>
+<span class="cstat-no" title="statement not covered" >    tips.push('建议先打95017转3查询具体驳回原因')</span>
+<span class="cstat-no" title="statement not covered" >    tips.push('切勿盲目重复提交相同材料')</span>
+  } else <span class="cstat-no" title="statement not covered" >if (ah.includes('没有') || ah.includes('无') || ah.includes('第一次')) {</span>
+<span class="cstat-no" title="statement not covered" >    riskScore -= 5; <span class="cstat-no" title="statement not covered" ></span>factors.push('首次申诉，成功率相对较高')</span>
+  }
+&nbsp;
+  // 5. 资金冻结特殊评估
+<span class="cstat-no" title="statement not covered" >  if (pt.includes('冻结') || pt.includes('延迟结算')) {</span>
+<span class="cstat-no" title="statement not covered" >    if (d.bank_name &amp;&amp; d.bank_account_last4) {</span>
+<span class="cstat-no" title="statement not covered" >      riskScore -= 5; <span class="cstat-no" title="statement not covered" ></span>tips.push('已提供结算账户信息，有助于资金验证和催审')</span>
+    } else {
+<span class="cstat-no" title="statement not covered" >      tips.push('资金冻结案件建议提供结算账户信息，方便拨打95017催审')</span>
+    }
+  }
+&nbsp;
+  // 计算等级和成功率
+<span class="cstat-no" title="statement not covered" >  riskScore = Math.max(10, Math.min(95, riskScore))</span>
+  let level, successRate
+<span class="cstat-no" title="statement not covered" >  if (riskScore &lt;= 30) { <span class="cstat-no" title="statement not covered" >level = '低'; <span class="cstat-no" title="statement not covered" ></span>successRate = '80-95%' </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (riskScore &lt;= 50) { <span class="cstat-no" title="statement not covered" >level = '中'; <span class="cstat-no" title="statement not covered" ></span>successRate = '65-80%' </span>}</span>
+  else <span class="cstat-no" title="statement not covered" >if (riskScore &lt;= 70) { <span class="cstat-no" title="statement not covered" >level = '较高'; <span class="cstat-no" title="statement not covered" ></span>successRate = '45-65%' </span>}</span>
+  else { <span class="cstat-no" title="statement not covered" >level = '高'; <span class="cstat-no" title="statement not covered" ></span>successRate = '30-50%' </span>}
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return { riskScore, level, successRate, factors, tips }</span>
+}
+&nbsp;
+// 生成个性化材料清单
+export function <span class="fstat-no" title="function not covered" >generateMaterialChecklist(</span>collectedData) {
+  const d = <span class="cstat-no" title="statement not covered" >collectedData</span>
+  const pt = <span class="cstat-no" title="statement not covered" >(d.problem_type || '').toLowerCase()</span>
+  const vr = <span class="cstat-no" title="statement not covered" >(d.violation_reason || '').toLowerCase()</span>
+&nbsp;
+  let checklist = <span class="cstat-no" title="statement not covered" >[</span>
+    { item: '营业执照照片（清晰完整）', required: true, category: '证件信息' },
+    { item: '法人身份证正反面照片', required: true, category: '证件信息' },
+    { item: '法人手持身份证照片', required: true, category: '证件信息' },
+  ]
+&nbsp;
+  // 经营场景照片
+  const bm = <span class="cstat-no" title="statement not covered" >(d.business_model || '').toLowerCase()</span>
+<span class="cstat-no" title="statement not covered" >  if (bm.includes('线下') || bm.includes('门店') || bm.includes('实体')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '门店门头照片', required: true, category: '经营信息' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '门店内景照片（体现经营范围）', required: true, category: '经营信息' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '营业场景地点定位截图', required: false, category: '经营信息' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (bm.includes('线上') || bm.includes('小程序') || bm.includes('电商') || bm.includes('网')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '小程序/商城后台截图', required: true, category: '经营信息' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '商品列表页面截图', required: true, category: '经营信息' })</span>
+  }
+&nbsp;
+  // 交易凭证
+<span class="cstat-no" title="statement not covered" >  checklist.push({ item: '3-5笔微信支付订单号（4开头28位）', required: true, category: '交易凭证' })</span>
+<span class="cstat-no" title="statement not covered" >  checklist.push({ item: '订单对应的商品/服务凭证', required: true, category: '交易凭证' })</span>
+&nbsp;
+  // 根据违规原因添加特殊材料
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('纠纷') || vr.includes('投诉')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '所有投诉的退款凭证截图', required: true, category: '投诉处理' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '消费者撤诉/确认已解决的截图', required: true, category: '投诉处理' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '完善的退款售后政策文件', required: true, category: '投诉处理' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('跨类目') || vr.includes('类目')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '已下架不符商品/服务的截图', required: true, category: '整改证据' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '类目变更申请截图', required: false, category: '整改证据' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('套现') || vr.includes('异常')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '进货合同/供应商发票', required: true, category: '交易凭证' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '发货单+物流单号+签收记录', required: true, category: '交易凭证' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('欺诈') || vr.includes('售假')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '品牌授权书', required: true, category: '正品证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '产品质检报告', required: true, category: '正品证明' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('分销')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '分销规则文档', required: true, category: '业务证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '分销后台截图（显示仅一级）', required: true, category: '业务证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '佣金结构说明', required: true, category: '业务证明' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('洗钱') || vr.includes('反洗钱') || vr.includes('可疑交易')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '商业合同（与交易对应）', required: true, category: '资金证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '银行流水与微信交易对账报告', required: true, category: '资金证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '增值税发票/收据', required: true, category: '资金证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '反洗钱内控制度文件', required: false, category: '合规文件' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '法人声明书（声明资金合法）', required: true, category: '合规文件' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('内容违规') || vr.includes('违反法律') || vr.includes('敏感内容')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '违规内容整改前后对比截图', required: true, category: '整改证据' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '内容审核管理制度文件', required: true, category: '整改证据' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '相关经营资质证明（如有）', required: false, category: '资质证明' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('虚假交易') || vr.includes('刷单') || vr.includes('自买自卖')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '物流实际签收记录（含签收照片）', required: true, category: '交易凭证' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '客户真实沟通记录截图', required: true, category: '交易凭证' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '商品实拍照片（含包装和标签）', required: true, category: '交易凭证' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '客户评价/复购记录截图', required: false, category: '交易凭证' })</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (vr.includes('赌博') || vr.includes('棋牌')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '软件著作权登记证书', required: true, category: '资质证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '游戏用户协议（含禁止变现条款）', required: true, category: '业务证明' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '游戏内商城/交易系统截图（证明无变现功能）', required: true, category: '业务证明' })</span>
+  }
+&nbsp;
+  // 资金冻结特殊材料
+<span class="cstat-no" title="statement not covered" >  if (pt.includes('冻结') || pt.includes('延迟结算')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '结算账户开户信息', required: true, category: '账户信息' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '交易流水明细导出', required: true, category: '交易凭证' })</span>
+  }
+&nbsp;
+  // 商户号封禁特殊材料
+<span class="cstat-no" title="statement not covered" >  if (pt.includes('封禁')) {</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '法人手持身份证+营业执照合影（视频认证用）', required: true, category: '证件信息' })</span>
+<span class="cstat-no" title="statement not covered" >    checklist.push({ item: '近6个月银行流水', required: false, category: '交易凭证' })</span>
+  }
+&nbsp;
+  // 通用整改材料
+<span class="cstat-no" title="statement not covered" >  checklist.push({ item: '整改措施说明书', required: true, category: '整改文件' })</span>
+<span class="cstat-no" title="statement not covered" >  checklist.push({ item: '业务模式说明', required: true, category: '整改文件' })</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return checklist</span>
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-03-22T10:17:55.538Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

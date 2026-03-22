@@ -1,4 +1,35 @@
-import React, { useState } from 'react'
+import React, { useState, memo, useMemo } from 'react'
+
+const CopyButton = memo(function CopyButton({ text, label }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopied(true); setTimeout(() => setCopied(false), 2000)
+    }
+  }
+  return (
+    <button onClick={handleCopy}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all border ${
+        copied
+          ? 'bg-green-50 text-green-600 border-green-200'
+          : 'bg-white text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
+      }`}>
+      {copied ? (
+        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>已复制</>
+      ) : (
+        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>{label || '复制'}</>
+      )}
+    </button>
+  )
+})
 
 // 去除 emoji 符号 + 清理 ·• 等异常符号
 function stripEmoji(text) {
@@ -124,8 +155,11 @@ function parseMarkdown(text) {
   // 粗体（支持跨行）
   html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*\*/g, '')  // 清除残余未配对的 **
-  // 链接
-  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+  // 链接 - XSS 防护：验证 URL 协议
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, (match, text, url) => {
+    const safeUrl = /^(https?:\/\/|mailto:|tel:)/i.test(url) ? url : '#'
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
+  })
   // 无序列表（包括•·-*，允许前导空格）
   html = html.replace(/^[ \t]*[•·]\s*(.+)$/gm, '<li>$1</li>')
   html = html.replace(/^[ \t]*[-*]\s+(.+)$/gm, '<li>$1</li>')
@@ -158,44 +192,10 @@ function parseMarkdown(text) {
   return html
 }
 
-// 复制按钮组件
-function CopyButton({ text, label }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // 降级方案
-      const ta = document.createElement('textarea')
-      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy')
-      document.body.removeChild(ta)
-      setCopied(true); setTimeout(() => setCopied(false), 2000)
-    }
-  }
-  return (
-    <button onClick={handleCopy}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all border ${
-        copied
-          ? 'bg-green-50 text-green-600 border-green-200'
-          : 'bg-white text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
-      }`}>
-      {copied ? (
-        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>已复制</>
-      ) : (
-        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>{label || '复制'}</>
-      )}
-    </button>
-  )
-}
-
-// 一键整理并复制组件（每条 AI 消息底部显示）
-function CleanCopyBlock({ content }) {
+const CleanCopyBlock = memo(function CleanCopyBlock({ content }) {
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
-  const cleaned = cleanTextForCopy(content)
+  const cleaned = useMemo(() => cleanTextForCopy(content), [content])
 
   if (!cleaned || cleaned.length < 10) return null
 
@@ -240,12 +240,16 @@ function CleanCopyBlock({ content }) {
       )}
     </div>
   )
-}
+})
 
-// 报告消息渲染（带分段复制按钮）
-function ReportContent({ content }) {
-  const sections = extractReportSections(content)
+const ReportContent = memo(function ReportContent({ content }) {
+  const sections = useMemo(() => extractReportSections(content), [content])
   const hasReport = sections.length >= 2
+  const preContent = useMemo(() => {
+    if (!hasReport) return null
+    const firstSectionIdx = content.indexOf('###')
+    return firstSectionIdx > 0 ? content.slice(0, firstSectionIdx).trim() : ''
+  }, [content, hasReport])
 
   if (!hasReport) {
     return (
@@ -254,15 +258,10 @@ function ReportContent({ content }) {
     )
   }
 
-  // 报告前面可能有一些文字（在第一个 ### 之前的内容）
-  const firstSectionIdx = content.indexOf('###')
-  const preContent = firstSectionIdx > 0 ? content.slice(0, firstSectionIdx).trim() : ''
-
   return (
     <div className="message-content text-sm leading-relaxed">
       {preContent && <div dangerouslySetInnerHTML={{ __html: parseMarkdown(preContent) }} />}
 
-      {/* 一键复制全部 */}
       <div className="flex items-center gap-2.5 my-3 py-2.5 px-3 bg-gradient-to-r from-green-50/80 to-emerald-50/60 rounded-xl border border-green-100/60">
         <CopyButton text={stripMarkdown(content)} label="一键复制全部" />
         <span className="text-[10px] text-gray-400">纯文本 · 可直接粘贴到申诉表单</span>
@@ -280,10 +279,9 @@ function ReportContent({ content }) {
       ))}
     </div>
   )
-}
+})
 
-// 消息底部：延迟 + Token 用量显示
-function MessageMeta({ timing, tokenUsage }) {
+const MessageMeta = memo(function MessageMeta({ timing, tokenUsage }) {
   if (!timing && !tokenUsage) return null
   const hasTiming = timing && (timing.totalMs || timing.firstByteMs)
   const hasTokens = tokenUsage && (tokenUsage.inputTokens || tokenUsage.outputTokens)
@@ -308,13 +306,12 @@ function MessageMeta({ timing, tokenUsage }) {
       )}
     </div>
   )
-}
+})
 
-export default function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false }) {
+export default memo(function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false }) {
   const isUser = role === 'user'
   const isSystem = role === 'system'
 
-  // 系统消息（充值提醒等）居中显示
   if (isSystem) {
     return (
       <div className={`flex justify-center my-3 ${animate ? 'message-animate' : ''}`}>
@@ -326,7 +323,6 @@ export default function ChatMessage({ role, content, animate = false, timing, to
     )
   }
 
-  // 检测是否是包含报告段落的消息（AI 回复且有 ### 标题）
   const isReport = !isUser && content && (content.match(/^###\s+/gm) || []).length >= 2
 
   return (
@@ -406,4 +402,4 @@ export default function ChatMessage({ role, content, animate = false, timing, to
       )}
     </div>
   )
-}
+})

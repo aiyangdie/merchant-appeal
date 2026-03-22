@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import compression from 'compression'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
@@ -43,7 +44,7 @@ import {
   fixEncryptedData,
   saveComplaintDoc, getComplaintDoc,
 } from './db.js'
-import { getWelcomeMessage, chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction, getAIConfig } from './ai.js'
+import { chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction, getAIConfig } from './ai.js'
 import { buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep } from './localAI.js'
 import { calculateCost } from './tokenizer.js'
 import {
@@ -70,10 +71,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// 宝塔 Nginx 反向代理：信任代理头以获取真实 IP
 app.set('trust proxy', 1)
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me'
-if (!process.env.JWT_SECRET) console.warn('\n⚠️  安全警告：未设置 JWT_SECRET 环境变量，正在使用不安全的默认密钥！\n   请在 .env 中设置 JWT_SECRET=<随机长字符串>\n')
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  console.error('\n❌ FATAL: JWT_SECRET environment variable is required. Server cannot start securely.\n   Please set JWT_SECRET=<random-long-string> in .env file\n')
+  process.exit(1)
+}
 const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '24h'
 
 // ========== 安全中间件 ==========
@@ -150,6 +153,16 @@ app.use('/api/payment/codepay/notify', express.urlencoded({ extended: true }))
 
 app.use(express.json({ limit: '1mb' }))
 
+// 响应压缩中间件
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false
+    return compression.filter(req, res)
+  },
+  threshold: 1024,
+  level: 6,
+}))
+
 // API 响应时间监控中间件
 app.use(apiMetricsMiddleware)
 
@@ -206,14 +219,171 @@ function optionalUser(req, res, next) {
   next()
 }
 
+// ========== 订单系统对接 API ==========
+
+const ORDER_SYSTEM_URL = process.env.ORDER_SYSTEM_URL
+if (!ORDER_SYSTEM_URL) {
+  console.error('\n❌ FATAL: ORDER_SYSTEM_URL environment variable is required.\n   Please set ORDER_SYSTEM_URL in .env file\n')
+  process.exit(1)
+}
+
+const APPEAL_API_KEY = process.env.APPEAL_API_KEY
+if (!APPEAL_API_KEY) {
+  console.error('\n❌ FATAL: APPEAL_API_KEY environment variable is required for external API calls.\n   Please set APPEAL_API_KEY in .env file\n')
+  process.exit(1)
+}
+
+// 从订单系统获取订单列表
+app.get('/api/orders/from-system', requireUser, async (req, res) => {
+  try {
+    const { page = 1, page_size = 20, status } = req.query
+    const url = `${ORDER_SYSTEM_URL}/api/external/orders?page=${page}&page_size=${page_size}${status ? `&status=${status}` : ''}`
+    
+    const response = await fetch(url, {
+      headers: {
+        'X-Api-Key': APPEAL_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      return res.status(response.status).json({ error: error.message || '获取订单失败' })
+    }
+    
+    const result = await response.json()
+    res.json(result)
+  } catch (error) {
+    console.error('获取订单失败:', error)
+    res.status(500).json({ error: '连接订单系统失败，请稍后重试' })
+  }
+})
+
+// 从订单系统获取单个订单详情
+app.get('/api/orders/from-system/:orderNo', requireUser, async (req, res) => {
+  try {
+    const { orderNo } = req.params
+    const url = `${ORDER_SYSTEM_URL}/api/external/order/${orderNo}`
+    
+    const response = await fetch(url, {
+      headers: {
+        'X-Api-Key': APPEAL_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      return res.status(response.status).json({ error: error.message || '获取订单详情失败' })
+    }
+    
+    const result = await response.json()
+    res.json(result)
+  } catch (error) {
+    console.error('获取订单详情失败:', error)
+    res.status(500).json({ error: '连接订单系统失败，请稍后重试' })
+  }
+})
+
+// 创建新会话（支持直接绑定订单）
+app.post('/api/sessions', optionalUser, async (req, res) => {
+  try {
+    const sessionId = uuidv4()
+    // 优先使用token中的userId，否则使用body中的userId
+    const userId = req.userId || req.body.userId || null
+    const { orderNo, orderData } = req.body
+    
+    console.log(`[创建会话] sessionId=${sessionId}, userId=${userId}`)
+    
+    await createSession(sessionId, userId, orderNo || null, orderData || null)
+    res.json({ sessionId, orderNo, orderData })
+  } catch (error) {
+    console.error('创建会话失败:', error)
+    res.status(500).json({ error: '创建会话失败' })
+  }
+})
+
+// 绑定订单到当前会话
+app.post('/api/sessions/:id/bind-order', requireUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { order_no, order_data } = req.body
+    
+    console.log(`[绑定订单] 会话 ${id}, 订单号: ${order_no}, 订单数据: ${order_data ? '有' : '无'}`)
+    
+    // 验证会话存在且属于当前用户
+    const session = await getSession(id)
+    if (!session) {
+      console.log(`[绑定订单] 会话 ${id} 不存在`)
+      return res.status(404).json({ error: '会话不存在' })
+    }
+    
+    // 更新会话的订单绑定信息
+    await updateSessionOrder(id, order_no, order_data)
+    console.log(`[绑定订单] 成功: 会话 ${id} 绑定订单 ${order_no}`)
+    
+    res.json({ success: true, message: '订单绑定成功', order_no, order_data })
+  } catch (error) {
+    console.error('绑定订单失败:', error)
+    res.status(500).json({ error: '绑定订单失败' })
+  }
+})
+
+// 获取会话绑定的订单信息
+app.get('/api/sessions/:id/order', requireUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    const session = await getSession(id)
+    if (!session) {
+      return res.status(404).json({ error: '会话不存在' })
+    }
+    
+    if (!session.order_no) {
+      return res.json({ success: true, data: null, message: '该会话未绑定订单' })
+    }
+    
+    // 如果有缓存的订单数据直接返回，否则从订单系统获取
+    if (session.order_data) {
+      return res.json({ success: true, data: session.order_data, cached: true })
+    }
+    
+    // 从订单系统获取最新订单数据
+    const url = `${ORDER_SYSTEM_URL}/api/external/order/${session.order_no}`
+    const response = await fetch(url, {
+      headers: {
+        'X-Api-Key': APPEAL_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: '获取订单详情失败' })
+    }
+    
+    const result = await response.json()
+    if (result.success && result.data) {
+      // 更新缓存
+      await updateSessionOrder(id, session.order_no, result.data)
+      return res.json({ success: true, data: result.data, cached: false })
+    }
+    
+    res.json({ success: true, data: null })
+  } catch (error) {
+    console.error('获取会话订单失败:', error)
+    res.status(500).json({ error: '获取订单信息失败' })
+  }
+})
+
 // ========== 用户 API ==========
 
 app.post('/api/user/register', authLimiter, async (req, res) => {
   try {
-    const { phone, nickname } = req.body
+    const { phone, nickname, name } = req.body
+    const userName = nickname || name  // 兼容前端发送的 name 或 nickname
     if (!phone || phone.trim().length < 2 || phone.trim().length > 20) return res.status(400).json({ error: '请输入有效的手机号' })
-    if (!nickname || !isChinese(nickname.trim()) || nickname.trim().length > 20) return res.status(400).json({ error: '名称必须为中文（不超过20字）' })
-    const result = await registerUser(phone.trim(), nickname.trim())
+    if (!userName || !isChinese(userName.trim()) || userName.trim().length > 20) return res.status(400).json({ error: '名称必须为中文（不超过20字）' })
+    const result = await registerUser(phone.trim(), userName.trim())
     const u = result.user
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || ''
     if (result.isNew) {
@@ -1154,8 +1324,53 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
     }
 
     // 新会话：保存欢迎消息到数据库（刷新后能恢复完整历史）
+    // 注意：需要先获取会话和订单信息
+    const session = await getSession(sessionId)
+    const currentStep = session?.step || 0
+    const collectedData = session?.collected_data || {}
+
+    // 获取绑定的订单信息
+    let orderInfo = null
+    const hasValidOrderData = session?.order_data && typeof session.order_data === 'object' && Object.keys(session.order_data).length > 0 && session.order_data.order_no
+    console.log(`[订单上下文] 会话 ${sessionId}, order_no: ${session?.order_no}, hasValidOrderData: ${hasValidOrderData}`)
+    if (hasValidOrderData) {
+      orderInfo = session.order_data
+      console.log(`[订单上下文] 使用缓存订单: ${orderInfo.order_no}`)
+    } else if (session?.order_no) {
+      console.log(`[订单上下文] 从订单系统获取: ${session.order_no}`)
+      try {
+        const orderRes = await fetch(`${ORDER_SYSTEM_URL}/api/external/order/${session.order_no}`, {
+          headers: { 'X-Api-Key': APPEAL_API_KEY }
+        })
+        if (orderRes.ok) {
+          const orderResult = await orderRes.json()
+          if (orderResult.success && orderResult.data) {
+            orderInfo = orderResult.data
+            console.log(`[订单上下文] 获取成功: ${orderInfo.order_no}`)
+          }
+        }
+      } catch (e) {
+        console.error('获取订单信息失败:', e)
+      }
+    }
+
+    // 发送欢迎消息
     if (isNew) {
-      await addMessage(sessionId, 'assistant', LOCAL_WELCOME)
+      if (orderInfo) {
+        const orderWelcome = `您好！我注意到您已绑定了订单信息：
+
+【当前订单】
+• 订单号: ${orderInfo.order_no}
+• 买家: ${orderInfo.buyer_nick || orderInfo.customer_name || '未知'}
+• 商品: ${orderInfo.goods?.title || orderInfo.product_name || '未知'}
+• 金额: ¥${orderInfo.pay_amount_fen ? (orderInfo.pay_amount_fen / 100).toFixed(2) : orderInfo.pay_amount}
+• 状态: ${orderInfo.status || '未知'}
+
+请问您这个订单遇到了什么问题？我可以帮您分析申诉方案。`
+        await addMessage(sessionId, 'assistant', orderWelcome)
+      } else {
+        await addMessage(sessionId, 'assistant', LOCAL_WELCOME)
+      }
     }
 
     await addMessage(sessionId, 'user', content)
@@ -1163,11 +1378,6 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
       await incrementUserMessages(user.id)
       await updateUserActivity(user.id)
     }
-
-    // 获取会话状态
-    const session = await getSession(sessionId)
-    const currentStep = session?.step || 0
-    const collectedData = session?.collected_data || {}
 
     // 检查付费能力（AI报告阶段需要）
     let apiKeyToUse = null
@@ -1217,7 +1427,7 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
           // 构建收集上下文
           const filledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
           const filledCount = filledFields.length
-          const collectionCtx = buildCollectionContext(updatedData, currentStep)
+          const collectionCtx = buildCollectionContext(updatedData, currentStep, orderInfo)
           const dynamicFields = updatedData._dynamic_fields || []
           const unfilled = dynamicFields.filter(df => !updatedData[df.key] || !String(updatedData[df.key]).trim()).map(df => `${df.label}: ${df.question || df.hint || ''}`).join('\n')
           const dynamicNote = unfilled ? `\n\n[行业专属信息待收集]\n${unfilled}` : ''
@@ -1406,7 +1616,7 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
         try {
           if (isRetryReport) {
             const similarCases = await findSimilarCases(collectedData.industry, collectedData.problem_type, 3)
-            const reportPrompt = buildReportPrompt(collectedData, similarCases)
+            const reportPrompt = buildReportPrompt(collectedData, similarCases, orderInfo)
             const reportMessages = [{ role: 'user', content: reportPrompt }]
             const streamResult = await streamChatWithAI(reportMessages, apiKeyToUse)
             const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'report_retry' })
@@ -1991,9 +2201,9 @@ app.get('/api/sessions/:id/complaint-doc', optionalUser, async (req, res) => {
 
 app.post('/api/sessions/:id/generate-complaint-reply', requireUser, async (req, res) => {
   try {
-    const session = await getSessionById(req.params.id)
+    const session = await getSession(req.params.id)
     if (!session) return res.status(404).json({ error: '会话不存在' })
-    const d = typeof session.collected_info === 'string' ? JSON.parse(session.collected_info || '{}') : (session.collected_info || {})
+    const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
     const { complaint_type, complaint_content } = req.body || {}
 
     const industry = d.industry || '通用'
@@ -2079,9 +2289,9 @@ app.post('/api/sessions/:id/generate-complaint-reply', requireUser, async (req, 
 
 app.get('/api/sessions/:id/appeal-guide', requireUser, async (req, res) => {
   try {
-    const session = await getSessionById(req.params.id)
+    const session = await getSession(req.params.id)
     if (!session) return res.status(404).json({ error: '会话不存在' })
-    const d = typeof session.collected_info === 'string' ? JSON.parse(session.collected_info || '{}') : (session.collected_info || {})
+    const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
 
     const violationReason = d.violation_reason || ''
     const problemType = d.problem_type || ''
@@ -2365,7 +2575,7 @@ app.put('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
 app.post('/api/sessions/:id/resubmit-strategy', requireUser, async (req, res) => {
   try {
     const sessionId = req.params.id
-    const session = await getSessionById(sessionId)
+    const session = await getSession(sessionId)
     if (!session) return res.status(404).json({ error: '会话不存在' })
     const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
 
@@ -4480,7 +4690,7 @@ process.on('uncaughtException', (err) => {
 async function start() {
   try {
     await initDatabase()
-    const server = app.listen(PORT, () => console.log(`🚀 服务器已启动: http://localhost:${PORT}`))
+    const server = app.listen(PORT, '0.0.0.0', () => console.log(`🚀 服务器已启动: http://0.0.0.0:${PORT}`))
 
     // 启动 AI 自进化引擎
     startEvolutionScheduler()

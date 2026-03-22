@@ -1,0 +1,817 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/modelHealth.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">server</a> modelHealth.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/135</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/67</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/19</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/118</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// ========== AI 模型健康检测 + 自动切换引擎 ==========
+&nbsp;
+import { getAIModels, getActiveAIModel, getHealthyFreeModels, getFallbackModels, updateModelHealth, setActiveAIModel } from './db.js'
+&nbsp;
+// 单个模型健康检测（发送最小请求验证可用性）
+async function <span class="fstat-no" title="function not covered" >checkModelHealth(</span>model) {
+  const start = <span class="cstat-no" title="statement not covered" >Date.now()</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    if (!model.api_key) {</span>
+<span class="cstat-no" title="statement not covered" >      return { status: 'no_key', error: '未配置 API Key', responseMs: null }</span>
+    }
+&nbsp;
+    const controller = <span class="cstat-no" title="statement not covered" >new AbortController()</span>
+    const timeout = <span class="cstat-no" title="statement not covered" >setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >controller.abort(),</span> 15000) </span>// 15s超时
+&nbsp;
+    const res = <span class="cstat-no" title="statement not covered" >await fetch(model.endpoint, {</span>
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${model.api_key}`,
+      },
+      body: JSON.stringify({
+        model: model.model_name,
+        messages: [{ role: 'user', content: '你好' }],
+        max_tokens: 5,
+        temperature: 0,
+      }),
+      signal: controller.signal,
+    })
+<span class="cstat-no" title="statement not covered" >    clearTimeout(timeout)</span>
+&nbsp;
+    const responseMs = <span class="cstat-no" title="statement not covered" >Date.now() - start</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (res.ok) {</span>
+<span class="cstat-no" title="statement not covered" >      return { status: 'healthy', error: null, responseMs }</span>
+    }
+&nbsp;
+    // 解析错误
+    let errMsg = <span class="cstat-no" title="statement not covered" >`HTTP ${res.status}`</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const body = <span class="cstat-no" title="statement not covered" >await res.json()</span>
+<span class="cstat-no" title="statement not covered" >      errMsg = body.error?.message || body.error?.code || JSON.stringify(body.error || body).substring(0, 200)</span>
+    } catch {}
+&nbsp;
+    // 区分可恢复和不可恢复错误
+<span class="cstat-no" title="statement not covered" >    if (res.status === 429) <span class="cstat-no" title="statement not covered" >return { status: 'rate_limited', error: `限流: ${errMsg}`, responseMs }</span></span>
+<span class="cstat-no" title="statement not covered" >    if (res.status === 401 || res.status === 403) <span class="cstat-no" title="statement not covered" >return { status: 'auth_failed', error: `认证失败: ${errMsg}`, responseMs: null }</span></span>
+<span class="cstat-no" title="statement not covered" >    if (res.status === 402) <span class="cstat-no" title="statement not covered" >return { status: 'balance_empty', error: `余额不足: ${errMsg}`, responseMs: null }</span></span>
+<span class="cstat-no" title="statement not covered" >    return { status: 'error', error: errMsg, responseMs: null }</span>
+  } catch (err) {
+    const responseMs = <span class="cstat-no" title="statement not covered" >Date.now() - start</span>
+<span class="cstat-no" title="statement not covered" >    if (err.name === 'AbortError') <span class="cstat-no" title="statement not covered" >return { status: 'timeout', error: '连接超时(15s)', responseMs }</span></span>
+<span class="cstat-no" title="statement not covered" >    return { status: 'error', error: err.message?.substring(0, 200) || '未知错误', responseMs: null }</span>
+  }
+}
+&nbsp;
+// 批量检测所有启用的模型
+export async function <span class="fstat-no" title="function not covered" >checkAllModels(</span>) {
+  const models = <span class="cstat-no" title="statement not covered" >await getAIModels()</span>
+  const enabled = <span class="cstat-no" title="statement not covered" >models.filter(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.is_enabled)</span></span>
+  const results = <span class="cstat-no" title="statement not covered" >[]</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  for (const model of enabled) {</span>
+<span class="cstat-no" title="statement not covered" >    if (!model.api_key) {</span>
+<span class="cstat-no" title="statement not covered" >      await updateModelHealth(model.id, { status: 'no_key', error: '未配置 API Key' })</span>
+<span class="cstat-no" title="statement not covered" >      results.push({ id: model.id, name: model.display_name, status: 'no_key' })</span>
+<span class="cstat-no" title="statement not covered" >      continue</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    console.log(`[健康检测] 检测 ${model.display_name}...`)</span>
+    const result = <span class="cstat-no" title="statement not covered" >await checkModelHealth(model)</span>
+<span class="cstat-no" title="statement not covered" >    await updateModelHealth(model.id, result)</span>
+<span class="cstat-no" title="statement not covered" >    results.push({ id: model.id, name: model.display_name, ...result })</span>
+<span class="cstat-no" title="statement not covered" >    console.log(`[健康检测] ${model.display_name}: ${result.status}${result.responseMs ? ` (${result.responseMs}ms)` : ''}${result.error ? ` - ${result.error}` : ''}`)</span>
+&nbsp;
+    // 避免触发限流，间隔500ms
+<span class="cstat-no" title="statement not covered" >    await new Promise(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >setTimeout(r, 500))</span></span>
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return results</span>
+}
+&nbsp;
+// 检测单个模型并更新状态
+export async function <span class="fstat-no" title="function not covered" >checkSingleModel(</span>modelId) {
+  const models = <span class="cstat-no" title="statement not covered" >await getAIModels()</span>
+  const model = <span class="cstat-no" title="statement not covered" >models.find(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.id === modelId)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (!model) <span class="cstat-no" title="statement not covered" >return { error: '模型不存在' }</span></span>
+  
+  const result = <span class="cstat-no" title="statement not covered" >await checkModelHealth(model)</span>
+<span class="cstat-no" title="statement not covered" >  await updateModelHealth(model.id, result)</span>
+<span class="cstat-no" title="statement not covered" >  return { id: model.id, name: model.display_name, ...result }</span>
+}
+&nbsp;
+// ========== 核心：智能自动切换 ==========
+&nbsp;
+/**
+ * 当当前活跃模型不可用时，自动切换到下一个可用的免费模型
+ * 优先级：健康的免费模型 &gt; 限流的免费模型(可能短暂恢复) &gt; 付费模型
+ * 自定义Key用户不走这个逻辑（用户自己的Key直接用）
+ */
+export async function <span class="fstat-no" title="function not covered" >autoSwitchIfNeeded(</span>) {
+  const active = <span class="cstat-no" title="statement not covered" >await getActiveAIModel()</span>
+<span class="cstat-no" title="statement not covered" >  if (!active) {</span>
+<span class="cstat-no" title="statement not covered" >    console.log('[自动切换] 无活跃模型，尝试找一个可用的...')</span>
+<span class="cstat-no" title="statement not covered" >    return await findAndActivateBestModel()</span>
+  }
+&nbsp;
+  // 当前模型健康，无需切换
+<span class="cstat-no" title="statement not covered" >  if (active.health_status === 'healthy' || active.health_status === 'unknown') {</span>
+<span class="cstat-no" title="statement not covered" >    return null</span>
+  }
+&nbsp;
+  // 当前模型不健康，连续失败&gt;=2次才切换（避免偶发抖动）
+<span class="cstat-no" title="statement not covered" >  if (active.consecutive_fails &lt; 2) {</span>
+<span class="cstat-no" title="statement not covered" >    return null</span>
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  console.log(`[自动切换] 当前模型 ${active.display_name} 状态: ${active.health_status}(连续失败${active.consecutive_fails}次)，尝试切换...`)</span>
+<span class="cstat-no" title="statement not covered" >  return await findAndActivateBestModel(active.id)</span>
+}
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >findAndActivateBestModel(</span>excludeId) {
+  // 优先找免费且健康的
+  const freeModels = <span class="cstat-no" title="statement not covered" >await getHealthyFreeModels()</span>
+  const healthyFree = <span class="cstat-no" title="statement not covered" >freeModels.filter(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.health_status === 'healthy' &amp;&amp; m.id !== excludeId)</span></span>
+  
+<span class="cstat-no" title="statement not covered" >  if (healthyFree.length &gt; 0) {</span>
+    const best = <span class="cstat-no" title="statement not covered" >healthyFree[0]</span>
+<span class="cstat-no" title="statement not covered" >    await setActiveAIModel(best.id)</span>
+<span class="cstat-no" title="statement not covered" >    console.log(`[自动切换] ✅ 已切换到免费模型: ${best.display_name}`)</span>
+<span class="cstat-no" title="statement not covered" >    return { switched: true, model: best.display_name, reason: '免费且健康' }</span>
+  }
+&nbsp;
+  // 其次找免费但状态未知的（可能还没检测过）
+  const unknownFree = <span class="cstat-no" title="statement not covered" >freeModels.filter(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.health_status === 'unknown' &amp;&amp; m.id !== excludeId)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (unknownFree.length &gt; 0) {</span>
+    // 先检测一下
+<span class="cstat-no" title="statement not covered" >    for (const model of unknownFree) {</span>
+      const result = <span class="cstat-no" title="statement not covered" >await checkModelHealth(model)</span>
+<span class="cstat-no" title="statement not covered" >      await updateModelHealth(model.id, result)</span>
+<span class="cstat-no" title="statement not covered" >      if (result.status === 'healthy') {</span>
+<span class="cstat-no" title="statement not covered" >        await setActiveAIModel(model.id)</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[自动切换] ✅ 检测并切换到免费模型: ${model.display_name}`)</span>
+<span class="cstat-no" title="statement not covered" >        return { switched: true, model: model.display_name, reason: '免费，刚检测可用' }</span>
+      }
+    }
+  }
+&nbsp;
+  // 最后找付费但有Key且健康的（fallback）
+  const fallbacks = <span class="cstat-no" title="statement not covered" >await getFallbackModels(excludeId)</span>
+  const healthyPaid = <span class="cstat-no" title="statement not covered" >fallbacks.filter(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.health_status === 'healthy' &amp;&amp; !m.is_free)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (healthyPaid.length &gt; 0) {</span>
+    const best = <span class="cstat-no" title="statement not covered" >healthyPaid[0]</span>
+<span class="cstat-no" title="statement not covered" >    await setActiveAIModel(best.id)</span>
+<span class="cstat-no" title="statement not covered" >    console.log(`[自动切换] ⚠️ 已切换到付费模型: ${best.display_name}（所有免费模型不可用）`)</span>
+<span class="cstat-no" title="statement not covered" >    return { switched: true, model: best.display_name, reason: '免费模型均不可用，切换付费' }</span>
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  console.log('[自动切换] ❌ 没有可用的备选模型')</span>
+<span class="cstat-no" title="statement not covered" >  return { switched: false, reason: '没有可用的备选模型' }</span>
+}
+&nbsp;
+// ========== AI调用失败时的实时fallback ==========
+&nbsp;
+/**
+ * 带自动fallback的AI调用包装器
+ * 如果当前模型调用失败，自动标记故障+切换到备选模型+重试
+ */
+export async function <span class="fstat-no" title="function not covered" >callWithFallback(</span>callFn, customApiKey = <span class="branch-0 cbranch-no" title="branch not covered" >null)</span> {
+  // 自定义Key用户直接调用，不走fallback
+<span class="cstat-no" title="statement not covered" >  if (customApiKey) {</span>
+<span class="cstat-no" title="statement not covered" >    return await callFn(customApiKey)</span>
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const result = <span class="cstat-no" title="statement not covered" >await callFn(null)</span>
+    // 调用成功，标记当前模型为健康
+    const active = <span class="cstat-no" title="statement not covered" >await getActiveAIModel()</span>
+<span class="cstat-no" title="statement not covered" >    if (active &amp;&amp; active.health_status !== 'healthy') {</span>
+<span class="cstat-no" title="statement not covered" >      await updateModelHealth(active.id, { status: 'healthy', responseMs: null })</span>
+    }
+<span class="cstat-no" title="statement not covered" >    return result</span>
+  } catch (err) {
+    // 调用失败，标记故障
+    const active = <span class="cstat-no" title="statement not covered" >await getActiveAIModel()</span>
+<span class="cstat-no" title="statement not covered" >    if (active) {</span>
+<span class="cstat-no" title="statement not covered" >      await updateModelHealth(active.id, { status: 'error', error: err.message })</span>
+    }
+&nbsp;
+    // 尝试自动切换
+    const switchResult = <span class="cstat-no" title="statement not covered" >await autoSwitchIfNeeded()</span>
+<span class="cstat-no" title="statement not covered" >    if (switchResult?.switched) {</span>
+      // 用新模型重试一次
+<span class="cstat-no" title="statement not covered" >      try {</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[Fallback] 使用新模型 ${switchResult.model} 重试...`)</span>
+<span class="cstat-no" title="statement not covered" >        return await callFn(null)</span>
+      } catch (retryErr) {
+<span class="cstat-no" title="statement not covered" >        console.error(`[Fallback] 重试也失败:`, retryErr.message)</span>
+<span class="cstat-no" title="statement not covered" >        throw retryErr</span>
+      }
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    throw err</span>
+  }
+}
+&nbsp;
+// ========== 定时健康巡检 ==========
+&nbsp;
+let healthCheckInterval = <span class="cstat-no" title="statement not covered" >null</span>
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >startHealthScheduler(</span>intervalMinutes = <span class="branch-0 cbranch-no" title="branch not covered" >30)</span> {
+<span class="cstat-no" title="statement not covered" >  if (healthCheckInterval) <span class="cstat-no" title="statement not covered" >clearInterval(healthCheckInterval)</span></span>
+  
+  const ms = <span class="cstat-no" title="statement not covered" >intervalMinutes * 60 * 1000</span>
+<span class="cstat-no" title="statement not covered" >  console.log(`[健康巡检] 每 ${intervalMinutes} 分钟自动检测所有模型`)</span>
+&nbsp;
+  // 启动后延迟30秒执行首次检测
+<span class="cstat-no" title="statement not covered" >  setTimeout(<span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      console.log('[健康巡检] 首次检测开始...')</span>
+      const results = <span class="cstat-no" title="statement not covered" >await checkAllModels()</span>
+      const healthy = <span class="cstat-no" title="statement not covered" >results.filter(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.status === 'healthy')</span>.length</span>
+<span class="cstat-no" title="statement not covered" >      console.log(`[健康巡检] 首次检测完成: ${healthy}/${results.length} 个模型健康`)</span>
+      
+      // 首次检测后尝试自动切换
+<span class="cstat-no" title="statement not covered" >      await autoSwitchIfNeeded()</span>
+    } catch (e) { <span class="cstat-no" title="statement not covered" >console.error('[健康巡检] 首次检测失败:', e.message) </span>}
+  }, 30000)
+&nbsp;
+  // 定时检测
+<span class="cstat-no" title="statement not covered" >  healthCheckInterval = setInterval(<span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      console.log('[健康巡检] 定时检测开始...')</span>
+      const results = <span class="cstat-no" title="statement not covered" >await checkAllModels()</span>
+      const healthy = <span class="cstat-no" title="statement not covered" >results.filter(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.status === 'healthy')</span>.length</span>
+<span class="cstat-no" title="statement not covered" >      console.log(`[健康巡检] 定时检测完成: ${healthy}/${results.length} 个模型健康`)</span>
+<span class="cstat-no" title="statement not covered" >      await autoSwitchIfNeeded()</span>
+    } catch (e) { <span class="cstat-no" title="statement not covered" >console.error('[健康巡检] 定时检测失败:', e.message) </span>}
+  }, ms)
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >stopHealthScheduler(</span>) {
+<span class="cstat-no" title="statement not covered" >  if (healthCheckInterval) { <span class="cstat-no" title="statement not covered" >clearInterval(healthCheckInterval); <span class="cstat-no" title="statement not covered" ></span>healthCheckInterval = null </span>}</span>
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-03-22T10:17:55.697Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

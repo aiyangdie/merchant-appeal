@@ -28,6 +28,7 @@ async function getAIConfig(customApiKey = null) {
   const FALLBACK = {
     deepseek: { key: 'deepseek_api_key', model: 'deepseek_model', defaultModel: 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' },
     zhipu:    { key: 'zhipu_api_key',    model: 'zhipu_model',    defaultModel: 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' },
+    siliconflow: { key: 'siliconflow_api_key', model: 'siliconflow_model', defaultModel: 'deepseek-ai/DeepSeek-V3', endpoint: 'https://api.siliconflow.cn/v1/chat/completions' },
   }
   const fb = FALLBACK[provider] || FALLBACK.deepseek
   return {
