@@ -65,8 +65,18 @@ jobs:
         name: dist
         path: dist/
 
+    - name: Check deploy configuration
+      id: check_deploy
+      run: |
+        if [ -n "${{ secrets.DEPLOY_HOST }}" ]; then
+          echo "configured=true" >> $GITHUB_OUTPUT
+        else
+          echo "configured=false" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+
     - name: Deploy to server
-      if: ${{ secrets.DEPLOY_HOST != '' }}
+      if: steps.check_deploy.outputs.configured == 'true'
       uses: appleboy/ssh-action@v1
       with:
         host: ${{ secrets.DEPLOY_HOST }}
@@ -88,5 +98,5 @@ jobs:
         NODE_ENV: production
 
     - name: Skip deploy (no server configured)
-      if: ${{ secrets.DEPLOY_HOST == '' }}
+      if: steps.check_deploy.outputs.configured != 'true'
       run: echo "Deployment skipped - DEPLOY_HOST secret not configured. Build artifacts are available for manual deployment."
