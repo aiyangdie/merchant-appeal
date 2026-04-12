@@ -1,0 +1,384 @@
+[
+  {
+    "name": "餐饮商户-虚假交易",
+    "industry": "餐饮",
+    "violationType": "虚假交易",
+    "messages": [
+      {
+        "role": "user",
+        "content": "你好，我是做餐饮外卖的，商户号被封了说虚假交易"
+      },
+      {
+        "role": "assistant",
+        "content": "了解，虚假交易封号在餐饮行业比较常见。请问您的商户号是什么时候被封的？封号通知里具体写了什么原因？"
+      },
+      {
+        "role": "user",
+        "content": "上周五封的，说检测到异常交易模式，但我们真的是正常外卖订单"
+      },
+      {
+        "role": "assistant",
+        "content": "明白。异常交易模式通常指短时间内大量相同金额订单或频繁退款。请问日均订单量多少？"
+      },
+      {
+        "role": "user",
+        "content": "日均200单，上个月做了满减活动订单量翻了三倍"
+      },
+      {
+        "role": "assistant",
+        "content": "活动期间订单暴增确实容易触发风控。建议准备美团/饿了么活动审批截图、订单对比数据、营业执照和近3个月流水明细。"
+      },
+      {
+        "role": "user",
+        "content": "有的，美团后台数据都在，活动审批记录也有"
+      },
+      {
+        "role": "assistant",
+        "content": "很好，材料齐全的话申诉成功率比较高。我帮您整理申诉材料清单。"
+      },
+      {
+        "role": "user",
+        "content": "好的谢谢，流水明细我去银行打印"
+      }
+    ],
+    "collectedData": {
+      "industry": "餐饮外卖",
+      "violation_type": "虚假交易-异常交易模式",
+      "merchant_type": "个体工商户",
+      "business_duration": "2年以上",
+      "daily_orders": "约200单",
+      "violation_detail": "活动期间订单暴增触发风控",
+      "evidence": "美团活动审批截图、订单数据、银行流水",
+      "urgency": "高"
+    }
+  },
+  {
+    "name": "电商-内容违规",
+    "industry": "电商",
+    "violationType": "内容违规",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我做电商卖护肤品的，商户号说我内容违规"
+      },
+      {
+        "role": "assistant",
+        "content": "护肤品电商内容违规通常涉及宣传用语问题。商品详情页里是否有美白祛斑等医疗效果描述？"
+      },
+      {
+        "role": "user",
+        "content": "可能有，我们详情页写了淡化色斑、提亮肤色这些"
+      },
+      {
+        "role": "assistant",
+        "content": "淡化色斑属于医疗效果暗示，容易触发违规。不过这种情况申诉成功率较高，关键是证明已修改违规内容且产品合规。"
+      },
+      {
+        "role": "user",
+        "content": "有的，我们产品都是正规渠道进的，有国家药监局备案"
+      },
+      {
+        "role": "assistant",
+        "content": "药监局备案是强有力的合规证据。建议准备药监局备案截图、产品检测报告、修改后的商品详情页截图、进货凭证和授权书。"
+      }
+    ],
+    "collectedData": {
+      "industry": "电商零售-护肤品",
+      "violation_type": "内容违规-医疗效果暗示",
+      "merchant_type": "企业",
+      "violation_detail": "商品详情页含淡化色斑等医疗暗示用语",
+      "evidence": "药监局备案、检测报告、进货凭证",
+      "has_corrected": "是",
+      "urgency": "中"
+    }
+  },
+  {
+    "name": "游戏代练-涉嫌欺诈",
+    "industry": "游戏",
+    "violationType": "涉嫌欺诈",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我做游戏代练的，微信支付商户号被冻结了，说涉嫌欺诈"
+      },
+      {
+        "role": "assistant",
+        "content": "游戏代练行业的欺诈标记比较棘手。冻结通知里有提到具体投诉内容吗？"
+      },
+      {
+        "role": "user",
+        "content": "有几个客户投诉说代练没完成就收款了，但其实是他们等不及自己取消的"
+      },
+      {
+        "role": "assistant",
+        "content": "客户主动取消但已扣款导致投诉，需要证明您有完善的退款机制。有聊天记录证明客户主动取消吗？"
+      },
+      {
+        "role": "user",
+        "content": "有微信聊天记录，但退款确实慢了点，有的拖了一周"
+      },
+      {
+        "role": "assistant",
+        "content": "退款时效是关键问题。建议整理所有投诉案例的聊天记录、退款凭证、制定24小时退款承诺制度、提供服务完成率数据和书面整改方案。"
+      }
+    ],
+    "collectedData": {
+      "industry": "游戏服务-代练",
+      "violation_type": "涉嫌欺诈-用户投诉",
+      "merchant_type": "个人",
+      "complaint_count": "5-10起",
+      "violation_detail": "客户取消订单但退款延迟导致投诉",
+      "evidence": "聊天记录、退款凭证",
+      "has_corrected": "已制定退款制度",
+      "urgency": "极高"
+    }
+  },
+  {
+    "name": "教育培训-资质问题",
+    "industry": "教育",
+    "violationType": "资质问题",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我们是做在线教育的公司，商户号审核不通过说资质不全"
+      },
+      {
+        "role": "assistant",
+        "content": "在线教育资质审核现在比较严格。公司经营范围有教育培训相关内容吗？有办学许可证吗？"
+      },
+      {
+        "role": "user",
+        "content": "营业执照经营范围有教育咨询，但没有办学许可，做职业技能培训的"
+      },
+      {
+        "role": "assistant",
+        "content": "职业技能培训如果不涉及学历教育，部分地区不需要办学许可。您在哪个城市？培训什么内容？"
+      },
+      {
+        "role": "user",
+        "content": "深圳的，做IT编程培训"
+      },
+      {
+        "role": "assistant",
+        "content": "深圳IT培训属于职业技能培训，可以走人社部门备案。建议准备营业执照、人社部门备案证明、课程大纲和师资证明。"
+      }
+    ],
+    "collectedData": {
+      "industry": "在线教育-IT培训",
+      "violation_type": "资质问题-缺少办学许可",
+      "merchant_type": "企业",
+      "location": "深圳",
+      "violation_detail": "缺少办学许可但属于职业技能培训范畴",
+      "evidence": "营业执照、人社备案、课程大纲",
+      "urgency": "中"
+    }
+  },
+  {
+    "name": "直播电商-投诉过多",
+    "industry": "直播电商",
+    "violationType": "投诉过多",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我做直播带货的，商户号因为投诉太多被限制了"
+      },
+      {
+        "role": "assistant",
+        "content": "直播电商投诉率高是常见问题。投诉主要集中在哪些方面？退货退款、商品质量还是发货延迟？"
+      },
+      {
+        "role": "user",
+        "content": "主要是退货退款，因为直播间下单冲动消费买了又不要"
+      },
+      {
+        "role": "assistant",
+        "content": "冲动消费退货率高是直播电商通病。需要区分正常退货和真实投诉。退货率和投诉率分别是多少？"
+      },
+      {
+        "role": "user",
+        "content": "退货率大概30%，真正投诉的10%不到"
+      },
+      {
+        "role": "assistant",
+        "content": "30%退货率在直播电商中算中等。建议准备退货率vs投诉率对比数据、直播录屏、完善的售后流程截图和好评复购率数据。"
+      }
+    ],
+    "collectedData": {
+      "industry": "直播电商",
+      "violation_type": "投诉过多-退货退款纠纷",
+      "merchant_type": "个体工商户",
+      "return_rate": "30%",
+      "complaint_rate": "10%",
+      "violation_detail": "冲动消费退货率高导致投诉",
+      "evidence": "退货率数据、直播录屏、售后流程、好评数据",
+      "urgency": "高"
+    }
+  },
+  {
+    "name": "金融科技-二清嫌疑",
+    "industry": "金融科技",
+    "violationType": "二清嫌疑",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我们做SaaS平台的，帮商户收款后结算，现在说我们涉嫌二清"
+      },
+      {
+        "role": "assistant",
+        "content": "二清是支付行业红线。平台收款后再分账给子商户？有没有接入微信支付分账功能？"
+      },
+      {
+        "role": "user",
+        "content": "之前没用分账功能，是手动转账的"
+      },
+      {
+        "role": "assistant",
+        "content": "手动转账确实会被认定为二清行为。建议立即接入微信支付分账API、申请服务商资质、准备ICP许可证和详细整改方案。"
+      },
+      {
+        "role": "user",
+        "content": "大概200个子商户，月交易额500万左右"
+      },
+      {
+        "role": "assistant",
+        "content": "规模不小，建议尽快转合规模式。需要准备分账API接入方案、服务商申请材料、平台运营资质和子商户入驻协议。"
+      }
+    ],
+    "collectedData": {
+      "industry": "金融科技-SaaS平台",
+      "violation_type": "二清嫌疑-手动结算",
+      "merchant_type": "企业",
+      "sub_merchant_count": "200家",
+      "monthly_volume": "500万",
+      "violation_detail": "平台代收后手动转账给子商户被认定二清",
+      "evidence": "ICP许可证、分账API接入计划、整改方案",
+      "urgency": "极高"
+    }
+  },
+  {
+    "name": "美容美发-预付费纠纷",
+    "industry": "美容美发",
+    "violationType": "投诉过多",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我开美容院的，充值卡模式被很多人投诉，商户号要被封了"
+      },
+      {
+        "role": "assistant",
+        "content": "预付费模式容易产生纠纷。投诉主要是退卡退款还是服务不满意？"
+      },
+      {
+        "role": "user",
+        "content": "大部分是搬家了想退卡的，还有觉得效果不好要退款的"
+      },
+      {
+        "role": "assistant",
+        "content": "需要证明有合理退卡制度且在积极处理。建议准备会员协议、退费处理记录、服务评价数据和整改方案。"
+      }
+    ],
+    "collectedData": {
+      "industry": "美容美发-预付费",
+      "violation_type": "投诉过多-预付费退款纠纷",
+      "merchant_type": "个体工商户",
+      "violation_detail": "充值卡退费纠纷投诉累积",
+      "evidence": "会员协议、退费处理记录",
+      "urgency": "高"
+    }
+  },
+  {
+    "name": "旅游服务-退款纠纷",
+    "industry": "旅游",
+    "violationType": "涉嫌欺诈",
+    "messages": [
+      {
+        "role": "user",
+        "content": "做旅游团购的，很多团退了但退款慢被投诉欺诈"
+      },
+      {
+        "role": "assistant",
+        "content": "旅游行业退款延迟在特殊时期常见。积压了多少退款？金额大概多少？"
+      },
+      {
+        "role": "user",
+        "content": "大概还有50单没退完，总额20万左右"
+      },
+      {
+        "role": "assistant",
+        "content": "关键是证明不是故意不退。建议准备供应商合同和退款沟通记录、已退款凭证、未退款处理计划时间表和旅游经营许可证。"
+      }
+    ],
+    "collectedData": {
+      "industry": "旅游服务-团购",
+      "violation_type": "涉嫌欺诈-退款延迟",
+      "merchant_type": "企业",
+      "pending_refunds": "50单/20万",
+      "violation_detail": "上游供应商退款延迟导致消费者投诉",
+      "evidence": "供应商合同、退款进度、旅游许可证",
+      "urgency": "高"
+    }
+  },
+  {
+    "name": "健身房-跑路投诉",
+    "industry": "健身",
+    "violationType": "涉嫌欺诈",
+    "messages": [
+      {
+        "role": "user",
+        "content": "我开健身房的，因为装修闭店一个月被投诉说跑路了"
+      },
+      {
+        "role": "assistant",
+        "content": "闭店装修被误解为跑路在健身行业常见。有装修合同和施工照片吗？"
+      },
+      {
+        "role": "user",
+        "content": "有的，装修公司合同、现场照片都有，门口贴了告示"
+      },
+      {
+        "role": "assistant",
+        "content": "证据充分。建议补充装修合同和付款凭证、多角度施工照片、告示照片、重新开业时间表和会员通知截图。"
+      }
+    ],
+    "collectedData": {
+      "industry": "健身服务",
+      "violation_type": "涉嫌欺诈-误判跑路",
+      "merchant_type": "企业",
+      "violation_detail": "装修闭店被投诉跑路",
+      "evidence": "装修合同、施工照片、告示、会员通知",
+      "reopen_plan": "1个月后重新开业",
+      "urgency": "高"
+    }
+  },
+  {
+    "name": "跨境电商-知识产权",
+    "industry": "跨境电商",
+    "violationType": "知识产权侵权",
+    "messages": [
+      {
+        "role": "user",
+        "content": "做跨境电商的，被品牌方投诉说卖假货，但我们是正品代购"
+      },
+      {
+        "role": "assistant",
+        "content": "正品代购被投诉假货，关键是证明货源正规。有品牌授权书或正规进货渠道凭证吗？"
+      },
+      {
+        "role": "user",
+        "content": "没有品牌授权，但有海关清关单据和购买小票"
+      },
+      {
+        "role": "assistant",
+        "content": "海关单据是有力证据。建议准备海关进口报关单、采购发票、物流追踪记录和商品实拍对比照片。"
+      }
+    ],
+    "collectedData": {
+      "industry": "跨境电商-代购",
+      "violation_type": "知识产权-被投诉售假",
+      "merchant_type": "企业",
+      "violation_detail": "正品代购被品牌方投诉假货",
+      "evidence": "海关报关单、采购发票、物流记录",
+      "urgency": "高"
+    }
+  }
+]

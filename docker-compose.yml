@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=merchant_appeal
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=merchant_appeal
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPT_KEY=${ENCRYPT_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - XIANGUAN_APPID=${XIANGUAN_APPID}
+      - XIANGUAN_APPSECRET=${XIANGUAN_APPSECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - merchant-network
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=merchant_appeal
+      - MYSQL_USER=merchant_appeal
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - merchant-network
+
+volumes:
+  mysql_data:
+
+networks:
+  merchant-network:
+    driver: bridge

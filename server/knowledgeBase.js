@@ -1,0 +1,949 @@
+// ========== 内置知识库：成功案例 + 违规原因专业知识 ==========
+
+// 内置成功案例（覆盖常见处罚类型和行业）
+export const BUILT_IN_CASES = [
+  {
+    id: 'builtin_1',
+    title: '餐饮行业交易拦截申诉成功',
+    industry: '餐饮',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 1,
+    success_summary: '提供门店实景照片+3笔真实外卖订单凭证+美团店铺截图，一次申诉通过',
+    key_strategy: '重点证明交易真实性，提供外卖平台店铺链接和近期真实订单的完整交易链路',
+    appeal_points: [
+      '提供门头照+内景照+厨房照共6张',
+      '提供3笔微信支付订单号对应的美团/饿了么订单截图',
+      '附上食品经营许可证和卫生许可证',
+      '说明近期交易量增长是因为新店开业促销活动'
+    ],
+    timeline: '提交后3个工作日通过'
+  },
+  {
+    id: 'builtin_2',
+    title: '电商零售交易限额申诉成功',
+    industry: '电商',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '说明双十一大促导致交易波动，提供店铺后台数据和物流发货记录',
+    key_strategy: '用数据说话，提供历史交易趋势对比图，证明交易量增长有合理商业原因',
+    appeal_points: [
+      '提供小程序商城后台30天交易数据截图',
+      '附上5笔订单的完整链路：下单-发货-物流-签收',
+      '提供进货合同和供应商发票',
+      '说明交易量激增原因是参加了平台促销活动'
+    ],
+    timeline: '提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_3',
+    title: '教育培训关闭支付权限(交易纠纷)申诉成功',
+    industry: '教育',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '全部投诉原路退款+消费者撤诉+完善退费政策，二次申诉通过',
+    key_strategy: '先处理所有投诉（原路全额退款），让消费者在微信投诉界面留言撤诉，再提交申诉',
+    appeal_points: [
+      '逐一联系所有投诉用户，协商退款并取得谅解',
+      '提供每笔投诉的退款凭证截图',
+      '引导消费者在微信投诉页面留言"已解决，撤销投诉"',
+      '提交完善的退费政策文件：7天无理由退费、课程不满意随时退',
+      '附上办学许可证和师资证明'
+    ],
+    timeline: '首次驳回，补充退款凭证后二次申诉5个工作日通过'
+  },
+  {
+    id: 'builtin_4',
+    title: '生活服务关闭支付权限(跨类目经营)申诉成功',
+    industry: '生活服务',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌跨类目经营',
+    difficulty: 3,
+    success_summary: '补充营业执照经营范围证明+下架不符商品+变更经营类目',
+    key_strategy: '承认问题并积极整改，下架超出类目的商品/服务，申请变更为正确类目',
+    appeal_points: [
+      '提供最新营业执照，标注经营范围中包含实际经营的业务',
+      '截图证明已下架所有不符合注册类目的商品/服务',
+      '如经营范围确实不包含，先去工商变更经营范围再申诉',
+      '提交整改报告，说明已梳理全部商品确保与类目一致',
+      '附上门店实景照片证明实际经营场景'
+    ],
+    timeline: '提交后7个工作日通过'
+  },
+  {
+    id: 'builtin_5',
+    title: '美妆零售关闭支付权限(交易异常)申诉成功',
+    industry: '零售',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '解释新店开业交易激增原因+提供品牌授权+进货凭证',
+    key_strategy: '用完整的供应链证据证明商品来源正规，用营销活动解释交易量波动',
+    appeal_points: [
+      '提供品牌授权书或正规渠道进货合同',
+      '附上近期5笔订单的发货单+物流单+签收截图',
+      '提供产品质检报告',
+      '说明新店开业期间做了朋友圈推广和优惠活动导致订单激增',
+      '提供门店实景照片和商品陈列照片'
+    ],
+    timeline: '提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_6',
+    title: '数码产品资金冻结申诉成功',
+    industry: '零售',
+    problem_type: '资金冻结',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 4,
+    success_summary: '提供结算账户信息+全部交易流水+进货发票，资金180天后全额解冻',
+    key_strategy: '资金冻结案件重点是证明资金来源合法，提供结算账户开户信息配合验证',
+    appeal_points: [
+      '提供结算账户开户银行+账户后四位配合身份验证',
+      '导出全部交易流水并标注每笔订单对应的商品',
+      '提供进货发票和供应商合同证明货源正规',
+      '拨打95017转3提供商户号+结算账户后四位催促审核',
+      '提交法人手持身份证+营业执照照片'
+    ],
+    timeline: '申诉通过后资金分批解冻，共耗时约15个工作日'
+  },
+  {
+    id: 'builtin_7',
+    title: '食品行业关闭支付权限(被驳回后二次申诉)成功',
+    industry: '餐饮',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 4,
+    success_summary: '首次驳回原因是"投诉未妥善处理"，补充退款凭证和撤诉截图后通过',
+    key_strategy: '被驳回后先打95017转3询问具体驳回原因，针对性补充材料，切勿盲目重复提交',
+    appeal_points: [
+      '拨打95017转3，提供商户号查询具体驳回原因',
+      '针对"投诉未妥善处理"：逐一联系投诉用户办理退款',
+      '收集每笔退款的微信转账截图作为凭证',
+      '引导用户在投诉页面确认"已解决"',
+      '重新提交时在整改说明中详细列出每笔投诉的处理结果',
+      '两次申诉间隔了5天，避免频繁提交'
+    ],
+    timeline: '首次申诉被驳回，间隔5天二次申诉后4个工作日通过'
+  },
+  {
+    id: 'builtin_8',
+    title: '保健品行业关闭支付权限(多级分销)申诉成功',
+    industry: '健康',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌多级分销返利',
+    difficulty: 4,
+    success_summary: '证明分销模式为一级分佣非多级，提供分销规则截图和佣金结构说明',
+    key_strategy: '重点证明不是多级分销：只有一级推荐奖励，无门槛费，非传销模式',
+    appeal_points: [
+      '提供分销系统后台截图，证明只有一级分佣',
+      '提交分销规则文档：无入门费、无囤货要求、可随时退出',
+      '提供佣金结构说明：仅推荐人获得一次性佣金，无多层级',
+      '附上产品质检报告和经营资质',
+      '整改说明：已调整分销规则，确保符合微信规范'
+    ],
+    timeline: '提交后7个工作日通过'
+  },
+  {
+    id: 'builtin_9',
+    title: '服装零售信用卡套现嫌疑申诉成功',
+    industry: '零售',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌信用卡套现',
+    difficulty: 3,
+    success_summary: '提供真实交易凭证证明非套现，附上发货物流记录',
+    key_strategy: '用真实的商品交易链路证明每笔大额交易都有对应的真实商品和物流',
+    appeal_points: [
+      '提供5笔大额订单的完整交易链路：订单详情-商品照片-发货单-物流单号-签收记录',
+      '附上进货合同和供应商发票',
+      '说明大额交易原因（如批发客户、企业团购等）',
+      '提供客户沟通记录截图证明交易真实性',
+      '提交门店实景照和商品库存照片'
+    ],
+    timeline: '提交后5个工作日限额恢复正常'
+  },
+  {
+    id: 'builtin_10',
+    title: '科技公司延迟结算申诉成功',
+    industry: '科技',
+    problem_type: '资金冻结',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '提供软件著作权+服务合同+客户验收报告，证明SaaS订阅收入合法',
+    key_strategy: 'SaaS/技术服务类需要用合同和交付证明来解释订阅制收费模式的合理性',
+    appeal_points: [
+      '提供软件著作权证书',
+      '附上3-5份客户服务合同（脱敏处理）',
+      '提供客户验收报告或使用反馈',
+      '说明SaaS订阅制收费模式：按月/年收费，非一次性大额交易',
+      '提供结算账户信息配合资金验证'
+    ],
+    timeline: '提交后5个工作日结算恢复正常'
+  },
+  {
+    id: 'builtin_11',
+    title: '微商/社交电商交易拦截申诉成功',
+    industry: '微商',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供朋友圈经营记录+客户聊天截图+发货物流凭证，证明社交电商模式真实',
+    key_strategy: '微商模式的关键是证明交易真实性：每笔交易都有真实的客户沟通、下单、发货记录',
+    appeal_points: [
+      '提供朋友圈/社群经营的截图记录（近1个月）',
+      '提供3-5笔订单的完整链路：客户微信聊天→转账/付款→发货单→物流单号→签收',
+      '提供进货渠道证明（供应商聊天记录、进货单、转账记录）',
+      '说明交易量增长原因（如参加团购活动、节日促销等）',
+      '如有实体仓库，提供仓库库存照片'
+    ],
+    timeline: '提交后3-5个工作日通过'
+  },
+  {
+    id: 'builtin_12',
+    title: '游戏陪玩/代练交易限额申诉成功',
+    industry: '游戏',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供陪玩平台入驻证明+接单记录+客户评价，证明服务真实',
+    key_strategy: '游戏服务类需重点证明有真实的服务交付，每笔收款都对应真实的陪玩/代练服务',
+    appeal_points: [
+      '提供陪玩平台（比心、捞月狗等）的入驻截图和接单记录',
+      '提供5笔订单对应的服务记录：接单截图+游戏对局截图+客户评价',
+      '说明收费标准和服务模式',
+      '如果是独立接单，提供客户沟通记录和转账对应的服务内容'
+    ],
+    timeline: '提交后3个工作日限额恢复'
+  },
+  {
+    id: 'builtin_13',
+    title: '直播带货支付权限关闭申诉成功',
+    industry: '直播',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 3,
+    success_summary: '提供直播回放+下单截图+发货记录，证明直播带货交易真实',
+    key_strategy: '直播电商的核心证据是直播回放录屏+实时下单记录+发货物流，形成完整证据链',
+    appeal_points: [
+      '提供近期3场直播回放截图或录屏片段',
+      '提供直播间商品列表和价格截图',
+      '提供5笔订单的完整链路：直播间下单→订单详情→发货→物流→签收',
+      '提供供应商合作合同或进货凭证',
+      '说明直播频次、场均观众、场均GMV等经营数据'
+    ],
+    timeline: '提交后5-7个工作日通过'
+  },
+  {
+    id: 'builtin_14',
+    title: '知识付费/在线教育交易纠纷申诉成功',
+    industry: '教育',
+    problem_type: '交易拦截',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '处理全部退款+完善售后政策+提供课程交付证明，二次申诉通过',
+    key_strategy: '知识付费要证明课程真实交付、已处理所有投诉退款、有完善的退费机制',
+    appeal_points: [
+      '逐一处理所有退款申请，提供退款凭证',
+      '提供课程内容截图/录屏证明课程真实存在且有价值',
+      '提供学员评价和学习记录截图',
+      '制定完善的退费政策：7天无理由退费、课程不满意全额退款',
+      '附上教师资质证明（如有）'
+    ],
+    timeline: '处理退款后二次申诉5个工作日通过'
+  },
+  {
+    id: 'builtin_15',
+    title: '跨境代购商户号封禁申诉成功',
+    industry: '代购',
+    problem_type: '商户号封禁',
+    violation_reason: '涉嫌欺诈',
+    difficulty: 5,
+    success_summary: '提供海关清关单+正品购买凭证+品牌授权，经法人视频认证后解封',
+    key_strategy: '代购/跨境类封禁最难，需要海关凭证+正品证明+法人亲自认证的全套材料',
+    appeal_points: [
+      '提供海关进口报关单/清关单',
+      '提供海外购买凭证（商场小票、电商订单截图）',
+      '提供品牌授权书或代理协议（如有）',
+      '提供商品防伪验证截图',
+      '准备法人视频认证：法人本人+身份证+营业执照出镜',
+      '间隔7天以上再提交二次申诉'
+    ],
+    timeline: '首次驳回，间隔7天后提交完善材料+法人视频认证后10个工作日通过'
+  },
+  {
+    id: 'builtin_16',
+    title: '盲盒/潮玩收款限额申诉成功',
+    industry: '盲盒',
+    problem_type: '收款限额',
+    violation_reason: '涉嫌交易异常',
+    difficulty: 2,
+    success_summary: '提供商品实拍+发货记录+经营资质，证明盲盒销售业务真实合规',
+    key_strategy: '盲盒类重点证明商品真实存在、价值合理、非赌博性质',
+    appeal_points: [
+      '提供盲盒商品实拍照片（含包装和内容物）',
+      '提供采购合同和进货发票',
+      '说明盲盒定价机制和商品价值范围，证明非赌博性质',
+      '提供5笔订单的发货物流截图',
+      '附上营业执照（经营范围含玩具/礼品销售）'
+    ],
+    timeline: '提交后3个工作日限额恢复'
+  },
+  {
+    id: 'builtin_17',
+    title: '内容违规(虚假宣传)支付权限关闭申诉成功',
+    industry: '美容',
+    problem_type: '支付权限关闭',
+    violation_reason: '内容违规',
+    difficulty: 3,
+    success_summary: '下架所有违规宣传内容+提供整改前后对比截图+制定内容审核制度后通过',
+    key_strategy: '内容违规的关键是先彻底整改再申诉，提供整改前后对比截图和内容管理制度',
+    appeal_points: [
+      '截图保存所有被标记的违规内容（作为整改前证据）',
+      '逐一修改所有违规宣传用语（去除"最""第一""100%有效"等绝对化用语）',
+      '提供整改后的页面截图（与整改前形成对比）',
+      '制定《内容发布审核管理制度》并提交',
+      '提供卫生许可证和从业人员资质证明'
+    ],
+    timeline: '整改完成后提交申诉，5个工作日通过'
+  },
+  {
+    id: 'builtin_18',
+    title: '虚假交易(刷单嫌疑)收款限额申诉成功',
+    industry: '电商',
+    problem_type: '收款限额',
+    violation_reason: '虚假交易',
+    difficulty: 4,
+    success_summary: '提供10笔订单完整物流签收链路+不同收货地址证明买家非同一人+客户评价截图',
+    key_strategy: '虚假交易申诉核心是用物流签收和不同收货地址证明买卖双方无关联',
+    appeal_points: [
+      '提供10笔被质疑订单的完整链路：下单→付款→发货→物流→签收照片',
+      '标注每笔订单的收货地址（证明分布在不同城市/地区）',
+      '提供与买家的微信聊天记录（证明真实沟通）',
+      '提供进货凭证和仓库实拍照片',
+      '如确实有刷单行为，坦诚承认并说明已停止+处罚涉事人员'
+    ],
+    timeline: '提交后7个工作日限额恢复'
+  },
+  {
+    id: 'builtin_19',
+    title: '跨类目经营(注册餐饮实际卖服装)申诉成功',
+    industry: '零售',
+    problem_type: '支付权限关闭',
+    violation_reason: '跨类目经营',
+    difficulty: 3,
+    success_summary: '先变更工商经营范围+下架不符商品+申请变更商户类目后二次申诉通过',
+    key_strategy: '跨类目必须先整改（变更工商+下架+变更类目）再申诉，顺序不能反',
+    appeal_points: [
+      '去工商局变更营业执照经营范围（增加实际经营类目）',
+      '立即下架所有不符合原注册类目的商品',
+      '在商户平台申请变更商户类目为实际经营类目',
+      '提供变更后的营业执照+已下架截图+类目变更申请截图',
+      '提交整改报告说明已梳理全部商品并确保合规'
+    ],
+    timeline: '工商变更5-10天+申诉提交后5个工作日通过'
+  },
+  {
+    id: 'builtin_20',
+    title: '多级分销返利(社交电商)支付权限关闭申诉成功',
+    industry: '电商',
+    problem_type: '支付权限关闭',
+    violation_reason: '多级分销',
+    difficulty: 4,
+    success_summary: '关闭多级佣金功能+修改分销规则为一级+提供整改后后台截图通过',
+    key_strategy: '多级分销申诉的前提是先整改为一级分销，提供整改前后对比证据',
+    appeal_points: [
+      '立即关闭二级及以上佣金功能（后台操作截图）',
+      '修改分销规则文档：明确仅一级推荐奖励',
+      '提供整改后的分销后台截图（显示仅一级佣金结构）',
+      '提交《分销规则合规说明》：无入门费、无囤货、可随时退出',
+      '提供分销员协议模板（体现合规条款）'
+    ],
+    timeline: '整改完成后提交，7个工作日通过'
+  },
+  {
+    id: 'builtin_21',
+    title: '财税代办行业交易纠纷申诉成功',
+    industry: '财税服务',
+    problem_type: '支付权限关闭',
+    violation_reason: '涉嫌交易纠纷',
+    difficulty: 3,
+    success_summary: '处理全部投诉退款+提供服务合同+说明B2B服务模式+完善退款政策后通过',
+    key_strategy: 'B2B服务类投诉多源于沟通误解，重点证明服务真实交付且已妥善处理所有投诉',
+    appeal_points: [
+      '逐一联系投诉客户，协商退款并取得谅解',
+      '提供每笔退款的微信转账凭证',
+      '引导客户在投诉页面确认"已解决"',
+      '提供5份以上服务合同（脱敏处理）证明业务真实',
+      '提交完善的退款政策：明确退款条件、时效、流程',
+      '说明已优化服务流程：新增服务前确认环节+进度跟踪系统'
+    ],
+    timeline: '处理投诉后提交，5个工作日通过'
+  },
+  {
+    id: 'builtin_22',
+    title: '医疗器械行业资金冻结(洗钱嫌疑)申诉成功',
+    industry: '医疗',
+    problem_type: '资金冻结',
+    violation_reason: '洗钱风险',
+    difficulty: 5,
+    success_summary: '提供医疗器械经营许可+全部交易合同发票+银行流水对账+法人声明后解冻',
+    key_strategy: '洗钱嫌疑需要每笔交易都有合同+发票+物流三方印证，医疗行业还需资质证明',
+    appeal_points: [
+      '提供《医疗器械经营许可证》和相关资质',
+      '每笔被标记交易提供：采购合同+增值税发票+物流签收单',
+      '导出银行流水与微信交易逐笔对账',
+      '提供法人亲笔签名的《资金合法声明书》',
+      '提交公司反洗钱内控制度文件',
+      '聘请律师出具法律意见书（加分项）'
+    ],
+    timeline: '提交后10个工作日审核通过，资金分批解冻共15天'
+  }
+]
+
+// 违规原因专业知识库（按违规原因分类）
+export const VIOLATION_KNOWLEDGE = {
+  '交易异常': {
+    aliases: ['交易异常', '异常交易', '交易波动', '交易量异常'],
+    severity: 3,
+    description: '微信风控系统检测到交易模式异常，如短时间内交易量激增、交易金额异常、交易时间异常等',
+    appeal_key_points: [
+      '用数据解释交易量变化的合理原因（促销、季节性、新店开业等）',
+      '提供3-5笔真实订单的完整交易链路证据',
+      '提供门店/仓库实景照片证明有真实经营场景',
+      '如有进货合同/发票，务必提供'
+    ],
+    required_materials: ['营业执照', '法人身份证', '门店照片', '交易凭证(3-5笔)', '业务模式说明'],
+    common_rejection_reasons: ['交易凭证不足', '无法证明交易真实性', '业务模式说明不清晰'],
+    success_key: '关键是让审核人员相信每笔交易都有真实的商品/服务交付',
+    estimated_success_rate: '首次申诉70-85%'
+  },
+  '交易纠纷': {
+    aliases: ['交易纠纷', '消费者投诉', '投诉率', '纠纷', '用户投诉'],
+    severity: 3,
+    description: '消费者投诉率超标或存在大量未处理的交易纠纷',
+    appeal_key_points: [
+      '先处理所有未解决的投诉（原路全额退款是最有效的方式）',
+      '引导消费者在微信投诉页面留言"已解决，撤销投诉"',
+      '提交完善的退款/售后政策文件',
+      '在整改说明中逐条列出每笔投诉的处理结果'
+    ],
+    required_materials: ['退款凭证', '消费者撤诉截图', '完善的退款政策', '投诉处理记录表', '整改措施说明'],
+    common_rejection_reasons: ['仍有未处理投诉', '退款凭证不完整', '消费者未确认撤诉'],
+    success_key: '必须100%处理完所有投诉，最好让消费者在投诉页面确认"已解决"',
+    estimated_success_rate: '投诉全部处理后80-90%'
+  },
+  '跨类目经营': {
+    aliases: ['跨类目', '类目不符', '经营范围不符', '超范围经营', '未开放类目', '无资质经营'],
+    severity: 3,
+    description: '实际经营内容与注册的商户类目不一致，或经营了微信未开放的类目',
+    appeal_key_points: [
+      '如果营业执照经营范围包含实际业务：提供执照证明',
+      '如果不包含：先去工商变更经营范围，再申诉',
+      '下架所有不符合注册类目的商品/服务',
+      '申请变更商户类目为实际经营类目'
+    ],
+    required_materials: ['最新营业执照', '已下架截图', '类目变更申请', '整改报告', '门店实景照片'],
+    common_rejection_reasons: ['仍有超出类目的商品在售', '营业执照经营范围不含', '未提供整改证据'],
+    success_key: '先整改再申诉，确保所有在售商品/服务都在注册类目范围内',
+    estimated_success_rate: '整改到位后75-85%'
+  },
+  '信用卡套现': {
+    aliases: ['套现', '信用卡套现', '信用卡', '大额交易'],
+    severity: 4,
+    description: '交易模式疑似信用卡套现：大额交易无对应商品、交易双方关联、交易后快速退款等',
+    appeal_key_points: [
+      '提供每笔大额交易对应的真实商品/服务交付证据',
+      '提供发货单、物流单号、签收记录的完整链路',
+      '解释大额交易的合理商业原因（批发、团购等）',
+      '提供进货合同和供应商发票证明货源真实'
+    ],
+    required_materials: ['完整交易链路(5笔以上)', '进货合同/发票', '物流发货记录', '客户沟通记录', '门店/仓库照片'],
+    common_rejection_reasons: ['交易链路不完整', '无法证明商品真实交付', '交易对手关联性存疑'],
+    success_key: '每笔被质疑的交易都需要有从下单到签收的完整证据链',
+    estimated_success_rate: '证据充分时60-75%'
+  },
+  '商户欺诈': {
+    aliases: ['欺诈', '诈骗', '虚假宣传', '假货', '售假'],
+    severity: 5,
+    description: '被判定为欺诈行为，如销售假冒伪劣商品、虚假宣传、收款不发货等',
+    appeal_key_points: [
+      '提供商品正品证明（品牌授权书、进货发票、质检报告）',
+      '提供真实发货记录和物流信息',
+      '如有虚假宣传嫌疑，提供已修改的宣传材料截图',
+      '处理所有消费者投诉并提供退款凭证'
+    ],
+    required_materials: ['品牌授权/进货证明', '质检报告', '发货物流记录', '退款处理凭证', '整改后宣传截图'],
+    common_rejection_reasons: ['无法提供正品证明', '仍有未处理投诉', '宣传内容仍有违规'],
+    success_key: '欺诈类最难申诉，必须有铁证证明商品为正品且已完全整改',
+    estimated_success_rate: '40-60%（难度最高）'
+  },
+  '赌博风险': {
+    aliases: ['赌博', '博彩', '棋牌', '彩票'],
+    severity: 5,
+    description: '交易模式疑似赌博或博彩类业务',
+    appeal_key_points: [
+      '如果确实不涉及赌博，提供完整的业务模式说明',
+      '提供产品/服务截图证明经营内容合法',
+      '如果是棋牌/游戏类，证明无真实货币兑换功能',
+      '提供软件著作权或游戏版号'
+    ],
+    required_materials: ['业务模式详细说明', '产品截图/演示', '软件著作权/版号', '营业执照', '法人声明书'],
+    common_rejection_reasons: ['业务模式说明不够详细', '产品功能疑似涉赌', '无法提供资质证明'],
+    success_key: '赌博类极难申诉，如确实不涉赌需要非常详细的业务证明',
+    estimated_success_rate: '30-50%（极难）'
+  },
+  '多级分销': {
+    aliases: ['分销', '多级分销', '传销', '返利', '拉人头'],
+    severity: 4,
+    description: '分销模式被判定为多级分销或类传销模式',
+    appeal_key_points: [
+      '证明分销模式为一级分佣，非多级（只有直接推荐人获得佣金）',
+      '证明无入门费、无囤货要求、可随时退出',
+      '提供分销系统后台截图和佣金结构说明',
+      '整改分销规则确保符合微信规范'
+    ],
+    required_materials: ['分销规则文档', '分销后台截图', '佣金结构说明', '整改报告', '营业执照'],
+    common_rejection_reasons: ['分销层级超过一级', '存在入门费机制', '佣金结构不透明'],
+    success_key: '微信只允许一级分销，必须证明分销层级不超过一层',
+    estimated_success_rate: '整改后65-80%'
+  },
+  '色情风险': {
+    aliases: ['色情', '涉黄', '低俗', '不雅'],
+    severity: 5,
+    description: '内容或交易涉嫌色情、低俗',
+    appeal_key_points: [
+      '如果是误判，提供产品/服务的完整展示截图',
+      '清理所有可能被误判的内容',
+      '提供业务模式说明证明经营内容合法',
+      '提交整改报告'
+    ],
+    required_materials: ['产品/内容截图', '已整改证据', '业务模式说明', '营业执照', '整改承诺书'],
+    common_rejection_reasons: ['仍有疑似违规内容', '整改不彻底', '业务模式说明不清'],
+    success_key: '必须彻底清理所有可能被误判的内容，提供清理前后对比截图',
+    estimated_success_rate: '30-50%（极难）'
+  },
+  '洗钱风险': {
+    aliases: ['洗钱', '反洗钱', '资金来源', '可疑交易', '大额可疑'],
+    severity: 5,
+    description: '交易模式被反洗钱系统标记，涉嫌利用商户号进行资金清洗',
+    appeal_key_points: [
+      '提供所有大额交易对应的真实合同和发票',
+      '证明资金流向清晰可追溯，每笔进出都有商业背景',
+      '提供公司银行流水与微信交易的对账报告',
+      '如涉及跨境业务，提供外汇许可和海关报关单',
+      '提供公司反洗钱内控制度文件'
+    ],
+    required_materials: ['商业合同', '银行流水对账', '发票/收据', '反洗钱内控制度', '法人声明书', '外汇许可（跨境）'],
+    common_rejection_reasons: ['资金流向不清晰', '交易缺乏商业背景', '无法提供合同/发票支撑'],
+    success_key: '每笔被标记交易都需要有合同+发票+物流/服务交付证明的三方印证',
+    estimated_success_rate: '35-55%（极难，需法律专业支持）'
+  },
+  '内容违规': {
+    aliases: ['内容违规', '违反法律法规', '违法内容', '敏感内容', '政治敏感', '侵权内容'],
+    severity: 4,
+    description: '发布的商品描述、宣传文案或页面内容违反相关法规或平台规则',
+    appeal_key_points: [
+      '立即下架/修改所有被标记的违规内容',
+      '提供修改前后的对比截图，证明已彻底整改',
+      '如是误判（如合规医疗器械被判为违禁品），提供相关资质证明',
+      '建立内容审核机制，提交内容管理制度文件',
+      '承诺后续所有上架内容经过合规审核'
+    ],
+    required_materials: ['违规内容整改截图', '整改报告', '内容审核制度', '相关资质证明（如有）', '法人承诺书'],
+    common_rejection_reasons: ['仍有违规内容未清理', '整改不彻底', '缺少相关经营资质'],
+    success_key: '先彻底整改再申诉，提供清理前后对比截图和内容管理制度',
+    estimated_success_rate: '55-75%（整改到位后较乐观）'
+  },
+  '虚假交易': {
+    aliases: ['虚假交易', '刷单', '虚假订单', '自买自卖', '虚构交易'],
+    severity: 4,
+    description: '交易被判定为虚假，如自买自卖、刷单刷量、无真实商品交付的空壳交易',
+    appeal_key_points: [
+      '提供被质疑交易的完整证据链：下单→付款→发货→物流→签收',
+      '证明买卖双方无关联关系（非同一人/同一公司/亲属）',
+      '提供物流实际配送记录和签收照片',
+      '如确实有刷单行为，承认并说明已停止、已处罚涉事人员',
+      '提供真实客户的评价和复购记录'
+    ],
+    required_materials: ['完整交易链路(5笔以上)', '物流签收记录', '客户沟通记录', '进货凭证', '商品实拍照', '整改报告'],
+    common_rejection_reasons: ['交易链路不完整', '买卖双方存在关联', '物流信息异常'],
+    success_key: '用无可辩驳的物流和签收证据证明交易真实存在',
+    estimated_success_rate: '50-70%（取决于证据完整度）'
+  },
+  '异地收款': {
+    aliases: ['异地收款', '异地交易', '收款地点异常', '地理位置异常'],
+    severity: 2,
+    description: '商户注册地与实际收款地不一致，触发地理位置风控',
+    appeal_key_points: [
+      '说明异地收款的合理原因（分支机构、外出展销、出差等）',
+      '提供异地经营的证明材料（分店执照、展会邀请函等）',
+      '如有多地经营，提供各地门店照片和员工证明',
+      '说明业务模式本身就需要多地收款（如物流、上门服务等）'
+    ],
+    required_materials: ['异地经营证明', '分店/分支机构证明', '业务模式说明', '门店照片（各地）'],
+    common_rejection_reasons: ['无法解释异地收款原因', '缺少异地经营证明'],
+    success_key: '合理解释异地收款的商业原因，提供辅助证明',
+    estimated_success_rate: '80-90%（通常容易解决）'
+  }
+}
+
+// 根据违规原因匹配知识
+export function matchViolation(text) {
+  if (!text) return null
+  const t = text.toLowerCase()
+  for (const [key, info] of Object.entries(VIOLATION_KNOWLEDGE)) {
+    if (info.aliases.some(a => t.includes(a))) return { key, ...info }
+  }
+  return null
+}
+
+// 根据处罚类型和行业匹配最相关的内置案例
+export function matchBuiltInCases(problemType, industry, violationReason) {
+  const pt = (problemType || '').toLowerCase()
+  const ind = (industry || '').toLowerCase()
+  const vr = (violationReason || '').toLowerCase()
+
+  return BUILT_IN_CASES
+    .map(c => {
+      let score = 0
+      const cpt = (c.problem_type || '').toLowerCase()
+      const cind = (c.industry || '').toLowerCase()
+      const cvr = (c.violation_reason || '').toLowerCase()
+      // 处罚类型匹配权重最高
+      if (pt && cpt.includes(pt)) score += 5
+      if (pt && pt.includes(cpt)) score += 3
+      // 违规原因匹配
+      if (vr && cvr.includes(vr)) score += 4
+      if (vr && vr.includes(cvr)) score += 2
+      // 行业匹配
+      if (ind && cind.includes(ind)) score += 2
+      if (ind && ind.includes(cind)) score += 1
+      return { ...c, _score: score }
+    })
+    .filter(c => c._score > 0)
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 3)
+}
+
+// 风险评分引擎：根据收集的数据评估申诉难度和成功率（像微信审核员一样思考）
+export function assessRisk(collectedData) {
+  const d = collectedData
+  let baseScore = 50 // 基准分50，越高越难
+  let positiveFactors = [] // 有利因素（降低难度）
+  let negativeFactors = [] // 不利因素（增加难度）
+  let examinerConcerns = [] // 审核员会重点关注什么
+  let objectiveAssessment = '' // 客观评估说明
+
+  const pt = (d.problem_type || '').toLowerCase()
+  const vr = (d.violation_reason || '').toLowerCase()
+  const cs = (d.complaint_status || '').toLowerCase()
+  const ah = (d.appeal_history || '').toLowerCase()
+
+  // ==================== 1. 处罚类型评估（对难度影响最大） ====================
+  if (pt.includes('封禁')) {
+    baseScore += 30
+    negativeFactors.push('商户号封禁是微信支付最严重的处罚措施')
+    examinerConcerns.push('审核员会重点审查：是否存在诈骗、涉赌涉黄、严重违规历史')
+    examinerConcerns.push('封禁申诉需要提供非常充分的整改证据和承诺书')
+  } else if (pt.includes('冻结')) {
+    baseScore += 20
+    negativeFactors.push('资金冻结案件复杂度较高')
+    examinerConcerns.push('审核员会重点审查：资金来源合法性、交易对手是否正常')
+    examinerConcerns.push('需要提供完整的交易流水和结算账户证明')
+  } else if (pt.includes('关闭') || pt.includes('撤销')) {
+    baseScore += 15
+    negativeFactors.push('支付权限关闭需要充分证明整改到位')
+    examinerConcerns.push('审核员会重点审查：历史违规是否已全部纠正')
+    examinerConcerns.push('关闭类申诉通常需要2-3次补充材料')
+  } else if (pt.includes('限额')) {
+    baseScore += 5
+    positiveFactors.push('交易限额属于较轻处罚，申诉材料要求相对简单')
+    examinerConcerns.push('审核员主要看：交易模式是否正常、有无异常波动')
+  } else if (pt.includes('拦截')) {
+    baseScore -= 5
+    positiveFactors.push('交易拦截通常最易解决，1-2次申诉可通过')
+    examinerConcerns.push('审核员主要验证：近期交易是否正常、是否为误判')
+  }
+
+  // ==================== 2. 违规原因评估（核心因素） ====================
+  if (vr.includes('赌博') || vr.includes('涉赌') || vr.includes('博彩')) {
+    baseScore += 30
+    negativeFactors.push('涉赌类违规是最高风险，成功率极低')
+    examinerConcerns.push('审核员会逐一核实每一笔交易，必须证明无任何博彩资金流动')
+    examinerConcerns.push('即使是误判也需要提供非常详细的业务模式说明')
+    objectiveAssessment = '客观地说，涉赌类违规申诉成功率在所有类型中最低。建议先确认是否完全误判，如果是则全力申诉，如果确有涉及则建议寻求法律支持。'
+  } else if (vr.includes('色情') || vr.includes('涉黄')) {
+    baseScore += 28
+    negativeFactors.push('涉黄类违规属于严重违规')
+    examinerConcerns.push('审核员会审查全部商品/服务内容，必须证明完全合规')
+  } else if (vr.includes('洗钱') || vr.includes('反洗钱')) {
+    baseScore += 28
+    negativeFactors.push('涉嫌洗钱是严重违规，申诉难度极高')
+    examinerConcerns.push('审核员会重点审查资金来源和去向的合法性')
+    objectiveAssessment = '洗钱嫌疑类违规建议寻求专业法律支持。'
+  } else if (vr.includes('欺诈') || vr.includes('诈骗') || vr.includes('售假') || vr.includes('假冒')) {
+    baseScore += 22
+    negativeFactors.push('欺诈类违规需要铁证证明商品/服务真实性')
+    examinerConcerns.push('审核员会重点审查：品牌授权链、进货凭证、质检报告')
+    examinerConcerns.push('需要提供完整的正品证明链路')
+  } else if (vr.includes('虚假交易') || vr.includes('刷单') || vr.includes('刷量')) {
+    baseScore += 18
+    negativeFactors.push('虚假交易需要证明每笔交易都是真实的')
+    examinerConcerns.push('审核员会核对订单与物流签收的一致性')
+    examinerConcerns.push('每笔被质疑的交易都需要有完整证据')
+  } else if (vr.includes('套现') || vr.includes('信用ka套现')) {
+    baseScore += 18
+    negativeFactors.push('套现嫌疑需要完整交易链路证明')
+    examinerConcerns.push('审核员会审查：每笔大额交易必须有对应商品交付')
+    examinerConcerns.push('信用卡套现类通常需要5笔以上完整链路')
+  } else if (vr.includes('传销') || vr.includes('多级分销') || vr.includes('拉人头')) {
+    baseScore += 15
+    negativeFactors.push('分销违规需要证明分销模式合规')
+    examinerConcerns.push('审核员会重点审查：是否有多级分佣、是否有入门费')
+    examinerConcerns.push('必须证明是一级分销且无入门费')
+  } else if (vr.includes('售假')) {
+    baseScore += 20
+    negativeFactors.push('售假违规需要提供品牌授权和进货凭证')
+    examinerConcerns.push('审核员会核实品牌授权链的完整性')
+  } else if (vr.includes('内容违规') || vr.includes('宣传违规') || vr.includes('广告违规')) {
+    baseScore += 12
+    negativeFactors.push('内容违规需要证明已彻底整改')
+    examinerConcerns.push('审核员会核对整改后的内容是否完全合规')
+    examinerConcerns.push('需要提供整改前后的对比截图')
+  } else if (vr.includes('跨类目') || vr.includes('超范围') || vr.includes('类目不符')) {
+    baseScore += 8
+    negativeFactors.push('跨类目违规申诉需要先完成工商变更')
+    examinerConcerns.push('审核员会核实营业执照经营范围是否包含实际业务')
+    examinerConcerns.push('必须先完成工商变更才能申诉')
+  } else if (vr.includes('纠纷') || vr.includes('投诉') || vr.includes('退款')) {
+    baseScore += 10
+    negativeFactors.push('交易纠纷需要先处理完所有投诉')
+    examinerConcerns.push('审核员会核实：是否还有未处理的投诉')
+    examinerConcerns.push('所有投诉必须处理完才能提交申诉')
+  } else if (vr.includes('异地') || vr.includes('地点异常') || vr.includes('收款地点')) {
+    baseScore -= 3
+    positiveFactors.push('异地收款类问题通常最容易解释')
+    examinerConcerns.push('审核员主要看：实际经营地是否与注册地一致')
+  } else if (vr.includes('异常') || vr.includes('波动')) {
+    baseScore += 3
+    examinerConcerns.push('交易异常是最常见的处罚原因，申诉材料要求相对标准')
+    examinerConcerns.push('审核员主要验证：是否有合理的商业解释')
+  }
+
+  // ==================== 3. 敏感行业额外评估 ====================
+  if (d._sensitive_industry) {
+    const sr = d._sensitive_risk || ''
+    if (sr === '极高') {
+      baseScore += 25
+      negativeFactors.push(`行业「${d._sensitive_industry}」属于微信支付慎重接入类型`)
+      examinerConcerns.push('该行业审核会更严格，需要更充分的合规证明')
+    } else if (sr === '高') {
+      baseScore += 15
+      negativeFactors.push(`行业「${d._sensitive_industry}」需要额外资质证明`)
+      examinerConcerns.push('该行业需要提供行业特定资质许可')
+    } else if (sr === '中高') {
+      baseScore += 10
+      negativeFactors.push(`行业「${d._sensitive_industry}」需要合规证明`)
+    } else if (sr === '中') {
+      baseScore += 5
+    }
+  }
+
+  // ==================== 4. 客诉情况评估（审核员必看） ====================
+  if (cs.includes('很多') || cs.includes('大量') || cs.includes('多次') || cs.includes('十几') || cs.includes('几十')) {
+    baseScore += 12
+    negativeFactors.push('投诉较多会给审核员留下不好印象')
+    examinerConcerns.push('审核员会重点审查：投诉是否已全部处理、是否还有存量投诉')
+    examinerConcerns.push('建议：申诉前必须处理完所有投诉')
+  } else if (cs.includes('几个') || cs.includes('少量')) {
+    baseScore += 5
+    examinerConcerns.push('少量投诉需要说明投诉原因和处理结果')
+  } else if (cs.includes('没有') || cs.includes('无') || cs.includes('已处理') || cs.includes('处理完')) {
+    baseScore -= 5
+    positiveFactors.push('无未处理投诉是个好信号')
+  }
+
+  // ==================== 5. 申诉历史评估（非常重要） ====================
+  if (ah.includes('驳回') || ah.includes('失败') || ah.includes('拒绝') || ah.includes('不通过')) {
+    baseScore += 18
+    negativeFactors.push('有被驳回记录，审核员会重点看上次驳回原因')
+    examinerConcerns.push('审核员会对比本次材料与上次有何不同、是否补充了新证据')
+    examinerConcerns.push('建议：先打95017转3询问具体驳回原因，针对性补充材料')
+  } else if (ah.includes('第一次') || ah.includes('首次') || ah.includes('没有') || ah.includes('无')) {
+    baseScore -= 8
+    positiveFactors.push('首次申诉通常审核员会更耐心审视')
+  }
+
+  // ==================== 6. 资料完整度加分项 ====================
+  let completenessBonus = 0
+  if (d.merchant_id && d.merchant_id.length >= 10) completenessBonus += 3
+  if (d.company_name && d.company_name.length > 2) completenessBonus += 2
+  if (d.legal_name && d.legal_name.length >= 2) completenessBonus += 2
+  if (d.contact_phone && d.contact_phone.length >= 11) completenessBonus += 2
+  if (d.bank_name && d.bank_name.length >= 2) completenessBonus += 1
+  if (d.business_scenario) completenessBonus += 2
+
+  baseScore -= completenessBonus
+  if (completenessBonus >= 8) {
+    positiveFactors.push('客户信息收集较完整，有助于评估')
+  }
+
+  // ==================== 7. 资金冻结特殊处理 ====================
+  if (pt.includes('冻结') || pt.includes('延迟结算')) {
+    if (d.bank_name && d.bank_account_last4) {
+      baseScore -= 3
+      positiveFactors.push('已提供结算账户信息，有助于催审和身份验证')
+    }
+    examinerConcerns.push('资金冻结案件审核员会核实：结算账户信息是否匹配、交易流水是否正常')
+  }
+
+  // ==================== 计算最终评分和成功率 ====================
+  baseScore = Math.max(5, Math.min(95, baseScore))
+
+  // 成功率计算（更客观的区间）
+  let level, successRate, successRateMin, successRateMax
+  if (baseScore <= 25) {
+    level = '简单'; successRateMin = 80; successRateMax = 95
+  } else if (baseScore <= 40) {
+    level = '较低'; successRateMin = 65; successRateMax = 80
+  } else if (baseScore <= 55) {
+    level = '中等'; successRateMin = 50; successRateMax = 65
+  } else if (baseScore <= 70) {
+    level = '较难'; successRateMin = 35; successRateMax = 50
+  } else if (baseScore <= 85) {
+    level = '困难'; successRateMin = 20; successRateMax = 35
+  } else {
+    level = '极难'; successRateMin = 5; successRateMax = 20
+  }
+  successRate = `${successRateMin}-${successRateMax}%`
+
+  // 生成客观评估说明
+  let finalAssessment = ''
+  if (baseScore <= 25) {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。根据经验，这类案件准备充分的情况下有较高成功率。但仍建议认真准备材料，一次通过。`
+  } else if (baseScore <= 40) {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。需要注意审核员可能会追问一些问题，建议提前准备补充说明。`
+  } else if (baseScore <= 55) {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。审核员会较为仔细地审查每一项材料。建议认真对待，准备完整证据链。`
+  } else if (baseScore <= 70) {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。这类案件审核员会重点审查，需要有充分的整改证据和合理的业务说明。建议做好二次申诉准备。`
+  } else if (baseScore <= 85) {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。审核员会非常严格地审查。建议：1）先确认处罚是否准确；2）充分准备全部证据；3）做好二次申诉甚至三次申诉的准备。`
+  } else {
+    finalAssessment = `从客观角度分析，您的案件属于「${level}」级别。这需要非常专业的材料和话术。建议：1）先通过95017确认违规详情；2）必要时寻求专业法律支持。`
+  }
+
+  if (objectiveAssessment) {
+    finalAssessment = objectiveAssessment + ' ' + finalAssessment
+  }
+
+  return {
+    riskScore: baseScore,
+    level,
+    successRate,
+    successRateMin,
+    successRateMax,
+    factors: {
+      positive: positiveFactors,
+      negative: negativeFactors
+    },
+    examinerConcerns,
+    completenessBonus,
+    assessment: finalAssessment
+  }
+}
+
+// 生成个性化材料清单
+export function generateMaterialChecklist(collectedData) {
+  const d = collectedData
+  const pt = (d.problem_type || '').toLowerCase()
+  const vr = (d.violation_reason || '').toLowerCase()
+
+  let checklist = [
+    { item: '营业执照照片（清晰完整）', required: true, category: '证件信息' },
+    { item: '法人身份证正反面照片', required: true, category: '证件信息' },
+    { item: '法人手持身份证照片', required: true, category: '证件信息' },
+  ]
+
+  // 经营场景照片
+  const bm = (d.business_model || '').toLowerCase()
+  if (bm.includes('线下') || bm.includes('门店') || bm.includes('实体')) {
+    checklist.push({ item: '门店门头照片', required: true, category: '经营信息' })
+    checklist.push({ item: '门店内景照片（体现经营范围）', required: true, category: '经营信息' })
+    checklist.push({ item: '营业场景地点定位截图', required: false, category: '经营信息' })
+  }
+  if (bm.includes('线上') || bm.includes('小程序') || bm.includes('电商') || bm.includes('网')) {
+    checklist.push({ item: '小程序/商城后台截图', required: true, category: '经营信息' })
+    checklist.push({ item: '商品列表页面截图', required: true, category: '经营信息' })
+  }
+
+  // 交易凭证
+  checklist.push({ item: '3-5笔微信支付订单号（4开头28位）', required: true, category: '交易凭证' })
+  checklist.push({ item: '订单对应的商品/服务凭证', required: true, category: '交易凭证' })
+
+  // 根据违规原因添加特殊材料
+  if (vr.includes('纠纷') || vr.includes('投诉')) {
+    checklist.push({ item: '所有投诉的退款凭证截图', required: true, category: '投诉处理' })
+    checklist.push({ item: '消费者撤诉/确认已解决的截图', required: true, category: '投诉处理' })
+    checklist.push({ item: '完善的退款售后政策文件', required: true, category: '投诉处理' })
+  }
+  if (vr.includes('跨类目') || vr.includes('类目')) {
+    checklist.push({ item: '已下架不符商品/服务的截图', required: true, category: '整改证据' })
+    checklist.push({ item: '类目变更申请截图', required: false, category: '整改证据' })
+  }
+  if (vr.includes('套现') || vr.includes('异常')) {
+    checklist.push({ item: '进货合同/供应商发票', required: true, category: '交易凭证' })
+    checklist.push({ item: '发货单+物流单号+签收记录', required: true, category: '交易凭证' })
+  }
+  if (vr.includes('欺诈') || vr.includes('售假')) {
+    checklist.push({ item: '品牌授权书', required: true, category: '正品证明' })
+    checklist.push({ item: '产品质检报告', required: true, category: '正品证明' })
+  }
+  if (vr.includes('分销')) {
+    checklist.push({ item: '分销规则文档', required: true, category: '业务证明' })
+    checklist.push({ item: '分销后台截图（显示仅一级）', required: true, category: '业务证明' })
+    checklist.push({ item: '佣金结构说明', required: true, category: '业务证明' })
+  }
+  if (vr.includes('洗钱') || vr.includes('反洗钱') || vr.includes('可疑交易')) {
+    checklist.push({ item: '商业合同（与交易对应）', required: true, category: '资金证明' })
+    checklist.push({ item: '银行流水与微信交易对账报告', required: true, category: '资金证明' })
+    checklist.push({ item: '增值税发票/收据', required: true, category: '资金证明' })
+    checklist.push({ item: '反洗钱内控制度文件', required: false, category: '合规文件' })
+    checklist.push({ item: '法人声明书（声明资金合法）', required: true, category: '合规文件' })
+  }
+  if (vr.includes('内容违规') || vr.includes('违反法律') || vr.includes('敏感内容')) {
+    checklist.push({ item: '违规内容整改前后对比截图', required: true, category: '整改证据' })
+    checklist.push({ item: '内容审核管理制度文件', required: true, category: '整改证据' })
+    checklist.push({ item: '相关经营资质证明（如有）', required: false, category: '资质证明' })
+  }
+  if (vr.includes('虚假交易') || vr.includes('刷单') || vr.includes('自买自卖')) {
+    checklist.push({ item: '物流实际签收记录（含签收照片）', required: true, category: '交易凭证' })
+    checklist.push({ item: '客户真实沟通记录截图', required: true, category: '交易凭证' })
+    checklist.push({ item: '商品实拍照片（含包装和标签）', required: true, category: '交易凭证' })
+    checklist.push({ item: '客户评价/复购记录截图', required: false, category: '交易凭证' })
+  }
+  if (vr.includes('赌博') || vr.includes('棋牌')) {
+    checklist.push({ item: '软件著作权登记证书', required: true, category: '资质证明' })
+    checklist.push({ item: '游戏用户协议（含禁止变现条款）', required: true, category: '业务证明' })
+    checklist.push({ item: '游戏内商城/交易系统截图（证明无变现功能）', required: true, category: '业务证明' })
+  }
+
+  // 资金冻结特殊材料
+  if (pt.includes('冻结') || pt.includes('延迟结算')) {
+    checklist.push({ item: '结算账户开户信息', required: true, category: '账户信息' })
+    checklist.push({ item: '交易流水明细导出', required: true, category: '交易凭证' })
+  }
+
+  // 商户号封禁特殊材料
+  if (pt.includes('封禁')) {
+    checklist.push({ item: '法人手持身份证+营业执照合影（视频认证用）', required: true, category: '证件信息' })
+    checklist.push({ item: '近6个月银行流水', required: false, category: '交易凭证' })
+  }
+
+  // 通用整改材料
+  checklist.push({ item: '整改措施说明书', required: true, category: '整改文件' })
+  checklist.push({ item: '业务模式说明', required: true, category: '整改文件' })
+
+  return checklist
+}

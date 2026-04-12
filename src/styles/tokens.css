@@ -1,0 +1,190 @@
+:root {
+  /* ============================================
+     商户号申诉系统 - Design Tokens
+     基于微信支付设计语言 + UI/UX设计文档
+     ============================================ */
+
+  /* === 主题色 - 微信绿 === */
+  --color-primary: #07C160;
+  --color-primary-hover: #06A854;
+  --color-primary-active: #059048;
+  --color-primary-light: #E8F8EE;
+  --color-primary-dark: #055037;
+  --color-primary-bg: #F0F9F2;
+
+  /* === 辅助色 === */
+  --color-secondary: #576B95;
+  --color-secondary-hover: #4A5F84;
+  --color-secondary-active: #3D5273;
+  --color-secondary-light: #EBEEF5;
+
+  /* === 语义色 === */
+  --color-success: #07C160;
+  --color-success-light: #E8F8EE;
+  --color-success-dark: #059048;
+
+  --color-warning: #FF9900;
+  --color-warning-light: #FFF4E6;
+  --color-warning-dark: #CC7A00;
+
+  --color-error: #FF3B30;
+  --color-error-light: #FFEBE9;
+  --color-error-dark: #CC2F26;
+
+  --color-info: #1890FF;
+  --color-info-light: #E6F7FF;
+  --color-info-dark: #096DD9;
+
+  /* === 中性色 - 灰阶 === */
+  --color-gray-50: #FAFAFA;
+  --color-gray-100: #F5F5F5;
+  --color-gray-200: #EEEEEE;
+  --color-gray-300: #E0E0E0;
+  --color-gray-400: #BDBDBD;
+  --color-gray-500: #999999;
+  --color-gray-600: #666666;
+  --color-gray-700: #4A4A4A;
+  --color-gray-800: #333333;
+  --color-gray-900: #1A1A1A;
+
+  /* === 文字色 === */
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #999999;
+  --color-text-disabled: #BDBDBD;
+  --color-text-inverse: #FFFFFF;
+
+  /* === 背景色 === */
+  --color-bg-page: #F5F5F5;
+  --color-bg-card: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-overlay: rgba(0, 0, 0, 0.5);
+  --color-bg-mask: rgba(0, 0, 0, 0.4);
+  --color-bg-primary-light: #E8F8EE;
+
+  /* === 边框色 === */
+  --color-border: #EEEEEE;
+  --color-border-light: #F5F5F5;
+  --color-border-medium: #E0E0E0;
+  --color-border-focus: #07C160;
+  --color-border-error: #FF3B30;
+
+  /* === 阴影 === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-bubble: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-bubble-user: 0 1px 2px rgba(7, 193, 96, 0.2);
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+  /* === 圆角 === */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* === 间距 - 4px基准 === */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* === 字体 - 系统字体栈 === */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-family-mono: 'SF Mono', 'Menlo', 'Monaco', Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* === 字号 === */
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+
+  /* === 字重 === */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* === 行高 === */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 1.75;
+
+  /* === 动画时长 === */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+  --duration-slow: 0.25s;
+  --duration-slower: 0.35s;
+
+  /* === 动画缓动 === */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* === Z-Index 层级 === */
+  --z-dropdown: 50;
+  --z-sticky: 60;
+  --z-fixed: 70;
+  --z-modal-backdrop: 80;
+  --z-modal: 90;
+  --z-popover: 100;
+  --z-tooltip: 110;
+  --z-toast: 120;
+
+  /* === 组件特定变量 === */
+
+  /* 按钮 */
+  --btn-height-sm: 32px;
+  --btn-height-md: 40px;
+  --btn-height-lg: 48px;
+  --btn-padding-x-sm: 12px;
+  --btn-padding-x-md: 16px;
+  --btn-padding-x-lg: 20px;
+
+  /* 输入框 */
+  --input-height-sm: 32px;
+  --input-height-md: 40px;
+  --input-height-lg: 48px;
+  --input-padding-x: 12px;
+  --input-padding-y: 10px;
+
+  /* 导航栏 */
+  --navbar-height: 56px;
+  --navbar-height-sm: 44px;
+
+  /* 标签栏 */
+  --tabbar-height: 56px;
+  --tabbar-height-sm: 50px;
+
+  /* 移动端安全区域 */
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+  --safe-area-left: env(safe-area-inset-left);
+  --safe-area-right: env(safe-area-inset-right);
+}
+
+/* === 暗色主题（预留） === */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* --color-bg-page: #1A1A1A; */
+    /* --color-text-primary: #FFFFFF; */
+  }
+}

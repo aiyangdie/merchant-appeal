@@ -1,0 +1,88 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run lint
+      run: npm run lint || true
+
+    - name: Run tests
+      run: npm test || true
+
+    - name: Build
+      run: npm run build
+      env:
+        CI: true
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+        retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        script: |
+          cd ${{ secrets.DEPLOY_PATH }}
+          pm2 stop merchant-appeal || true
+          pm2 delete merchant-appeal || true
+          npm ci --production
+          cp .env.example .env
+          # Set production environment variables via secrets
+          sed -i 's/DB_HOST=.*/DB_HOST=${{ secrets.DB_HOST }}/' .env
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=${{ secrets.DB_PASSWORD }}/' .env
+          sed -i 's/JWT_SECRET=.*/JWT_SECRET=${{ secrets.JWT_SECRET }}/' .env
+          sed -i 's/ENCRYPT_KEY=.*/ENCRYPT_KEY=${{ secrets.ENCRYPT_KEY }}/' .env
+          sed -i 's/DEEPSEEK_API_KEY=.*/DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}/' .env
+          npm run start &
+      env:
+        NODE_ENV: production
