@@ -1,20 +1,21 @@
 import mysql from 'mysql2/promise';
 import logger from '../utils/logger.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import config from './config.js';
 
 const DB_CONFIG = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'merchant_appeal',
+  host: config.get('database.host'),
+  port: config.get('database.port'),
+  user: config.get('database.user'),
+  password: config.get('database.password'),
+  database: config.get('database.database'),
   waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10'),
+  connectionLimit: config.get('database.connectionLimit'),
   connectTimeout: 30000,
-  // Add SSL config if needed for production
-  // ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined
+  // 安全配置
+  charset: 'utf8mb4_unicode_ci',
+  multipleStatements: false, // 禁用多语句执行，防止SQL注入
+  // SSL配置（生产环境建议启用）
+  ssl: config.get('database.ssl')
 };
 
 class Database {

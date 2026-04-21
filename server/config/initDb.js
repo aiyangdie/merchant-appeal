@@ -292,9 +292,8 @@ async function seedDefaults(pool) {
   // 1. Admin
   const [admins] = await pool.execute('SELECT COUNT(*) as cnt FROM admins');
   if (admins[0].cnt === 0) {
-    const hash = bcrypt.hashSync('admin123', 12);
-    await pool.execute('INSERT INTO admins (username, password) VALUES (?, ?)', ['admin', hash]);
-    logger.warn('⚠️  Created default admin: admin / admin123 (CHANGE IMMEDIATELY)');
+    // 注意：管理员账户将在安装过程中创建，这里预留结构
+    logger.info('⚠️  Admin account will be created during installation');
   }
 
   // 2. AI Models
@@ -304,9 +303,10 @@ async function seedDefaults(pool) {
     ['custom',    '自定义模型',                '', 'custom-model',      'https://your-api.com/v1/chat/completions',               0, 0, 0, 99],
   ];
   for (const [provider, name, key, model, endpoint, active, enabled, free, order] of aiModelPresets) {
+    const encryptedKey = safeEncrypt(key);
     await pool.execute(
       'INSERT IGNORE INTO ai_models (provider, display_name, api_key, model_name, endpoint, is_active, is_enabled, is_free, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [provider, name, key, model, endpoint, active, enabled, free, order]
+      [provider, name, encryptedKey, model, endpoint, active, enabled, free, order]
     );
   }
 

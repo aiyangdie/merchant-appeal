@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid'
 import jwt from 'jsonwebtoken'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import { initInstallRoutes } from './install.js'
+import config from './config/config.js'
 import {
   initDatabase,
   createSession, getSession, updateSession,
@@ -71,15 +73,14 @@ import { initEmailService, sendEmail, checkNewEmails } from './services/emailSer
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = config.get('server.port')
+
+// 初始化安装路由
+initInstallRoutes(app)
 
 app.set('trust proxy', 1)
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) {
-  console.error('\n❌ FATAL: JWT_SECRET environment variable is required. Server cannot start securely.\n   Please set JWT_SECRET=<random-long-string> in .env file\n')
-  process.exit(1)
-}
-const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '24h'
+const JWT_SECRET = config.get('server.jwtSecret')
+const JWT_EXPIRES = config.get('server.jwtExpiresIn')
 
 // ========== 安全中间件 ==========
 
@@ -94,18 +95,43 @@ app.use(helmet({
 }))
 
 // CORS 配置
-const corsOrigins = process.env.CORS_ORIGINS || '*'
-app.use(cors({
-  origin: corsOrigins === '*' ? true : corsOrigins.split(',').map(s => s.trim()),
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}))
+const corsOrigins = config.get('cors.origins')
+const corsOptions = {
+  methods: config.get('cors.methods'),
+  allowedHeaders: config.get('cors.allowedHeaders'),
+  credentials: config.get('cors.credentials'),
+}
+
+if (corsOrigins === '*') {
+  // 开发环境使用通配符
+  corsOptions.origin = true
+} else if (corsOrigins) {
+  // 生产环境使用指定域名
+  corsOptions.origin = corsOrigins.split(',').map(s => s.trim())
+} else {
+  // 生产环境默认只允许同域
+  corsOptions.origin = (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      config.get('frontend.apiBaseUrl')?.replace('http://', 'https://') || '',
+      config.get('frontend.apiBaseUrl') || ''
+    ].filter(Boolean)
+    
+    if (allowedOrigins.includes(origin) || !origin) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  }
+}
+
+app.use(cors(corsOptions))
 
 // 全局速率限制（管理员跳过：后台并行请求多，不应被限速）
 app.use(rateLimit({
-  windowMs: 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+  windowMs: config.get('security.rateLimit.windowMs'),
+  max: config.get('security.rateLimit.max'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: '请求过于频繁，请稍后再试' },
@@ -130,16 +156,16 @@ app.use(rateLimit({
 
 // 聊天接口单独限速
 const chatLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: parseInt(process.env.CHAT_RATE_LIMIT_MAX || '20'),
+  windowMs: config.get('security.chatRateLimit.windowMs'),
+  max: config.get('security.chatRateLimit.max'),
   message: { error: '发送消息过快，请稍后再试' },
   validate: { xForwardedForHeader: false },
 })
 
 // 登录/注册接口严格限速（防暴力破解）
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分钟
-  max: 10, // 最多10次尝试
+  windowMs: config.get('security.authRateLimit.windowMs'),
+  max: config.get('security.authRateLimit.max'),
   message: { error: '登录尝试过于频繁，请15分钟后再试' },
   standardHeaders: true,
   legacyHeaders: false,
