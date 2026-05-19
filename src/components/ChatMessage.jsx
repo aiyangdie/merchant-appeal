@@ -1,5 +1,34 @@
+/**
+ * 聊天消息组件
+ * @description 渲染用户、AI、管理员和系统消息，支持 Markdown 解析、报告分块渲染、复制功能
+ * 
+ * 核心功能：
+ * 1. Markdown 解析 — 将 Markdown 格式转换为 HTML，支持表格、代码块、列表、粗体等
+ * 2. 报告分块渲染 — 检测以 ### 开头的报告格式，分段渲染并单独复制
+ * 3. 微信复制优化 — 去除格式符号保留 emoji，输出可直接粘贴到微信的纯文本
+ * 4. 安全转义 — XSS 防护，HTML 实体转义，URL 协议验证
+ * 5. 性能优化 — React.memo 包装，useMemo 缓存解析结果
+ * 6. 主题支持 — 支持专业模式（proMode）暗色主题
+ * 
+ * 消息角色类型：
+ * - user: 用户消息（右侧对齐，绿色气泡）
+ * - assistant/AI: AI 助手消息（左侧对齐，白色气泡）
+ * - admin: 人工客服消息（左侧对齐，白色气泡带绿色边框）
+ * - system: 系统消息（居中，琥珀色提示）
+ */
 import React, { useState, memo, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 
+/**
+ * 复制按钮组件
+ * @description 带状态反馈的复制按钮，点击后显示"已复制"状态，2秒后恢复
+ * 
+ * 复制策略：优先使用 navigator.clipboard.writeText，失败时回退到 execCommand('copy')
+ * 
+ * @param {Object} props
+ * @param {string} props.text - 要复制的文本内容
+ * @param {string} [props.label='复制'] - 按钮显示的标签文本
+ */
 const CopyButton = memo(function CopyButton({ text, label }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
@@ -31,7 +60,12 @@ const CopyButton = memo(function CopyButton({ text, label }) {
   )
 })
 
-// 去除 emoji 符号 + 清理 ·• 等异常符号
+/**
+ * 去除 emoji 符号 + 清理异常符号
+ * @description 移除 emoji、特殊符号（☐✅❓⚡⏳），将行首的 •· 转换为标准 markdown 列表
+ * @param {string} text - 原始文本
+ * @returns {string} 清理后的文本
+ */
 function stripEmoji(text) {
   if (!text) return text
   return text
@@ -43,7 +77,15 @@ function stripEmoji(text) {
     .replace(/^ /gm, '')
 }
 
-// 去除 Markdown 格式，返回纯文本（可直接粘贴到微信）
+/**
+ * 去除 Markdown 格式，返回纯文本
+ * @description 移除所有 Markdown 格式标记，输出可直接粘贴到微信的纯文本
+ * 
+ * 处理顺序：代码块 → 行内代码 → 粗体 → 斜体 → 标题 → 引用 → 列表 → 链接 → 分隔线
+ * 
+ * @param {string} text - Markdown 格式文本
+ * @returns {string} 清理后的纯文本
+ */
 function stripMarkdown(text) {
   if (!text) return ''
   let t = text
@@ -63,7 +105,15 @@ function stripMarkdown(text) {
   return t.trim()
 }
 
-// 整理文本用于微信复制：去掉格式符号，保留 emoji，输出干净可粘贴文本
+/**
+ * 整理文本用于微信复制
+ * @description 去除格式符号但保留 emoji，输出干净可粘贴文本
+ * 
+ * 与 stripMarkdown 的区别：保留有序列表编号，保留 emoji 表情符号
+ * 
+ * @param {string} text - 原始文本
+ * @returns {string} 清理后的纯文本（保留 emoji）
+ */
 function cleanTextForCopy(text) {
   if (!text) return ''
   let t = text
@@ -84,7 +134,15 @@ function cleanTextForCopy(text) {
   return t.trim()
 }
 
-// 检测报告分段（以 ### 开头的段落），返回 [{title, content, fullText}]
+/**
+ * 检测报告分段
+ * @description 以 ### 开头的段落作为分段标记，返回结构化分段数组
+ * 
+ * 用于报告格式检测：当 AI 回复包含多个 ### 标题时，将其拆分为可独立复制的段落
+ * 
+ * @param {string} text - 完整文本内容
+ * @returns {Array<{title: string, content: string, fullText: string}>} 分段数组
+ */
 function extractReportSections(text) {
   if (!text) return []
   const sections = []
@@ -103,6 +161,27 @@ function extractReportSections(text) {
   return sections
 }
 
+/**
+ * Markdown 解析器
+ * @description 将 Markdown 格式文本转换为 HTML，用于 dangerouslySetInnerHTML 渲染
+ * 
+ * 解析顺序：
+ * 1. XSS 防护 — HTML 实体转义（& < > 转义，引用符号还原）
+ * 2. 代码块提取 — 提取代码块为占位符，防止内部内容被解析
+ * 3. 行内代码 — 转换为 <code> 标签
+ * 4. 表格提取 — 提取表格为占位符，解析为 HTML table
+ * 5. 引用块 — > text 转换为普通文本
+ * 6. 标题 — ## ### 转换为 h2 h3
+ * 7. 粗体 — **text** 转换为 strong
+ * 8. 链接 — [text](url) 转换为 a 标签（带 URL 协议验证）
+ * 9. 列表 — 无序/有序列表转换为 ul/li
+ * 10. 段落 — 换行符转换为 <br /> 和 <p>
+ * 11. 特殊标记 — [推荐商品:ID] 和 [推荐名片:ID] 转换为美化卡片
+ * 12. 占位符还原 — 还原代码块和表格占位符
+ * 
+ * @param {string} text - Markdown 格式文本
+ * @returns {string} HTML 字符串
+ */
 function parseMarkdown(text) {
   if (!text) return ''
 
@@ -189,9 +268,21 @@ function parseMarkdown(text) {
   // 还原代码块占位符
   codeBlocks.forEach((c, i) => { html = html.replace(`%%CODE_${i}%%`, c) })
 
-  return html
+  return DOMPurify.sanitize(html)
 }
 
+/**
+ * 微信复制功能块
+ * @description 提供一键整理并复制纯文本功能，带预览模式
+ * 
+ * 渲染逻辑：
+ * 1. 内容少于10字符 → 不渲染（返回 null）
+ * 2. 显示"一键整理并复制"按钮 + "预览纯文本"切换按钮
+ * 3. 预览模式下显示 200px 高度可滚动的纯文本框
+ * 
+ * @param {Object} props
+ * @param {string} props.content - 原始 Markdown 内容
+ */
 const CleanCopyBlock = memo(function CleanCopyBlock({ content }) {
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -239,9 +330,24 @@ const CleanCopyBlock = memo(function CleanCopyBlock({ content }) {
         </div>
       )}
     </div>
-  )
+    )
 })
 
+/**
+ * 报告内容渲染组件
+ * @description 检测并渲染结构化报告格式（多个 ### 标题分段）
+ * 
+ * 渲染逻辑：
+ * 1. 提取所有 ### 开头的分段（至少2个分段才视为报告）
+ * 2. 分段前的内容作为前置内容（preContent）单独渲染
+ * 3. 顶部显示"一键复制全部"按钮 + 纯文本提示
+ * 4. 每个分段独立渲染：标题栏 + 复制按钮 + 内容区
+ * 
+ * 非报告格式 → 直接渲染为普通 Markdown 内容
+ * 
+ * @param {Object} props
+ * @param {string} props.content - AI 生成的完整报告内容（Markdown 格式）
+ */
 const ReportContent = memo(function ReportContent({ content }) {
   const sections = useMemo(() => extractReportSections(content), [content])
   const hasReport = sections.length >= 2
@@ -280,7 +386,20 @@ const ReportContent = memo(function ReportContent({ content }) {
     </div>
   )
 })
-
+/**
+ * 消息元数据组件
+ * @description 显示消息的计时信息和 Token 使用统计
+ * 
+ * 渲染逻辑：
+ * 1. 无 timing 和 tokenUsage → 不渲染（返回 null）
+ * 2. 有 firstByteMs 和 totalMs → 显示首字时间和总耗时
+ * 3. 有 inputTokens 和 outputTokens → 显示输入/输出 Token 数
+ * 4. 有 cost > 0 → 显示费用（精确到小数点后4位）
+ * 
+ * @param {Object} props
+ * @param {Object} [props.timing] - 计时信息 {firstByteMs, totalMs}
+ * @param {Object} [props.tokenUsage] - Token 使用统计 {inputTokens, outputTokens, cost}
+ */
 const MessageMeta = memo(function MessageMeta({ timing, tokenUsage }) {
   if (!timing && !tokenUsage) return null
   const hasTiming = timing && (timing.totalMs || timing.firstByteMs)
@@ -308,6 +427,27 @@ const MessageMeta = memo(function MessageMeta({ timing, tokenUsage }) {
   )
 })
 
+/**
+ * 聊天消息主组件
+ * @description 根据消息角色渲染不同样式的消息气泡
+ * 
+ * 渲染规则：
+ * 1. system 角色 → 居中显示，琥珀色背景，小号文字
+ * 2. user 角色 → 右侧对齐，绿色渐变气泡，白色文字
+ * 3. admin 角色 → 左侧对齐，白色气泡带绿色边框，"人工客服"标签
+ * 4. assistant/AI 角色 → 左侧对齐，白色气泡/专业模式气泡
+ * 
+ * 报告检测：非用户消息且包含≥2个 ### 标题 → 使用 ReportContent 渲染
+ * 普通消息：使用 parseMarkdown 渲染 + CleanCopyBlock 复制按钮
+ * 
+ * @param {Object} props
+ * @param {string} props.role - 消息角色 'user' | 'assistant' | 'admin' | 'system'
+ * @param {string} props.content - 消息内容（Markdown 格式）
+ * @param {boolean} [props.animate=false] - 是否显示入场动画
+ * @param {Object} [props.timing] - 计时信息 {firstByteMs, totalMs}
+ * @param {Object} [props.tokenUsage] - Token 使用统计 {inputTokens, outputTokens, cost}
+ * @param {boolean} [props.proMode=false] - 是否为专业模式（影响主题色和气泡样式）
+ */
 export default memo(function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false }) {
   const isUser = role === 'user'
   const isSystem = role === 'system'
@@ -330,7 +470,7 @@ export default memo(function ChatMessage({ role, content, animate = false, timin
       {!isUser && (
         <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mr-2 sm:mr-2.5 mt-0.5 ${
           role === 'admin'
-            ? 'bg-gradient-to-br from-orange-400 to-orange-500 shadow-sm'
+            ? 'bg-gradient-to-br from-green-400 to-emerald-500 shadow-sm'
             : proMode
               ? 'bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm shadow-amber-500/15'
               : 'bg-gradient-to-br from-[#07C160] to-[#059669] shadow-sm'
@@ -356,7 +496,7 @@ export default memo(function ChatMessage({ role, content, animate = false, timin
                 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
                 : 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3')
             : role === 'admin'
-              ? 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3 border border-orange-100/80'
+              ? 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3 border border-green-100/80'
               : proMode
                 ? 'pro-bubble-ai rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
                 : 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
@@ -366,7 +506,7 @@ export default memo(function ChatMessage({ role, content, animate = false, timin
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-1">
             {role === 'admin' ? (
-              <span className="text-[10px] text-orange-500 font-medium">人工客服</span>
+              <span className="text-[10px] text-green-600 font-medium">人工客服</span>
             ) : proMode ? (
               <span className="text-[10px] text-amber-600 font-medium">AI 专业顾问</span>
             ) : (

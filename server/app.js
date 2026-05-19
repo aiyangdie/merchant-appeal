@@ -1,3 +1,4 @@
+// DEPRECATED: 生产入口为 server/index.js。本文件与 server/routes/* 未挂载，请勿新增代码。
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';

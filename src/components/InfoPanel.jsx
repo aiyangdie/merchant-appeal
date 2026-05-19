@@ -1,5 +1,15 @@
+/**
+ * @fileoverview 客户信息面板组件
+ * @description 在对话侧边栏展示收集到的客户信息，支持按分组展示、点击编辑、查看修改历史
+ * @module InfoPanel
+ */
+
 import React, { useState, useCallback } from 'react'
 
+/**
+ * 基础分组定义
+ * @description 信息字段的固定分组及配色方案，用于将不同类型的信息分类展示
+ */
 const BASE_GROUPS = [
   { key: '业务了解', color: 'purple' },
   { key: '问题信息', color: 'emerald' },
@@ -12,8 +22,16 @@ const BASE_GROUPS = [
   { key: '申诉历史', color: 'slate' },
 ]
 
+/**
+ * 动态分组配色方案
+ * @description 用于超出 BASE_GROUPS 的动态发现分组，循环使用这些颜色
+ */
 const DYNAMIC_COLORS = ['amber', 'teal', 'cyan', 'purple', 'emerald', 'blue']
 
+/**
+ * 颜色映射表
+ * @description 将颜色名称映射到对应的 Tailwind CSS 类名（圆点、背景、文字）
+ */
 const C = {
   purple:  { dot: 'bg-purple-400',  bg: 'bg-purple-50/60',  text: 'text-purple-700' },
   emerald: { dot: 'bg-emerald-400', bg: 'bg-emerald-50/60', text: 'text-emerald-700' },
@@ -27,6 +45,18 @@ const C = {
   slate:   { dot: 'bg-slate-400',   bg: 'bg-slate-50/60',   text: 'text-slate-700' },
 }
 
+/**
+ * 字段修改历史组件
+ * @description 展示单个字段的所有修改记录，包括旧值→新值、修改来源、时间和原因
+ * @param {Object} props
+ * @param {Array} props.logs - 修改记录数组 [{old_value, new_value, change_source, change_reason, created_at}]
+ * 
+ * 修改来源类型：
+ * - ai_extract: AI 自动识别提取
+ * - ai_correction: AI 更正/修正
+ * - user_edit: 用户手动修改
+ * - system: 系统默认值
+ */
 function FieldHistory({ logs }) {
   if (!logs || logs.length === 0) return <div className="text-[10px] text-gray-400 py-2 text-center">暂无修改记录</div>
   const SOURCE_LABEL = { ai_extract: '🤖 AI识别', ai_correction: '🔄 AI更正', user_edit: '✏️ 用户修改', system: '⚙️ 系统' }
@@ -60,6 +90,24 @@ function FieldHistory({ logs }) {
   )
 }
 
+/**
+ * 可编辑字段组件
+ * @description 展示单个信息字段，支持点击已填字段进入编辑模式，查看修改历史
+ * 
+ * 交互逻辑：
+ * 1. 未填写字段 → 显示灰色占位圆圈，点击无反应
+ * 2. 已填写字段 → 显示绿色对勾，hover 显示编辑/历史按钮，点击可进入编辑
+ * 3. 编辑模式 → 显示 textarea 输入框，支持保存/取消
+ * 
+ * @param {Object} props
+ * @param {string} props.fieldKey - 字段唯一标识，用于保存和查询历史
+ * @param {string} props.label - 字段显示名称（如"商户号"、"公司全称"）
+ * @param {string} props.value - 字段当前值
+ * @param {Function} props.onSave - 保存回调 (fieldKey, value) => Promise
+ * @param {Function} props.onShowHistory - 查看历史回调 (fieldKey) => void
+ * @param {Array} props.historyLogs - 修改历史记录数组
+ * @param {boolean} props.historyLoading - 历史加载状态
+ */
 function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyLogs, historyLoading }) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
@@ -150,6 +198,27 @@ function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyL
   )
 }
 
+/**
+ * 客户信息面板主组件
+ * @description 展示所有收集到的客户信息，按分组组织，支持进度追踪、字段编辑和历史查看
+ * 
+ * 核心功能：
+ * 1. 信息分组展示 — 按业务了解、问题信息、商户号信息等分组展示
+ * 2. 进度追踪 — 显示已收集字段数和百分比进度条
+ * 3. 字段编辑 — 点击已填字段可修改，调用后端 API 保存
+ * 4. 修改历史 — 查看每个字段的修改记录（来源、时间、原因）
+ * 5. 动态分组 — 后端返回的新分组会自动发现并分配颜色
+ * 
+ * @param {Object} props
+ * @param {Object} props.collectedData - 已收集的数据 {fieldKey: value}
+ * @param {Array} props.fields - 字段定义数组 [{key, label, group}]
+ * @param {number} props.step - 当前步骤（已废弃，使用 fieldList.length）
+ * @param {number} props.totalSteps - 总步骤数（已废弃，使用 fieldList.length）
+ * @param {Function} props.onClose - 关闭面板回调（移动端）
+ * @param {string} props.sessionId - 会话 ID，用于 API 请求
+ * @param {Function} props.onFieldUpdate - 字段更新回调 (key, value)
+ * @param {Function} props.getAuthHeaders - 获取认证请求头回调
+ */
 export default function InfoPanel({ collectedData, fields, step, totalSteps, onClose, sessionId, onFieldUpdate, getAuthHeaders }) {
   const data = collectedData || {}
   const fieldList = fields || []

@@ -1,6 +1,21 @@
+/**
+ * @fileoverview 申诉分析报告卡片组件
+ * @description 将 AI 分析的申诉报告以可视化卡片形式展示，支持下载为图片
+ * @module ReportCard
+ * 
+ * 核心功能：
+ * 1. Markdown 解析 — 将 AI 返回的结构化文本解析为不同板块
+ * 2. 数据可视化 — 风险评估、材料清单、策略建议等结构化展示
+ * 3. 图片导出 — 使用 html2canvas 将报告渲染为 PNG 图片下载
+ */
+
 import React, { useRef, useState, useMemo } from 'react'
 import html2canvas from 'html2canvas'
 
+/**
+ * 字段标签映射
+ * @description 将 collectedData 中的英文字段名映射为中文显示标签
+ */
 const FIELD_LABELS = {
   industry: '业务类型', business_model: '经营模式',
   problem_type: '处罚类型', violation_reason: '违规原因',
@@ -11,6 +26,28 @@ const FIELD_LABELS = {
   appeal_history: '申诉历史',
 }
 
+/**
+ * 解析 AI 分析文本为结构化板块
+ * @description 按 ## 标题分割 Markdown 文本，将内容分类到不同板块
+ * @param {string} text - AI 返回的完整分析文本（Markdown 格式）
+ * @returns {Object} 解析后的板块对象 {overview, risk, materials, strategies, ...}
+ * 
+ * 支持的板块类型：
+ * - overview: 案件概况/案情描述
+ * - chatInsights: 对话信息/信息提取
+ * - risk: 风险评估
+ * - violation: 违规原因
+ * - warnings: 风险警告/关键风险
+ * - qualifications: 资质要求
+ * - evidence: 证据链
+ * - strategies: 策略建议
+ * - materials: 申诉材料清单
+ * - riskControl: 风控逆向推演
+ * - actionPlan: 行动计划
+ * - scripts: 话术模板
+ * - timing: 最佳时机
+ * - pricing: 报价服务
+ */
 function parseSections(text) {
   if (!text) return {}
   const sections = {}
@@ -38,16 +75,34 @@ function parseSections(text) {
   return sections
 }
 
+/**
+ * 解析列表项（无序列表）
+ * @description 提取以 `-` 或 `·` 开头的行作为列表项
+ * @param {string} text - 包含列表的文本段落
+ * @returns {string[]} 提取的列表项数组（去除前缀符号和空白）
+ */
 function parseListItems(text) {
   if (!text) return []
   return text.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('·')).map(l => l.replace(/^[\s\-·]+/, '').trim()).filter(Boolean)
 }
 
+/**
+ * 解析编号列表项
+ * @description 提取以 `数字.` 开头的行（如 `1. xxx`, `2. xxx`）
+ * @param {string} text - 包含编号列表的文本段落
+ * @returns {string[]} 提取的编号项数组（去除前缀序号）
+ */
 function parseNumberedItems(text) {
   if (!text) return []
   return text.split('\n').filter(l => /^\d+\./.test(l.trim())).map(l => l.replace(/^\d+\.\s*/, '').trim()).filter(Boolean)
 }
 
+/**
+ * 解析材料分组
+ * @description 将材料文本按 `### 分组标题` 分组，提取每个分组下的列表项
+ * @param {string} text - 材料清单文本
+ * @returns {Array<{title: string, items: string[]}>} 材料分组数组
+ */
 function parseMaterialGroups(text) {
   if (!text) return []
   const groups = []
@@ -70,6 +125,12 @@ function parseMaterialGroups(text) {
   return groups
 }
 
+/**
+ * 解析风险评估信息
+ * @description 从风险评估文本中提取难度等级、评分、成功率和影响因素
+ * @param {string} text - 风险评估板块文本
+ * @returns {Object} 解析结果 {level, score, successRate, factors[]}
+ */
 function parseRiskInfo(text) {
   if (!text) return {}
   const info = {}
@@ -82,6 +143,32 @@ function parseRiskInfo(text) {
   return info
 }
 
+/**
+ * 申诉分析报告卡片主组件
+ * @description 以弹窗形式展示 AI 分析报告，支持多板块结构化渲染和图片下载
+ * 
+ * 渲染板块（按顺序）：
+ * 1. 客户基本信息 — 从 collectedData 提取已填字段
+ * 2. 案件概况 — 从 analysisText 解析的案情摘要
+ * 3. 风险评估 — 难度等级/评分/成功率 + 影响因素
+ * 4. 关键风险警告 — 红色警告提示
+ * 5. 申诉材料清单 — 按分组展示，标记必需/建议
+ * 6. 申诉策略建议 — 编号列表展示
+ * 7. 行动计划 — 带序号的步骤
+ * 8. 资质要求 — 分组展示所需资质
+ * 9. 证据链构建 — 证据材料组织
+ * 10. 风控逆向推演 — 风控触发机制分析
+ * 
+ * 注意：
+ * - 下载功能使用 html2canvas，设置固定宽度 420px 确保输出一致性
+ * - 文件名格式：申诉分析报告_{商户名}_{日期}.png
+ * - 所有 ** 标记在渲染时被去除（纯文本展示）
+ * 
+ * @param {Object} props
+ * @param {Object} props.collectedData - 客户信息数据 {merchant_name, industry, ...}
+ * @param {string} props.analysisText - AI 生成的完整分析文本（Markdown 格式）
+ * @param {Function} props.onClose - 关闭弹窗回调
+ */
 export default function ReportCard({ collectedData, analysisText, onClose }) {
   const cardRef = useRef(null)
   const [downloading, setDownloading] = useState(false)

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商户申诉系统 API 测试工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#07C160',
+                        secondary: '#6B7280',
+                        dark: '#1F2937',
+                        light: '#F3F4F6',
+                    },
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 头部 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">商户申诉系统 API 测试工具</h1>
+                    <p class="text-gray-600 mt-2">测试和验证所有API接口的功能</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">✅ 已修复 JavaScript 错误</span>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full">⚡ 一键测试功能</span>
+                        <span class="px-3 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">🔄 自动保存 Token</span>
+                    </div>
+                </div>
+                <div class="mt-4 md:mt-0 space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="api-base-url" value="http://49.232.48.193" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="API基础URL">
+                        <button id="save-base-url" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                            <i class="fa fa-save mr-1"></i> 保存
+                        </button>
+                    </div>
+                    <button id="quick-test-all" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium">
+                        <i class="fa fa-bolt mr-1"></i> 快速测试所有 API（自动填充参数）
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 认证部分 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">认证管理</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用户 Token</label>
+                    <input type="text" id="user-token" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="用户 JWT Token">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">管理员 Token</label>
+                    <input type="text" id="admin-token" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="管理员 JWT Token">
+                </div>
+            </div>
+            <div class="mt-4 flex space-x-2">
+                <button id="clear-tokens" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    <i class="fa fa-times mr-1"></i> 清除 Token
+                </button>
+            </div>
+        </div>
+
+        <!-- API 分类导航 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">API 分类</h2>
+            <div class="flex flex-wrap gap-2">
+                <button class="api-category-btn px-4 py-2 bg-primary text-white rounded-lg" data-category="user">用户 API</button>
+                <button class="api-category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" data-category="chat">聊天 API</button>
+                <button class="api-category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" data-category="session">会话 API</button>
+                <button class="api-category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" data-category="admin">管理员 API</button>
+                <button class="api-category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" data-category="order">订单 API</button>
+                <button class="api-category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" data-category="payment">支付 API</button>
+            </div>
+        </div>
+
+        <!-- API 测试区域 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div class="api-test-section" id="user-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">用户 API 测试</h2>
+                
+                <!-- 用户注册 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">用户注册</h3>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">POST</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/user/register" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求参数 (JSON)</label>
+                            <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" rows="4" placeholder='{"phone": "15276102974", "nickname": "测试用户"}'>{"phone": "15276102974", "nickname": "测试用户"}</textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="register">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 用户登录 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">用户登录</h3>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">POST</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/user/login" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求参数 (JSON)</label>
+                            <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" rows="4" placeholder='{"phone": "15276102974"}'>{"phone": "15276102974"}</textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="login">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 获取用户信息 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">获取用户信息</h3>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">GET</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/user/{id}" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">用户 ID</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" value="1" placeholder="用户 ID">
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="get-user">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 聊天 API 测试 -->
+            <div class="api-test-section hidden" id="chat-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">聊天 API 测试</h2>
+                
+                <!-- 发送消息 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">发送消息</h3>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">POST</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/chat" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求参数 (JSON)</label>
+                            <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" rows="4" placeholder='{"sessionId": "", "content": "你好", "userId": "1"}'>{"sessionId": "", "content": "你好", "userId": "1"}</textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="chat">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 会话 API 测试 -->
+            <div class="api-test-section hidden" id="session-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">会话 API 测试</h2>
+                
+                <!-- 创建会话 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">创建会话</h3>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">POST</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/sessions" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求参数 (JSON)</label>
+                            <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" rows="4" placeholder='{"userId": "1"}'>{"userId": "1"}</textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="create-session">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理员 API 测试 -->
+            <div class="api-test-section hidden" id="admin-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">管理员 API 测试</h2>
+                
+                <!-- 管理员登录 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">管理员登录</h3>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">POST</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/admin/login" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求参数 (JSON)</label>
+                            <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" rows="4" placeholder='{"username": "admin", "password": "admin123"}'>{"username": "admin", "password": "admin123"}</textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="admin-login">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 订单 API 测试 -->
+            <div class="api-test-section hidden" id="order-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">订单 API 测试</h2>
+                
+                <!-- 获取订单列表 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">获取订单列表</h3>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">GET</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/orders/from-system" readonly>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="get-orders">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 支付 API 测试 -->
+            <div class="api-test-section hidden" id="payment-api-section">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">支付 API 测试</h2>
+                
+                <!-- 获取充值配置 -->
+                <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium text-gray-800">获取充值配置</h3>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">GET</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">请求 URL</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" value="/api/recharge/config" readonly>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="api-test-btn px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" data-api="get-recharge-config">
+                                <i class="fa fa-play mr-1"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 响应结果 -->
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">响应结果</h2>
+            <div class="relative">
+                <div class="absolute top-2 right-2">
+                    <button id="clear-response" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300 transition-colors">
+                        <i class="fa fa-times mr-1"></i> 清除
+                    </button>
+                </div>
+                <pre id="response-output" class="bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto max-h-96 scrollbar-hide text-sm">响应结果将显示在这里...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let apiBaseUrl = localStorage.getItem('apiBaseUrl') || 'http://49.232.48.193';
+        let userToken = localStorage.getItem('userToken') || '';
+        let adminToken = localStorage.getItem('adminToken') || '';
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载保存的配置
+            document.getElementById('api-base-url').value = apiBaseUrl;
+            document.getElementById('user-token').value = userToken;
+            document.getElementById('admin-token').value = adminToken;
+
+            // 保存 API 基础 URL
+            document.getElementById('save-base-url').addEventListener('click', function() {
+                apiBaseUrl = document.getElementById('api-base-url').value;
+                localStorage.setItem('apiBaseUrl', apiBaseUrl);
+                showToast('API 基础 URL 已保存');
+            });
+
+            // 清除 Token
+            document.getElementById('clear-tokens').addEventListener('click', function() {
+                document.getElementById('user-token').value = '';
+                document.getElementById('admin-token').value = '';
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('adminToken');
+                userToken = '';
+                adminToken = '';
+                showToast('Token 已清除');
+            });
+
+            // API 分类切换
+            document.querySelectorAll('.api-category-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const category = this.dataset.category;
+                    
+                    // 更新按钮样式
+                    document.querySelectorAll('.api-category-btn').forEach(btn => {
+                        btn.classList.remove('bg-primary', 'text-white');
+                        btn.classList.add('bg-gray-200', 'text-gray-700');
+                    });
+                    this.classList.remove('bg-gray-200', 'text-gray-700');
+                    this.classList.add('bg-primary', 'text-white');
+
+                    // 显示对应分类的 API 测试区域
+                    document.querySelectorAll('.api-test-section').forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    document.getElementById(`${category}-api-section`).classList.remove('hidden');
+                });
+            });
+
+            // 清除响应
+            document.getElementById('clear-response').addEventListener('click', function() {
+                document.getElementById('response-output').textContent = '响应结果将显示在这里...';
+            });
+
+            // 快速测试所有API
+            document.getElementById('quick-test-all').addEventListener('click', async function() {
+                const responseOutput = document.getElementById('response-output');
+                responseOutput.textContent = '🚀 开始快速测试所有 API...\n\n';
+                
+                const tests = [
+                    { name: '1. 管理员登录', api: 'admin-login' },
+                    { name: '2. 用户注册', api: 'register' },
+                    { name: '3. 用户登录', api: 'login' },
+                    { name: '4. 获取充值配置', api: 'get-recharge-config' }
+                ];
+
+                for (const test of tests) {
+                    responseOutput.textContent += `⏳ 正在测试: ${test.name}...\n`;
+                    
+                    try {
+                        const btn = document.querySelector(`[data-api="${test.api}"]`);
+                        if (btn) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await testAPI(test.api, btn);
+                            responseOutput.textContent += `✅ ${test.name} 完成\n\n`;
+                        } else {
+                            responseOutput.textContent += `❌ ${test.name}: 未找到按钮\n\n`;
+                        }
+                    } catch (error) {
+                        responseOutput.textContent += `❌ ${test.name} 失败: ${error.message}\n\n`;
+                    }
+                }
+
+                responseOutput.textContent += '\n🎉 快速测试完成！\n';
+                responseOutput.textContent += '\n💡 提示：\n';
+                responseOutput.textContent += '- 管理员 Token 已自动保存\n';
+                responseOutput.textContent += '- 用户 Token 已自动保存\n';
+                responseOutput.textContent += '- 现在可以使用其他需要 Token 的 API 了\n';
+                
+                showToast('快速测试完成！');
+            });
+
+            // API 测试按钮
+            document.querySelectorAll('.api-test-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    const api = this.dataset.api;
+                    testAPI(api, this);
+                });
+            });
+        });
+
+        // 测试 API
+        async function testAPI(api, buttonElement) {
+            let url, method, headers, body;
+            const responseOutput = document.getElementById('response-output');
+
+            // 保存 Token
+            userToken = document.getElementById('user-token').value;
+            adminToken = document.getElementById('admin-token').value;
+            localStorage.setItem('userToken', userToken);
+            localStorage.setItem('adminToken', adminToken);
+
+            // 设置默认头部
+            headers = {
+                'Content-Type': 'application/json'
+            };
+
+            // 根据 API 类型设置参数
+            switch(api) {
+                case 'register':
+                    url = `${apiBaseUrl}/api/user/register`;
+                    method = 'POST';
+                    body = getJSONValue(buttonElement, 'textarea');
+                    break;
+                case 'login':
+                    url = `${apiBaseUrl}/api/user/login`;
+                    method = 'POST';
+                    body = getJSONValue(buttonElement, 'textarea');
+                    break;
+                case 'get-user':
+                    url = `${apiBaseUrl}/api/user/${getInputValue(buttonElement, 'input[placeholder="用户 ID"]')}`;
+                    method = 'GET';
+                    headers['Authorization'] = `Bearer ${userToken}`;
+                    break;
+                case 'chat':
+                    url = `${apiBaseUrl}/api/chat`;
+                    method = 'POST';
+                    body = getJSONValue(buttonElement, 'textarea');
+                    headers['Authorization'] = `Bearer ${userToken}`;
+                    break;
+                case 'create-session':
+                    url = `${apiBaseUrl}/api/sessions`;
+                    method = 'POST';
+                    body = getJSONValue(buttonElement, 'textarea');
+                    headers['Authorization'] = `Bearer ${userToken}`;
+                    break;
+                case 'admin-login':
+                    url = `${apiBaseUrl}/api/admin/login`;
+                    method = 'POST';
+                    body = getJSONValue(buttonElement, 'textarea');
+                    break;
+                case 'get-orders':
+                    url = `${apiBaseUrl}/api/orders/from-system`;
+                    method = 'GET';
+                    headers['Authorization'] = `Bearer ${userToken}`;
+                    break;
+                case 'get-recharge-config':
+                    url = `${apiBaseUrl}/api/recharge/config`;
+                    method = 'GET';
+                    break;
+                default:
+                    return;
+            }
+
+            try {
+                responseOutput.textContent = '正在请求...';
+
+                const options = {
+                    method: method,
+                    headers: headers
+                };
+
+                if (body) {
+                    options.body = body;
+                }
+
+                const response = await fetch(url, options);
+                const data = await response.json();
+
+                responseOutput.textContent = JSON.stringify(data, null, 2);
+
+                // 如果是登录成功，自动保存 Token
+                if (api === 'login' && data.token) {
+                    document.getElementById('user-token').value = data.token;
+                    userToken = data.token;
+                    localStorage.setItem('userToken', userToken);
+                    showToast('用户 Token 已自动保存');
+                }
+
+                if (api === 'admin-login' && data.token) {
+                    document.getElementById('admin-token').value = data.token;
+                    adminToken = data.token;
+                    localStorage.setItem('adminToken', adminToken);
+                    showToast('管理员 Token 已自动保存');
+                }
+
+            } catch (error) {
+                responseOutput.textContent = `错误: ${error.message}`;
+            }
+        }
+
+        // 获取 JSON 值
+        function getJSONValue(element, selector) {
+            const textarea = element.closest('.mb-6').querySelector(selector);
+            return textarea.value;
+        }
+
+        // 获取输入值
+        function getInputValue(element, selector) {
+            const input = element.closest('.mb-6').querySelector(selector);
+            return input.value;
+        }
+
+        // 显示提示
+        function showToast(message) {
+            // 创建提示元素
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300 transform translate-x-full';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // 显示提示
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 100);
+
+            // 3秒后隐藏
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

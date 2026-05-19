@@ -19,10 +19,14 @@ class AppealController {
   async getAppeal(req, res) {
     try {
       const { sessionId } = req.params;
+      const userId = req.userId;
       const appeal = await appealModel.findBySessionId(sessionId);
       if (!appeal) return res.status(404).json({ error: '尚未生成申诉文案' });
       
-      // Auth check could be added here if needed, but session ID is usually UUID
+      if (appeal.user_id !== userId) {
+        return res.status(403).json({ error: '无权访问此申诉文案' });
+      }
+      
       res.json(appeal);
     } catch (error) {
       logger.error('Get Appeal Error', error);

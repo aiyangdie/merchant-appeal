@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">24.24% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/66</span>
+                <span class='fraction'>0/66</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">16.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>5/30</span>
+                <span class='fraction'>0/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/9</span>
+                <span class='fraction'>0/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">28.57% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>16/56</span>
+                <span class='fraction'>0/56</span>
             </div>
         
             
@@ -197,40 +197,40 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -325,40 +325,40 @@
  */
 import crypto from 'crypto'
 &nbsp;
-const ALGORITHM = 'aes-256-gcm'
-const IV_LENGTH = 16
-const TAG_LENGTH = 16
+const ALGORITHM = <span class="cstat-no" title="statement not covered" >'aes-256-gcm'</span>
+const IV_LENGTH = <span class="cstat-no" title="statement not covered" >16</span>
+const TAG_LENGTH = <span class="cstat-no" title="statement not covered" >16</span>
 &nbsp;
 /**
  * SHA-256 哈希（不可逆，用于索引查找）
  * 添加 ENCRYPT_KEY 作为 HMAC 密钥，防止彩虹表攻击
  */
-export function hmacHash(plaintext) {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!plaintext) <span class="cstat-no" title="statement not covered" >return ''</span>
-  const key = getKey()
-  return crypto.createHmac('sha256', key).update(plaintext.trim()).digest('hex')
+export function <span class="fstat-no" title="function not covered" >hmacHash(</span>plaintext) {
+<span class="cstat-no" title="statement not covered" >  if (!plaintext) <span class="cstat-no" title="statement not covered" >return ''</span></span>
+  const key = <span class="cstat-no" title="statement not covered" >getKey()</span>
+<span class="cstat-no" title="statement not covered" >  return crypto.createHmac('sha256', key).update(plaintext.trim()).digest('hex')</span>
 }
 &nbsp;
-function getKey() {
-  const hex = process.env.ENCRYPT_KEY
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!hex || hex.length !== 64) {
+function <span class="fstat-no" title="function not covered" >getKey(</span>) {
+  const hex = <span class="cstat-no" title="statement not covered" >process.env.ENCRYPT_KEY</span>
+<span class="cstat-no" title="statement not covered" >  if (!hex || hex.length !== 64) {</span>
 <span class="cstat-no" title="statement not covered" >    throw new Error('ENCRYPT_KEY 必须为 64 位十六进制字符串（32 字节）')</span>
   }
-  return Buffer.from(hex, 'hex')
+<span class="cstat-no" title="statement not covered" >  return Buffer.from(hex, 'hex')</span>
 }
 &nbsp;
 /**
  * 加密明文 → 返回 base64 密文（iv + tag + ciphertext）
  */
-export function encrypt(plaintext) {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!plaintext) <span class="cstat-no" title="statement not covered" >return ''</span>
-  const key = getKey()
-  const iv = crypto.randomBytes(IV_LENGTH)
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
+export function <span class="fstat-no" title="function not covered" >encrypt(</span>plaintext) {
+<span class="cstat-no" title="statement not covered" >  if (!plaintext) <span class="cstat-no" title="statement not covered" >return ''</span></span>
+  const key = <span class="cstat-no" title="statement not covered" >getKey()</span>
+  const iv = <span class="cstat-no" title="statement not covered" >crypto.randomBytes(IV_LENGTH)</span>
+  const cipher = <span class="cstat-no" title="statement not covered" >crypto.createCipheriv(ALGORITHM, key, iv)</span>
+  const encrypted = <span class="cstat-no" title="statement not covered" >Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])</span>
+  const tag = <span class="cstat-no" title="statement not covered" >cipher.getAuthTag()</span>
   // 格式: iv(16) + tag(16) + ciphertext
-  return Buffer.concat([iv, tag, encrypted]).toString('base64')
+<span class="cstat-no" title="statement not covered" >  return Buffer.concat([iv, tag, encrypted]).toString('base64')</span>
 }
 &nbsp;
 /**
@@ -454,7 +454,7 @@ export function <span class="fstat-no" title="function not covered" >reEncrypt(<
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-22T10:17:55.697Z
+                at 2026-05-19T05:45:38.996Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

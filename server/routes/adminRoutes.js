@@ -7,7 +7,6 @@ import {
   getSuccessCases, getSuccessCaseById, createSuccessCase, updateSuccessCase, deleteSuccessCase,
   getAIModels, getAIModelById, createAIModel, updateAIModel, setActiveAIModel, deleteAIModel as deleteAIModelDB,
   getDeepseekAccounts, createDeepseekAccount, updateDeepseekAccount, deleteDeepseekAccount,
-  getContactCards, getContactCardById, createContactCard, updateContactCard, deleteContactCard,
   getTokenUsageStats, getAppealStats,
 } from '../db.js'
 import jwt from 'jsonwebtoken'

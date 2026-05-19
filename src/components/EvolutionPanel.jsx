@@ -1,6 +1,43 @@
+/**
+ * @fileoverview AI 自进化引擎管理面板（管理员专用）
+ * 提供9个子模块，全方位管理 AI 系统的自我学习和持续优化能力
+ *
+ * 核心功能：
+ *   - 质量仪表板：整体学习质量、规则效果、知识覆盖等核心指标可视化
+ *   - 总览：活跃规则数、待审批数、已分析对话数、自动升降级等快捷操作
+ *   - 规则库：AI 生成/手动创建的规则管理，支持审批、归档、批量操作、AI辅助生成
+ *   - 对话分析：逐条对话的用户情绪、信息收集完成率、流失热点分析
+ *   - 知识聚合：按行业/违规模式/问题效果等维度的知识簇自动聚类
+ *   - 探索实验：A/B 对比实验，AI 自主探索新策略并自动判定优劣
+ *   - 引擎健康：组件级别健康监控（熔断、降级、恢复中状态追踪）
+ *   - 学习指标：每日聚合的学习指标趋势（完成率、收集轮数、流失分布）
+ *   - 变更日志：规则的完整生命周期变更记录（创建/激活/拒绝/归档）
+ *
+ * AI 自进化工作流程：
+ *   1. 对话进行中 → AI 自动分析对话质量（每10分钟）
+ *   2. 分析完成后 → 生成优化建议 → 高频建议自动创建规则提案
+ *   3. 规则提案 → 管理员审批或 AI 批量审批 → 生效后影响后续对话
+ *   4. 生效规则 → 自动追踪使用效果（usage_count, effectiveness_score）
+ *   5. 自动升降级 → 低效规则归档，高效规则保留
+ *   6. A/B 实验 → 新策略与基准组对比 → 自动判定是否推广
+ *
+ * 关键依赖：
+ *   - QualityDashboard: 质量仪表板子组件
+ *   - adminFetch: 带管理员认证的 fetch 函数
+ *   - showToast: 全局 Toast 通知函数
+ *   - 后端接口: /api/admin/evolution/* 系列接口
+ *
+ * 注意事项：
+ *   - 规则内容 ruleContent 必须是合法 JSON，创建和编辑时会校验
+ *   - 批量操作为串行执行（for 循环 await），非并行
+ *   - AI 辅助生成规则调用 /api/admin/ai-assist (type: 'rule')
+ *   - 部分数据首次加载后缓存（如规则列表），刷新需手动操作
+ */
 import React, { useState, useEffect, useCallback } from 'react'
+import AdminAiChat from './AdminAiChat.jsx'
 import QualityDashboard from './QualityDashboard'
 
+/** 子模块导航配置：9个子标签页的 key、中文名称和图标 */
 const SUB_TABS = [
   { key: 'quality', label: '质量仪表板', icon: '🎯' },
   { key: 'overview', label: '总览', icon: '🧠' },
@@ -11,8 +48,10 @@ const SUB_TABS = [
   { key: 'health', label: '引擎健康', icon: '💚' },
   { key: 'metrics', label: '学习指标', icon: '📈' },
   { key: 'changelog', label: '变更日志', icon: '📝' },
+  { key: 'ai-chat', label: 'AI对话', icon: '🤖' },
 ]
 
+/** 规则分类中文映射 */
 const CATEGORY_LABELS = {
   collection_strategy: '收集策略',
   question_template: '提问话术',
@@ -22,6 +61,7 @@ const CATEGORY_LABELS = {
   diagnosis_rule: '诊断规则',
 }
 
+/** 规则状态对应的 Tailwind CSS 样式类 */
 const STATUS_STYLES = {
   active: 'bg-green-100 text-green-700',
   pending_review: 'bg-yellow-100 text-yellow-700',
@@ -29,6 +69,7 @@ const STATUS_STYLES = {
   rejected: 'bg-red-100 text-red-600',
 }
 
+/** 规则状态中文映射 */
 const STATUS_LABELS = {
   active: '生效中',
   pending_review: '待审批',
@@ -36,6 +77,7 @@ const STATUS_LABELS = {
   rejected: '已拒绝',
 }
 
+/** 用户情绪标签配置：中文名、文字颜色、背景色 */
 const SENTIMENT_LABELS = {
   positive: { label: '积极', color: 'text-green-600', bg: 'bg-green-50' },
   slightly_positive: { label: '偏积极', color: 'text-green-500', bg: 'bg-green-50' },
@@ -44,10 +86,12 @@ const SENTIMENT_LABELS = {
   negative: { label: '消极', color: 'text-red-600', bg: 'bg-red-50' },
 }
 
+/** 引擎健康状态中文映射 */
 const HEALTH_STATUS_LABELS = {
   healthy: '正常', recovering: '恢复中', degraded: '降级', circuit_open: '已熔断',
 }
 
+/** 引擎组件名中文映射 */
 const COMPONENT_LABELS = {
   batch_analysis: '批量分析', rule_evaluation: '规则评估', auto_promote: '自动升降级',
   exploration: '探索实验', daily_aggregation: '每日聚合', knowledge_clustering: '知识聚类',
@@ -55,13 +99,22 @@ const COMPONENT_LABELS = {
   batch_aggregation: '批量聚合', auto_review: 'AI规则审批',
 }
 
+/** 规则变更动作中文映射 */
 const ACTION_LABELS = {
   activated: '激活', created: '创建', rejected: '拒绝', archived: '归档',
   updated: '更新', status_change: '状态变更', content_update: '内容更新',
 }
 
+/** 优先级中文映射 */
 const PRIORITY_LABELS = { high: '高', medium: '中', low: '低' }
 
+/**
+ * 相对时间格式化
+ * 将时间戳转换为"刚刚"、"X分钟前"、"X小时前"、"X天前"的中文描述
+ *
+ * @param {string|Date} t - 时间戳或 Date 对象
+ * @returns {string} 相对时间描述
+ */
 function timeAgo(t) {
   if (!t) return '-'
   const d = new Date(t)
@@ -73,6 +126,16 @@ function timeAgo(t) {
   return `${Math.floor(s / 86400)}天前`
 }
 
+/**
+ * 统计卡片组件（通用，白色背景边框样式）
+ *
+ * @param {Object} props
+ * @param {string} props.label - 标签文字
+ * @param {string|number} props.value - 主要数值
+ * @param {string} [props.sub] - 辅助说明文字
+ * @param {string} [props.color='text-gray-900'] - 数值文字颜色
+ * @returns {JSX.Element} 统计卡片
+ */
 function StatCard({ label, value, sub, color = 'text-gray-900' }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
@@ -83,6 +146,14 @@ function StatCard({ label, value, sub, color = 'text-gray-900' }) {
   )
 }
 
+/**
+ * 规则状态徽章组件
+ * 根据规则状态显示对应颜色和中文标签
+ *
+ * @param {Object} props
+ * @param {string} props.status - 规则状态（active/pending_review/archived/rejected）
+ * @returns {JSX.Element} 状态徽章
+ */
 function Badge({ status }) {
   return (
     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[status] || 'bg-gray-100 text-gray-500'}`}>
@@ -91,57 +162,115 @@ function Badge({ status }) {
   )
 }
 
+/**
+ * AI 自进化引擎管理面板（管理员专用）
+ *
+ * 提供9个子标签页，覆盖 AI 系统自我学习的完整生命周期：
+ *   1. 质量仪表板：核心学习指标可视化（QualityDashboard 子组件）
+ *   2. 总览：活跃规则/待审批/已分析对话等概览 + 快捷操作（评估/升降级/批量分析）
+ *   3. 规则库：规则的增删改查、审批流程、AI辅助生成、批量操作、内联编辑
+ *   4. 对话分析：逐条对话的情绪、完成率、流失点、优化建议
+ *   5. 知识聚合：按行业/违规模式/问题效果等维度聚类分析
+ *   6. 探索实验：A/B 对比实验可视化，完成率/满意度条形图对比
+ *   7. 引擎健康：组件级熔断/降级/恢复状态监控 + 对话标签统计
+ *   8. 学习指标：每日聚合指标的时序展示
+ *   9. 变更日志：规则生命周期变更记录
+ *
+ * 数据加载策略：
+ *   - 切换子标签页时按需加载对应数据
+ *   - 已加载数据缓存（通过 length 判断），避免重复请求
+ *   - 总览使用 Promise.allSettled 并行请求3个接口
+ *
+ * @param {Object} props
+ * @param {Function} props.adminFetch - 带管理员认证的 fetch 函数
+ * @param {Function} props.showToast - 全局 Toast 通知函数
+ * @returns {JSX.Element} AI 自进化引擎管理面板 UI
+ *
+ * 注意事项：
+ *   - 规则内容 ruleContent 必须为合法 JSON，创建/编辑时会 try-catch 校验
+ *   - 批量状态变更为串行执行，逐条 await 而非 Promise.all
+ *   - AI 辅助生成调用 /api/admin/ai-assist (type: 'rule') 而非 evolution 接口
+ *   - A/B 实验自动判定需要 A/B 两组各≥10样本
+ */
 export default function EvolutionPanel({ adminFetch, showToast }) {
+  /** 当前激活的子标签页 */
   const [subTab, setSubTab] = useState('quality')
+  /** 全局加载状态 */
   const [loading, setLoading] = useState(false)
 
-  // Quality dashboard data
+  /** 质量仪表板数据 */
   const [qualityData, setQualityData] = useState(null)
 
-  // Overview data
+  /** 总览数据 */
   const [ruleStats, setRuleStats] = useState(null)
+  /** 对话分析统计数据 */
   const [analysisStats, setAnalysisStats] = useState(null)
+  /** 待分析对话列表 */
   const [unanalyzed, setUnanalyzed] = useState([])
 
-  // Rules data
+  /** 规则列表数组 */
   const [rules, setRules] = useState([])
+  /** 规则筛选条件: { category, status } */
   const [ruleFilter, setRuleFilter] = useState({ category: '', status: '' })
+  /** 展开查看详情的规则对象，null 表示无展开 */
   const [selectedRule, setSelectedRule] = useState(null)
+  /** 展开规则的变更历史数组 */
   const [ruleChangeLog, setRuleChangeLog] = useState([])
+  /** 是否显示创建规则表单 */
   const [showRuleForm, setShowRuleForm] = useState(false)
+  /** 创建规则表单数据: { category, ruleKey, ruleName, ruleContent, status } */
   const [ruleForm, setRuleForm] = useState({ category: 'collection_strategy', ruleKey: '', ruleName: '', ruleContent: '{}', status: 'active' })
-  const [editingRule, setEditingRule] = useState(null) // {id, ruleName, ruleContent}
+  /** 内联编辑中的规则: { id, ruleName, ruleContent }，null 表示无编辑 */
+  const [editingRule, setEditingRule] = useState(null)
+  /** 批量选中的规则 ID 集合 */
   const [selectedRuleIds, setSelectedRuleIds] = useState(new Set())
+  /** AI 辅助生成规则是否进行中 */
   const [aiRuleAssist, setAiRuleAssist] = useState(false)
+  /** AI 辅助生成规则的自然语言描述输入 */
   const [aiRuleDesc, setAiRuleDesc] = useState('')
 
-  // Analyses data
+  /** 对话分析列表数组 */
   const [analyses, setAnalyses] = useState([])
+  /** 展开查看详情的分析对象 */
   const [selectedAnalysis, setSelectedAnalysis] = useState(null)
+  /** 分析筛选条件: { sentiment, industry } */
   const [analysisFilter, setAnalysisFilter] = useState({ sentiment: '', industry: '' })
 
-  // Metrics data
+  /** 学习指标数组（每日聚合） */
   const [metrics, setMetrics] = useState([])
 
-  // Changelog data
+  /** 变更日志数组 */
   const [changelog, setChangelog] = useState([])
 
-  // V3: Clusters, experiments, health, tags
+  /** V3 新增：知识聚合簇数组 */
   const [clusters, setClusters] = useState([])
+  /** 聚合簇统计数据 */
   const [clusterStats, setClusterStats] = useState(null)
+  /** A/B 探索实验数组 */
   const [experiments, setExperiments] = useState([])
+  /** 引擎健康状态对象 */
   const [engineHealth, setEngineHealth] = useState(null)
+  /** 对话标签统计数据 */
   const [tagStats, setTagStats] = useState(null)
 
+  /**
+   * 获取质量仪表板数据
+   * 调用 /api/admin/evolution/quality-dashboard 获取整体学习质量指标
+   */
   const fetchQuality = useCallback(async () => {
-    setLoading(true)
+    if (!qualityData) setLoading(true)
     try {
       const data = await (await adminFetch('/api/admin/evolution/quality-dashboard')).json()
       setQualityData(data)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }, [adminFetch])
+  }, [adminFetch, qualityData])
 
+  /**
+   * 获取总览数据（并行请求3个接口）
+   * 调用 rules/stats、analyses/stats、unanalyzed 获取规则统计、分析统计、待分析对话
+   * 使用 Promise.allSettled 确保单个接口失败不影响其他数据
+   */
   const fetchOverview = useCallback(async () => {
     if (!ruleStats && !analysisStats) setLoading(true)
     try {
@@ -157,6 +286,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取规则列表（支持筛选）
+   * @param {Object} ruleFilter - 筛选条件 { category, status }
+   */
   const fetchRules = useCallback(async () => {
     if (rules.length === 0) setLoading(true)
     try {
@@ -169,6 +302,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch, ruleFilter])
 
+  /**
+   * 获取对话分析列表和统计数据（并行请求）
+   * 调用 /api/admin/evolution/analyses 获取分析列表，/analyses/stats 获取统计
+   */
   const fetchAnalyses = useCallback(async () => {
     if (analyses.length === 0) setLoading(true)
     try {
@@ -182,6 +319,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取学习指标（近30天）
+   * 调用 /api/admin/evolution/metrics?days=30 获取每日聚合指标
+   */
   const fetchMetrics = useCallback(async () => {
     if (metrics.length === 0) setLoading(true)
     try {
@@ -191,6 +332,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取规则变更日志
+   * 调用 /api/admin/evolution/changelog?limit=50 获取最近50条变更记录
+   */
   const fetchChangelog = useCallback(async () => {
     if (changelog.length === 0) setLoading(true)
     try {
@@ -200,6 +345,9 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取知识聚合簇和统计数据（并行请求）
+   */
   const fetchClusters = useCallback(async () => {
     if (clusters.length === 0) setLoading(true)
     try {
@@ -213,6 +361,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取探索实验列表
+   * 调用 /api/admin/evolution/experiments 获取 A/B 对比实验数据
+   */
   const fetchExperiments = useCallback(async () => {
     if (experiments.length === 0) setLoading(true)
     try {
@@ -222,6 +374,9 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /**
+   * 获取引擎健康状态和标签统计（并行请求）
+   */
   const fetchHealth = useCallback(async () => {
     if (!engineHealth) setLoading(true)
     try {
@@ -235,6 +390,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setLoading(false)
   }, [adminFetch])
 
+  /** 切换子标签页时按需加载对应数据 */
   useEffect(() => {
     if (subTab === 'quality') fetchQuality()
     else if (subTab === 'overview') fetchOverview()
@@ -247,7 +403,26 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     else if (subTab === 'health') fetchHealth()
   }, [subTab, fetchQuality, fetchOverview, fetchRules, fetchAnalyses, fetchMetrics, fetchChangelog, fetchClusters, fetchExperiments, fetchHealth])
 
-  // Rule actions
+  const hasPanelData =
+  !!(qualityData || ruleStats || rules.length || analyses.length || metrics.length || changelog.length || clusters.length || experiments.length || engineHealth)
+
+  const refreshAfterAi = useCallback(() => {
+    if (subTab === 'quality') fetchQuality()
+    else if (subTab === 'overview') fetchOverview()
+    else if (subTab === 'rules') fetchRules()
+    else if (subTab === 'analyses') fetchAnalyses()
+    else if (subTab === 'metrics') fetchMetrics()
+    else if (subTab === 'changelog') fetchChangelog()
+    else if (subTab === 'clusters') fetchClusters()
+    else if (subTab === 'experiments') fetchExperiments()
+    else if (subTab === 'health') fetchHealth()
+  }, [subTab, fetchQuality, fetchOverview, fetchRules, fetchAnalyses, fetchMetrics, fetchChangelog, fetchClusters, fetchExperiments, fetchHealth])
+
+  /**
+   * 切换规则状态（通过/拒绝/归档）
+   * @param {number} id - 规则 ID
+   * @param {string} status - 目标状态
+   */
   async function handleRuleStatus(id, status) {
     try {
       await adminFetch(`/api/admin/evolution/rules/${id}/status`, {
@@ -259,6 +434,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('操作失败: ' + e.message) }
   }
 
+  /**
+   * 删除规则
+   * @param {number} id - 要删除的规则 ID
+   */
   async function handleDeleteRule(id) {
     if (!confirm('确定删除此规则？')) return
     try {
@@ -269,6 +448,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('删除失败') }
   }
 
+  /**
+   * 创建新规则（手动填写表单）
+   * 校验 ruleContent 必须为合法 JSON，调用 POST /api/admin/evolution/rules
+   */
   async function handleCreateRule() {
     try {
       let content
@@ -287,6 +470,11 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('创建失败: ' + e.message) }
   }
 
+  /**
+   * 查看规则详情
+   * 获取规则完整信息和变更历史
+   * @param {number} id - 规则 ID
+   */
   async function handleViewRule(id) {
     try {
       const data = await (await adminFetch(`/api/admin/evolution/rules/${id}`)).json()
@@ -295,7 +483,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { console.error(e) }
   }
 
-  // Analysis actions
+  /**
+   * 分析单条对话
+   * @param {number} sessionId - 会话 ID
+   */
   async function handleAnalyzeSession(sessionId) {
     try {
       showToast('正在分析...')
@@ -305,6 +496,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('分析失败: ' + e.message) }
   }
 
+  /**
+   * 批量分析对话（每次10条）
+   * 调用 POST /api/admin/evolution/batch-analyze
+   */
   async function handleBatchAnalyze() {
     try {
       showToast('正在批量分析...')
@@ -316,6 +511,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('批量分析失败: ' + e.message) }
   }
 
+  /** 手动触发每日数据聚合 */
   async function handleAggregate() {
     try {
       await adminFetch('/api/admin/evolution/aggregate', { method: 'POST' })
@@ -324,6 +520,7 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('聚合失败: ' + e.message) }
   }
 
+  /** 评估规则效果（触发规则评估引擎） */
   async function handleEvaluate() {
     try {
       showToast('正在评估规则效果...')
@@ -333,6 +530,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('评估失败: ' + e.message) }
   }
 
+  /**
+   * 自动升降级
+   * 根据规则效果分数自动升级高效规则、归档低效规则
+   */
   async function handleAutoPromote() {
     try {
       showToast('正在执行自动升降级...')
@@ -343,6 +544,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('升降级失败: ' + e.message) }
   }
 
+  /**
+   * AI 批量审批规则
+   * 调用 AI 对 pending_review 状态的规则进行批量审批
+   */
   async function handleBatchAutoReview() {
     try {
       showToast('AI正在批量审批规则...')
@@ -352,6 +557,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('AI审批失败: ' + e.message) }
   }
 
+  /**
+   * AI 审批单条规则
+   * @param {number} id - 规则 ID
+   */
   async function handleSingleAutoReview(id) {
     try {
       showToast('AI正在审批...')
@@ -361,7 +570,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('AI审批失败: ' + e.message) }
   }
 
-  // Batch actions
+  /**
+   * 切换规则选中状态（用于批量操作）
+   * @param {number} id - 规则 ID
+   */
   function toggleRuleSelection(id) {
     setSelectedRuleIds(prev => {
       const next = new Set(prev)
@@ -370,6 +582,11 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     })
   }
 
+  /**
+   * 批量修改规则状态
+   * 串行执行（for 循环 await），逐条调用状态修改接口
+   * @param {string} status - 目标状态
+   */
   async function handleBatchAction(status) {
     if (selectedRuleIds.size === 0) return
     const label = STATUS_LABELS[status] || status
@@ -386,6 +603,11 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     } catch (e) { showToast('批量操作失败: ' + e.message) }
   }
 
+  /**
+   * AI 辅助生成规则
+   * 用户用自然语言描述规则，AI 自动填充表单字段（ruleKey/ruleName/category/ruleContent）
+   * 调用 /api/admin/ai-assist (type: 'rule')
+   */
   async function handleAIAssistRule() {
     if (!aiRuleDesc.trim()) { showToast('请输入规则描述'); return }
     setAiRuleAssist(true)
@@ -409,7 +631,10 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
     setAiRuleAssist(false)
   }
 
-  // Inline edit
+  /**
+   * 保存内联编辑的规则
+   * 校验 JSON 格式，调用 PUT /api/admin/evolution/rules/:id/content
+   */
   async function handleSaveEdit() {
     if (!editingRule) return
     try {
@@ -441,7 +666,17 @@ export default function EvolutionPanel({ adminFetch, showToast }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5 gpu-scroll">
-        {loading && !qualityData && !ruleStats && rules.length === 0 && analyses.length === 0 && metrics.length === 0 && changelog.length === 0 && clusters.length === 0 && experiments.length === 0 && !engineHealth && (
+        {subTab === 'ai-chat' && (
+          <AdminAiChat
+            module="evolution"
+            adminFetch={adminFetch}
+            showToast={showToast}
+            onRefresh={refreshAfterAi}
+            loading={loading && !hasPanelData}
+            compact={false}
+          />
+        )}
+        {subTab !== 'ai-chat' && loading && !qualityData && !ruleStats && rules.length === 0 && analyses.length === 0 && metrics.length === 0 && changelog.length === 0 && clusters.length === 0 && experiments.length === 0 && !engineHealth && (
           <div className="text-center py-8 text-gray-400">加载中...</div>
         )}
 

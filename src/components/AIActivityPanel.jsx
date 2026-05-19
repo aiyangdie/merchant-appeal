@@ -1,15 +1,51 @@
+/**
+ * AI 活动监控面板
+ * @description 管理员后台组件，展示 AI 代理的操作日志和统计信息
+ * 
+ * 核心功能：
+ * 1. 统计卡片 — 总操作数、成功率、Token 消耗、总费用
+ * 2. 分类筛选 — 按活动类型过滤（砍价、人设、风险评估、名片、商品、对话、分析、优化、通用）
+ * 3. 日志列表 — 显示最近 60 条 AI 活动记录，含状态、耗时、Token、费用
+ * 4. 自动刷新 — 每 10 秒自动拉取最新数据，支持暂停/恢复
+ * 5. 相对时间 — 智能显示"X 秒前/分钟前/小时前"
+ * 
+ * 数据来源：/api/admin/ai-activity 接口
+ * 
+ * @param {Object} props
+ * @param {Function} props.adminFetch - 管理员认证 fetch 函数，返回带 Authorization 头的 Response
+ */
 import React, { useState, useEffect, useCallback } from 'react'
 
+/**
+ * 活动分类图标映射
+ * @constant {Object<string, string>}
+ */
 const CATEGORY_ICONS = {
   bargain: '💰', persona: '🎭', risk: '🔍', card: '📇', product: '📦',
   chat: '💬', analysis: '📊', optimize: '✨', general: '🤖',
 }
+
+/**
+ * 活动分类中文标签映射
+ * @constant {Object<string, string>}
+ */
 const CATEGORY_LABELS = {
   bargain: '砍价', persona: '人设', risk: '风险评估', card: '名片',
   product: '商品', chat: '对话', analysis: '分析', optimize: '优化', general: '通用',
 }
+
+/**
+ * 状态样式映射
+ * @constant {Object<string, string>}
+ */
 const STATUS_COLORS = { success: 'bg-green-100 text-green-700', failed: 'bg-red-100 text-red-700', pending: 'bg-yellow-100 text-yellow-700' }
 
+/**
+ * AI 活动监控面板主组件
+ * @description 展示 AI 操作日志和统计数据的完整面板
+ * @param {Object} props
+ * @param {Function} props.adminFetch - 管理员认证的 fetch 函数
+ */
 export default function AIActivityPanel({ adminFetch }) {
   const [logs, setLogs] = useState([])
   const [stats, setStats] = useState({})
@@ -132,7 +168,7 @@ export default function AIActivityPanel({ adminFetch }) {
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="text-[10px] text-gray-300">{fmtTime(log.created_at)}</span>
                       {log.tokens_used > 0 && <span className="text-[10px] text-amber-400">🔥 {log.tokens_used} tokens</span>}
-                      {parseFloat(log.cost) > 0 && <span className="text-[10px] text-purple-400">¥{parseFloat(log.cost).toFixed(4)}</span>}
+                      {parseFloat(log.cost || 0) > 0 && <span className="text-[10px] text-purple-400">¥{parseFloat(log.cost || 0).toFixed(4)}</span>}
                     </div>
                   </div>
                 </div>

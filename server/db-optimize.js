@@ -42,9 +42,6 @@ export async function optimizeDatabase() {
     // mall_products 表索引优化
     'CREATE INDEX IF NOT EXISTS idx_products_status ON mall_products(status)',
     
-    // contact_cards 表索引优化
-    'CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_cards(status)',
-    
     // orders 表索引优化
     'CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at)',
     'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)',

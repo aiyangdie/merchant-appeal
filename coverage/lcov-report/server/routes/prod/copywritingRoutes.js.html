@@ -1,0 +1,1555 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/routes/prod/copywritingRoutes.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">server/routes/prod</a> copywritingRoutes.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/286</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/227</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/16</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/235</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { getAIConfig } from '../../ai.js'
+import { calculateCost } from '../../tokenizer.js'
+import { getUserById, getActiveAIModel, deductBalance, incrementUserSpent, recordTokenUsage } from '../../db.js'
+import { buildMerchantInfo, copywritingNeedsDeepThinking, parseCopywritingJson, COPYWRITING_APPEAL_TYPES, COPYWRITING_SYSTEM_PROMPT, COPYWRITING_PROMPTS } from '../../services/copywritingHelpers.js'
+import { stripEmoji } from '../../lib/textUtils.js'
+import { pipeAIStream } from '../../lib/sseStream.js'
+/**
+ * copywritingRoutes
+ */
+export function <span class="fstat-no" title="function not covered" >registerCopywritingRoutes(</span>app, ctx) {
+  const { signToken, requireUser, requireAdmin, optionalUser, requireAdminOrQueryToken, authLimiter, chatLimiter, ensureUserCanUseOfficialAI, recordAIUsageForRequest, logFinancialActivity, unwrapMallUsagePayload, unwrapPersonaPayload } = <span class="cstat-no" title="statement not covered" >ctx</span>
+&nbsp;
+// ========== 智能文案生成 API ==========
+&nbsp;
+const COPYWRITING_APPEAL_TYPES = <span class="cstat-no" title="statement not covered" >{</span>
+  situation_statement: '情况说明',
+  commitment_letter: '承诺书',
+  rectification_report: '整改报告',
+  customer_service_script: '客服沟通话术',
+  urgent_appeal: '加急申诉文案',
+  rejection_supplement: '驳回补充申诉材料',
+  phone_script: '95017电话沟通文案',
+  full_package: '全套申诉材料',
+}
+&nbsp;
+const COPYWRITING_SYSTEM_PROMPT = <span class="cstat-no" title="statement not covered" >`你是商户号申诉文案专家，专注于微信支付、支付宝商户号处罚申诉领域。你必须严格遵循以下规则和指南来生成高质量申诉文案。</span>
+&nbsp;
+## 核心原则
+1. 基于真实情况撰写，绝不编造事实、伪造数据或虚构整改措施
+2. 话术必须柔和合规，使用"经营不规范""管理疏忽""流程不完善"等中性表述
+3. 绝对禁用敏感词汇：套现、刷单、洗钱、虚假交易、赌博、欺诈、传销、非法集资、违规套码、二清、资金池、跑分、色情、涉赌
+4. 逻辑严谨，证据链完整，每个主张都有对应的事实或数据支撑
+5. 数据量化整改成效，用具体数字说明改进幅度（如"投诉率下降85%""异常交易占比降至0.3%"）
+&nbsp;
+## 文案结构规范
+所有申诉文案必须遵循四段式结构：
+- 第一段「认错」：诚恳承认问题，不推诿不辩解，表达深刻反思
+- 第二段「原因」：客观分析问题根源，区分主观因素和客观因素
+- 第三段「整改」：详细说明已采取的整改措施和取得的量化成效
+- 第四段「恳请」：恳请平台给予改正机会，表达合规经营决心
+&nbsp;
+## 平台规则知识
+### 微信支付常见处罚类型
+- 限制收款：通常因交易异常、投诉率过高触发，需提供交易真实性证明
+- 冻结资金：涉嫌违规交易时触发，需说明资金来源和用途
+- 关闭支付权限：严重违规导致，需全面整改并承诺合规
+- 降级商户等级：风险指标超标，需改善经营数据
+&nbsp;
+### 支付宝常见处罚类型
+- 限制收款：因交易风险、违规经营触发
+- 冻结账户：涉嫌欺诈或严重违规，需提供合规证明
+- 限制提现：资金异常流动，需说明资金用途
+- 关闭收钱功能：严重违规，需全面整改
+&nbsp;
+### 申诉审核要点
+- 审核人员关注：整改是否彻底、是否可能再犯、经营是否合规
+- 有利因素：首次违规、主动整改、投诉率下降、交易量恢复
+- 不利因素：多次违规、整改不彻底、仍有投诉、涉嫌欺诈
+&nbsp;
+## 写作风格指南
+- 语气：诚恳、谦逊、专业，避免过于卑微或过于强硬
+- 用词：正式书面语，避免口语化表达和网络用语
+- 数据：所有数据必须合理可信，整改前后对比要明显
+- 证据：列举具体可查的证据类型（培训记录、监控截图、制度文件等）
+- 承诺：具体可执行的承诺，避免空泛表态
+&nbsp;
+## 常见整改措施参考
+- 人员方面：组织合规培训、设立风控专员、建立考核机制
+- 制度方面：完善交易审核流程、建立异常预警机制、制定应急预案
+- 技术方面：升级监控系统、部署风控规则、接入实名认证
+- 管理方面：加强供应商审核、优化客服响应、建立投诉处理SOP
+&nbsp;
+## JSON输出规范
+- 严格输出合法JSON格式，不包含任何多余文字、注释或markdown标记
+- JSON字段值使用中文内容
+- 数组字段至少包含2个元素
+- content字段必须包含完整的文案正文
+- 所有字段都必须填写，不得留空`
+&nbsp;
+const COPYWRITING_PROMPTS = <span class="cstat-no" title="statement not covered" >{</span>
+  situation_statement: `写《情况说明》。商户：{merchant_info}\n结构：基本信息→经营情况→异常原因→证据→诚恳表态。500-800字。正式诚恳。\n输出JSON：{"title":"","content":"","key_points":[],"evidence_list":[],"warnings":[]}`,
+&nbsp;
+  commitment_letter: `写《合规经营承诺书》。商户：{merchant_info}\n结构：承诺人→承诺事项(5条+)→违约责任→期限→签名。300-500字。郑重坚定。\n输出JSON：{"title":"","content":"","commitment_items":[],"validity_period":""}`,
+&nbsp;
+  rectification_report: `写《整改报告》。商户：{merchant_info}\n结构：问题概述→原因→措施(即时/短期/长期)→成效→保障。800-1200字。认真务实。\n输出JSON：{"title":"","content":"","immediate_actions":[],"short_term_actions":[],"long_term_actions":[],"evidence_list":[]}`,
+&nbsp;
+  customer_service_script: `写客服沟通话术。商户：{merchant_info}\n3场景(在线客服/用户回访/补充材料)，每场景含开场白/核心/Q&amp;A/结束语。礼貌专业。\n输出JSON：{"scenes":[{"scene_name":"","opening":"","key_points":[],"qa":[{"question":"","answer":""}],"closing":""}],"tips":[]}`,
+&nbsp;
+  urgent_appeal: `写加急申诉文案。商户：{merchant_info}\n紧急原因→核心诉求→证据→诚恳表态。200-400字。紧迫有礼。\n输出JSON：{"title":"","content":"","urgent_reason":"","key_evidence":[],"expected_resolution":""}`,
+&nbsp;
+  rejection_supplement: `写驳回补充申诉。商户：{merchant_info}\n驳回：{rejection_info}\n感谢→逐条回应→补充整改→恳请审核。500-800字。感恩诚恳。\n输出JSON：{"title":"","content":"","rejection_responses":[{"rejection_point":"","response":"","new_evidence":""}],"additional_evidence":[],"summary":""}`,
+&nbsp;
+  phone_script: `写95017电话文案。商户：{merchant_info}\n自我介绍→来电目的→核心诉求→证据→请求处理。含脚本/Q&amp;A/注意事项。礼貌坚定。\n输出JSON：{"script":"","key_talking_points":[],"anticipated_questions":[{"question":"","answer":""}],"do_list":[],"dont_list":[],"follow_up":""}`,
+&nbsp;
+  full_package: `生成全套申诉材料。商户：{merchant_info}\n含：情况说明+承诺书+整改报告+客服话术+95017电话文案。逻辑一致，证据互证。\n输出JSON：{"situation_statement":{"title":"","content":""},"commitment_letter":{"title":"","content":""},"rectification_report":{"title":"","content":""},"customer_service_script":{"opening":"","key_points":[],"closing":""},"phone_script":{"script":"","key_points":[]},"evidence_checklist":[],"submission_order":[]}`,
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >buildMerchantInfo(</span>data) {
+  const fieldMap = <span class="cstat-no" title="statement not covered" >{</span>
+    merchant_name: '商户名称', merchant_id: '商户号', platform: '平台',
+    industry: '所属行业', ban_type: '处罚类型', ban_reason: '封禁/处罚原因',
+    ban_time: '处罚时间', business_model: '经营模式', business_address: '经营地址',
+    monthly_revenue: '月均交易额', complaint_count: '投诉数量',
+    violation_details: '违规详情', rectification_status: '已整改情况',
+    contact_name: '联系人', contact_phone: '联系电话',
+  }
+  const parts = <span class="cstat-no" title="statement not covered" >[]</span>
+<span class="cstat-no" title="statement not covered" >  for (const [key, label] of Object.entries(fieldMap)) {</span>
+<span class="cstat-no" title="statement not covered" >    if (data[key]) <span class="cstat-no" title="statement not covered" >parts.push(`${label}：${data[key]}`)</span></span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (data.extra_info) <span class="cstat-no" title="statement not covered" >parts.push(`补充信息：${data.extra_info}`)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (data.rejection_reason) <span class="cstat-no" title="statement not covered" >parts.push(`驳回原因：${data.rejection_reason}`)</span></span>
+<span class="cstat-no" title="statement not covered" >  return parts.length &gt; 0 ? parts.join('\n') : '商户信息待补充'</span>
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >copywritingNeedsDeepThinking(</span>appealType, data) {
+<span class="cstat-no" title="statement not covered" >  if (data.enable_deep_thinking === true) <span class="cstat-no" title="statement not covered" >return true</span></span>
+<span class="cstat-no" title="statement not covered" >  if (data.enable_deep_thinking === false) <span class="cstat-no" title="statement not covered" >return false</span></span>
+<span class="cstat-no" title="statement not covered" >  return false</span>
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >parseCopywritingJson(</span>content) {
+<span class="cstat-no" title="statement not covered" >  if (!content) <span class="cstat-no" title="statement not covered" >return null</span></span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >return JSON.parse(content) </span>} catch {}</span>
+  let c = <span class="cstat-no" title="statement not covered" >content.trim()</span>
+<span class="cstat-no" title="statement not covered" >  if (c.startsWith('```json')) <span class="cstat-no" title="statement not covered" >c = c.slice(7)</span></span>
+  else <span class="cstat-no" title="statement not covered" >if (c.startsWith('```')) <span class="cstat-no" title="statement not covered" >c = c.slice(3)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (c.endsWith('```')) <span class="cstat-no" title="statement not covered" >c = c.slice(0, -3)</span></span>
+<span class="cstat-no" title="statement not covered" >  c = c.trim()</span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >return JSON.parse(c) </span>} catch {}</span>
+  let depth = <span class="cstat-no" title="statement not covered" >0,</span> start = <span class="cstat-no" title="statement not covered" >-1</span>
+<span class="cstat-no" title="statement not covered" >  for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; c.length; i++) {</span>
+<span class="cstat-no" title="statement not covered" >    if (c[i] === '{') { <span class="cstat-no" title="statement not covered" >if (depth === 0) <span class="cstat-no" title="statement not covered" >start = i; <span class="cstat-no" title="statement not covered" ></span></span>depth++ </span>}</span>
+    else <span class="cstat-no" title="statement not covered" >if (c[i] === '}') { <span class="cstat-no" title="statement not covered" >depth--; <span class="cstat-no" title="statement not covered" ></span>if (depth === 0 &amp;&amp; start &gt;= 0) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >return JSON.parse(c.slice(start, i + 1)) </span>} catch { <span class="cstat-no" title="statement not covered" >start = -1 </span>} </span>} </span>}</span>
+  }
+<span class="cstat-no" title="statement not covered" >  return null</span>
+}
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.get('/api/copywriting/types', <span class="fstat-no" title="function not covered" >(r</span>eq, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  res.json({ success: true, appeal_types: COPYWRITING_APPEAL_TYPES })</span>
+})
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.get('/api/copywriting/health', <span class="fstat-no" title="function not covered" >(r</span>eq, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  res.json({ status: 'ok', service: 'copywriting', supported_types: Object.keys(COPYWRITING_APPEAL_TYPES) })</span>
+})
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.post('/api/copywriting/generate', requireUser, ensureUserCanUseOfficialAI, <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { appeal_type, merchant_data, temperature, max_tokens } = <span class="cstat-no" title="statement not covered" >req.body</span>
+<span class="cstat-no" title="statement not covered" >    if (!appeal_type || !COPYWRITING_PROMPTS[appeal_type]) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ success: false, error: `不支持的文案类型，支持：${Object.keys(COPYWRITING_PROMPTS).join('/')}` })</span>
+    }
+<span class="cstat-no" title="statement not covered" >    if (!merchant_data) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ success: false, error: '缺少 merchant_data 参数' })</span>
+    }
+&nbsp;
+    const merchantInfo = <span class="cstat-no" title="statement not covered" >buildMerchantInfo(merchant_data)</span>
+    const rejectionInfo = <span class="cstat-no" title="statement not covered" >merchant_data.rejection_info || merchant_data.rejection_reason || '无具体驳回信息'</span>
+    const userPrompt = <span class="cstat-no" title="statement not covered" >COPYWRITING_PROMPTS[appeal_type].replace('{merchant_info}', merchantInfo).replace('{rejection_info}', rejectionInfo)</span>
+    const enableDeepThinking = <span class="cstat-no" title="statement not covered" >copywritingNeedsDeepThinking(appeal_type, merchant_data)</span>
+&nbsp;
+    const cfg = <span class="cstat-no" title="statement not covered" >await getAIConfig()</span>
+<span class="cstat-no" title="statement not covered" >    if (!cfg.apiKey) <span class="cstat-no" title="statement not covered" >return res.status(500).json({ success: false, error: 'AI API Key 未配置，请在管理后台配置' })</span></span>
+&nbsp;
+    const isVolcengine = <span class="cstat-no" title="statement not covered" >['volcengine', 'doubao'].includes(cfg.provider?.toLowerCase())</span>
+    const model = <span class="cstat-no" title="statement not covered" >(isVolcengine &amp;&amp; cfg.endpointId) ? cfg.endpointId : cfg.model</span>
+    const MAX_TOKENS_MAP = <span class="cstat-no" title="statement not covered" >{ situation_statement: 1024, commitment_letter: 768, rectification_report: 1024, customer_service_script: 1024, urgent_appeal: 512, rejection_supplement: 1024, phone_script: 768, full_package: 2048 }</span>
+    const defaultMaxTokens = <span class="cstat-no" title="statement not covered" >MAX_TOKENS_MAP[appeal_type] || 1024</span>
+&nbsp;
+    const body = <span class="cstat-no" title="statement not covered" >{</span>
+      model,
+      messages: [
+        { role: 'system', content: COPYWRITING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: '{' },
+      ],
+      temperature: temperature || 0.3,
+      top_p: 0.7,
+      max_tokens: max_tokens || defaultMaxTokens,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      response_format: { type: 'json_object' },
+    }
+<span class="cstat-no" title="statement not covered" >    if (isVolcengine) {</span>
+<span class="cstat-no" title="statement not covered" >      body.thinking = { type: enableDeepThinking ? 'enabled' : 'disabled' }</span>
+<span class="cstat-no" title="statement not covered" >      body.service_tier = 'auto'</span>
+    }
+&nbsp;
+    const t0 = <span class="cstat-no" title="statement not covered" >Date.now()</span>
+    const response = <span class="cstat-no" title="statement not covered" >await fetch(cfg.endpoint, {</span>
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(body),
+      timeout: 120000,
+    })
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (!response.ok) {</span>
+      const errText = <span class="cstat-no" title="statement not covered" >await response.text().catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >'')</span></span>
+<span class="cstat-no" title="statement not covered" >      return res.status(502).json({ success: false, error: `AI API Error ${response.status}: ${errText.slice(0, 200)}` })</span>
+    }
+&nbsp;
+    const json = <span class="cstat-no" title="statement not covered" >await response.json()</span>
+    const content = <span class="cstat-no" title="statement not covered" >json.choices?.[0]?.message?.content || ''</span>
+    const parsed = <span class="cstat-no" title="statement not covered" >parseCopywritingJson(content)</span>
+    const elapsed = <span class="cstat-no" title="statement not covered" >((Date.now() - t0) / 1000).toFixed(2)</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (json.usage) {</span>
+<span class="cstat-no" title="statement not covered" >      await recordAIUsageForRequest(req, { type: 'copywriting', usage: json.usage })</span>
+      const promptT = <span class="cstat-no" title="statement not covered" >json.usage.prompt_tokens || 0</span>
+      const completionT = <span class="cstat-no" title="statement not covered" >json.usage.completion_tokens || 0</span>
+      const totalT = <span class="cstat-no" title="statement not covered" >json.usage.total_tokens || promptT + completionT</span>
+      const inputPricePer1M = <span class="cstat-no" title="statement not covered" >isVolcengine ? 2 : (cfg.provider === 'deepseek' ? 1 : 5)</span>
+      const outputPricePer1M = <span class="cstat-no" title="statement not covered" >isVolcengine ? 8 : (cfg.provider === 'deepseek' ? 2 : 15)</span>
+      const costYuan = <span class="cstat-no" title="statement not covered" >(promptT * inputPricePer1M + completionT * outputPricePer1M) / 1000000</span>
+      const _pool = <span class="cstat-no" title="statement not covered" >getPool()</span>
+<span class="cstat-no" title="statement not covered" >      if (_pool) {</span>
+<span class="cstat-no" title="statement not covered" >        _pool.execute(</span>
+          'INSERT INTO token_usage_logs (model_id, provider, model_name, prompt_tokens, completion_tokens, total_tokens, request_type, cost_yuan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [0, cfg.provider, cfg.model, promptT, completionT, totalT, 'copywriting', costYuan]
+        ).catch(<span class="fstat-no" title="function not covered" >e </span>=&gt; <span class="cstat-no" title="statement not covered" >console.error('[TokenUsage] log error:', e.message))</span>
+      }
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    res.json({</span>
+      success: true,
+      appeal_type,
+      appeal_type_name: COPYWRITING_APPEAL_TYPES[appeal_type],
+      data: parsed || { raw_content: content },
+      raw_content: content,
+      deep_thinking_enabled: enableDeepThinking,
+      model: cfg.model,
+      provider: cfg.provider,
+      elapsed: parseFloat(elapsed),
+      usage: json.usage || null,
+    })
+  } catch (error) {
+<span class="cstat-no" title="statement not covered" >    console.error('[Copywriting] Generate Error:', error)</span>
+<span class="cstat-no" title="statement not covered" >    res.status(500).json({ success: false, error: error.message })</span>
+  }
+})
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.post('/api/copywriting/generate/stream', requireUser, ensureUserCanUseOfficialAI, <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { appeal_type, merchant_data, temperature, max_tokens } = <span class="cstat-no" title="statement not covered" >req.body</span>
+<span class="cstat-no" title="statement not covered" >    if (!appeal_type || !COPYWRITING_PROMPTS[appeal_type]) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ success: false, error: `不支持的文案类型` })</span>
+    }
+<span class="cstat-no" title="statement not covered" >    if (!merchant_data) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ success: false, error: '缺少 merchant_data 参数' })</span>
+    }
+&nbsp;
+    const merchantInfo = <span class="cstat-no" title="statement not covered" >buildMerchantInfo(merchant_data)</span>
+    const rejectionInfo = <span class="cstat-no" title="statement not covered" >merchant_data.rejection_info || merchant_data.rejection_reason || '无具体驳回信息'</span>
+    const userPrompt = <span class="cstat-no" title="statement not covered" >COPYWRITING_PROMPTS[appeal_type].replace('{merchant_info}', merchantInfo).replace('{rejection_info}', rejectionInfo)</span>
+    const enableDeepThinking = <span class="cstat-no" title="statement not covered" >copywritingNeedsDeepThinking(appeal_type, merchant_data)</span>
+&nbsp;
+    const cfg = <span class="cstat-no" title="statement not covered" >await getAIConfig()</span>
+<span class="cstat-no" title="statement not covered" >    if (!cfg.apiKey) <span class="cstat-no" title="statement not covered" >return res.status(500).json({ success: false, error: 'AI API Key 未配置' })</span></span>
+&nbsp;
+    const isVolcengine = <span class="cstat-no" title="statement not covered" >['volcengine', 'doubao'].includes(cfg.provider?.toLowerCase())</span>
+    const model = <span class="cstat-no" title="statement not covered" >(isVolcengine &amp;&amp; cfg.endpointId) ? cfg.endpointId : cfg.model</span>
+    const MAX_TOKENS_MAP = <span class="cstat-no" title="statement not covered" >{ situation_statement: 1024, commitment_letter: 768, rectification_report: 1024, customer_service_script: 1024, urgent_appeal: 512, rejection_supplement: 1024, phone_script: 768, full_package: 2048 }</span>
+    const defaultMaxTokens = <span class="cstat-no" title="statement not covered" >MAX_TOKENS_MAP[appeal_type] || 1024</span>
+&nbsp;
+    const body = <span class="cstat-no" title="statement not covered" >{</span>
+      model,
+      messages: [
+        { role: 'system', content: COPYWRITING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: '{' },
+      ],
+      temperature: temperature || 0.3,
+      top_p: 0.7,
+      max_tokens: max_tokens || defaultMaxTokens,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      stream: true,
+    }
+<span class="cstat-no" title="statement not covered" >    if (isVolcengine) {</span>
+<span class="cstat-no" title="statement not covered" >      body.thinking = { type: enableDeepThinking ? 'enabled' : 'disabled' }</span>
+<span class="cstat-no" title="statement not covered" >      body.service_tier = 'auto'</span>
+<span class="cstat-no" title="statement not covered" >      body.stream_options = { include_usage: true, chunk_include_usage: false }</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    res.setHeader('Content-Type', 'text/event-stream')</span>
+<span class="cstat-no" title="statement not covered" >    res.setHeader('Cache-Control', 'no-cache')</span>
+<span class="cstat-no" title="statement not covered" >    res.setHeader('Connection', 'keep-alive')</span>
+<span class="cstat-no" title="statement not covered" >    res.setHeader('X-Accel-Buffering', 'no')</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    res.write(`data: ${JSON.stringify({ type: 'meta', appeal_type, appeal_type_name: COPYWRITING_APPEAL_TYPES[appeal_type], deep_thinking_enabled: enableDeepThinking })}\n\n`)</span>
+&nbsp;
+    const response = <span class="cstat-no" title="statement not covered" >await fetch(cfg.endpoint, {</span>
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(body),
+      timeout: 120000,
+    })
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (!response.ok) {</span>
+      const errText = <span class="cstat-no" title="statement not covered" >await response.text().catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >'')</span></span>
+<span class="cstat-no" title="statement not covered" >      res.write(`data: ${JSON.stringify({ type: 'error', error: `AI API Error ${response.status}: ${errText.slice(0, 200)}` })}\n\n`)</span>
+<span class="cstat-no" title="statement not covered" >      res.end()</span>
+<span class="cstat-no" title="statement not covered" >      return</span>
+    }
+&nbsp;
+    let fullContent = <span class="cstat-no" title="statement not covered" >''</span>
+    let thinkingContent = <span class="cstat-no" title="statement not covered" >''</span>
+    let usageData = <span class="cstat-no" title="statement not covered" >null</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (response.body?.on) {</span>
+      let buffer = <span class="cstat-no" title="statement not covered" >''</span>
+<span class="cstat-no" title="statement not covered" >      response.body.on('data', <span class="fstat-no" title="function not covered" >(c</span>hunk) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >        buffer += chunk.toString()</span>
+        const lines = <span class="cstat-no" title="statement not covered" >buffer.split('\n')</span>
+<span class="cstat-no" title="statement not covered" >        buffer = lines.pop() || ''</span>
+<span class="cstat-no" title="statement not covered" >        for (const line of lines) {</span>
+          const trimmed = <span class="cstat-no" title="statement not covered" >line.trim()</span>
+<span class="cstat-no" title="statement not covered" >          if (!trimmed || !trimmed.startsWith('data: ')) <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >          if (trimmed === 'data: [DONE]') <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >          try {</span>
+            const j = <span class="cstat-no" title="statement not covered" >JSON.parse(trimmed.slice(6))</span>
+            const delta = <span class="cstat-no" title="statement not covered" >j.choices?.[0]?.delta</span>
+<span class="cstat-no" title="statement not covered" >            if (delta) {</span>
+              const c = <span class="cstat-no" title="statement not covered" >delta.content || ''</span>
+              const tc = <span class="cstat-no" title="statement not covered" >delta.reasoning_content || delta.thinking || ''</span>
+<span class="cstat-no" title="statement not covered" >              if (c) {</span>
+<span class="cstat-no" title="statement not covered" >                fullContent += c</span>
+<span class="cstat-no" title="statement not covered" >                res.write(`data: ${JSON.stringify({ type: 'content', content: c })}\n\n`)</span>
+              }
+<span class="cstat-no" title="statement not covered" >              if (tc) {</span>
+<span class="cstat-no" title="statement not covered" >                thinkingContent += tc</span>
+<span class="cstat-no" title="statement not covered" >                res.write(`data: ${JSON.stringify({ type: 'thinking', content: tc })}\n\n`)</span>
+              }
+            }
+<span class="cstat-no" title="statement not covered" >            if (j.usage) <span class="cstat-no" title="statement not covered" >usageData = j.usage</span></span>
+          } catch {}
+        }
+      })
+<span class="cstat-no" title="statement not covered" >      response.body.on('end', <span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >        if (usageData) <span class="cstat-no" title="statement not covered" >await recordAIUsageForRequest(req, { type: 'copywriting', usage: usageData })</span></span>
+        const parsed = <span class="cstat-no" title="statement not covered" >parseCopywritingJson(fullContent)</span>
+        const finalData = <span class="cstat-no" title="statement not covered" >{ type: 'done', result: parsed || { raw_content: fullContent }, raw_content: fullContent }</span>
+<span class="cstat-no" title="statement not covered" >        if (thinkingContent) <span class="cstat-no" title="statement not covered" >finalData.thinking_content = thinkingContent</span></span>
+<span class="cstat-no" title="statement not covered" >        if (usageData) <span class="cstat-no" title="statement not covered" >finalData.usage = usageData</span></span>
+<span class="cstat-no" title="statement not covered" >        res.write(`data: ${JSON.stringify(finalData)}\n\n`)</span>
+<span class="cstat-no" title="statement not covered" >        res.write('data: [DONE]\n\n')</span>
+<span class="cstat-no" title="statement not covered" >        res.end()</span>
+      })
+<span class="cstat-no" title="statement not covered" >      response.body.on('error', <span class="fstat-no" title="function not covered" >(e</span>rr) =&gt; { <span class="cstat-no" title="statement not covered" >res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`); <span class="cstat-no" title="statement not covered" ></span>res.end() </span>})</span>
+    } else <span class="cstat-no" title="statement not covered" >if (response.body?.getReader) {</span>
+      const reader = <span class="cstat-no" title="statement not covered" >response.body.getReader()</span>
+      const decoder = <span class="cstat-no" title="statement not covered" >new TextDecoder()</span>
+      let buffer = <span class="cstat-no" title="statement not covered" >''</span>
+<span class="cstat-no" title="statement not covered" >      while (true) {</span>
+        const { done, value } = <span class="cstat-no" title="statement not covered" >await reader.read()</span>
+<span class="cstat-no" title="statement not covered" >        if (done) <span class="cstat-no" title="statement not covered" >break</span></span>
+<span class="cstat-no" title="statement not covered" >        buffer += decoder.decode(value, { stream: true })</span>
+        const lines = <span class="cstat-no" title="statement not covered" >buffer.split('\n')</span>
+<span class="cstat-no" title="statement not covered" >        buffer = lines.pop() || ''</span>
+<span class="cstat-no" title="statement not covered" >        for (const line of lines) {</span>
+          const trimmed = <span class="cstat-no" title="statement not covered" >line.trim()</span>
+<span class="cstat-no" title="statement not covered" >          if (!trimmed || !trimmed.startsWith('data: ')) <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >          if (trimmed === 'data: [DONE]') <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >          try {</span>
+            const j = <span class="cstat-no" title="statement not covered" >JSON.parse(trimmed.slice(6))</span>
+            const delta = <span class="cstat-no" title="statement not covered" >j.choices?.[0]?.delta</span>
+<span class="cstat-no" title="statement not covered" >            if (delta) {</span>
+              const c = <span class="cstat-no" title="statement not covered" >delta.content || ''</span>
+              const tc = <span class="cstat-no" title="statement not covered" >delta.reasoning_content || delta.thinking || ''</span>
+<span class="cstat-no" title="statement not covered" >              if (c) {</span>
+<span class="cstat-no" title="statement not covered" >                fullContent += c</span>
+<span class="cstat-no" title="statement not covered" >                res.write(`data: ${JSON.stringify({ type: 'content', content: c })}\n\n`)</span>
+              }
+<span class="cstat-no" title="statement not covered" >              if (tc) {</span>
+<span class="cstat-no" title="statement not covered" >                thinkingContent += tc</span>
+<span class="cstat-no" title="statement not covered" >                res.write(`data: ${JSON.stringify({ type: 'thinking', content: tc })}\n\n`)</span>
+              }
+            }
+<span class="cstat-no" title="statement not covered" >            if (j.usage) <span class="cstat-no" title="statement not covered" >usageData = j.usage</span></span>
+          } catch {}
+        }
+      }
+<span class="cstat-no" title="statement not covered" >      if (usageData) <span class="cstat-no" title="statement not covered" >await recordAIUsageForRequest(req, { type: 'copywriting', usage: usageData })</span></span>
+      const parsed = <span class="cstat-no" title="statement not covered" >parseCopywritingJson(fullContent)</span>
+      const finalData = <span class="cstat-no" title="statement not covered" >{ type: 'done', result: parsed || { raw_content: fullContent }, raw_content: fullContent }</span>
+<span class="cstat-no" title="statement not covered" >      if (thinkingContent) <span class="cstat-no" title="statement not covered" >finalData.thinking_content = thinkingContent</span></span>
+<span class="cstat-no" title="statement not covered" >      if (usageData) <span class="cstat-no" title="statement not covered" >finalData.usage = usageData</span></span>
+<span class="cstat-no" title="statement not covered" >      res.write(`data: ${JSON.stringify(finalData)}\n\n`)</span>
+<span class="cstat-no" title="statement not covered" >      res.write('data: [DONE]\n\n')</span>
+<span class="cstat-no" title="statement not covered" >      res.end()</span>
+    } else {
+      const text = <span class="cstat-no" title="statement not covered" >await response.text()</span>
+      const lines = <span class="cstat-no" title="statement not covered" >text.split('\n')</span>
+<span class="cstat-no" title="statement not covered" >      for (const line of lines) {</span>
+        const trimmed = <span class="cstat-no" title="statement not covered" >line.trim()</span>
+<span class="cstat-no" title="statement not covered" >        if (!trimmed || !trimmed.startsWith('data: ')) <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >        if (trimmed === 'data: [DONE]') <span class="cstat-no" title="statement not covered" >continue</span></span>
+<span class="cstat-no" title="statement not covered" >        try {</span>
+          const j = <span class="cstat-no" title="statement not covered" >JSON.parse(trimmed.slice(6))</span>
+          const delta = <span class="cstat-no" title="statement not covered" >j.choices?.[0]?.delta</span>
+<span class="cstat-no" title="statement not covered" >          if (delta) {</span>
+            const c = <span class="cstat-no" title="statement not covered" >delta.content || ''</span>
+            const tc = <span class="cstat-no" title="statement not covered" >delta.reasoning_content || delta.thinking || ''</span>
+<span class="cstat-no" title="statement not covered" >            if (c) {</span>
+<span class="cstat-no" title="statement not covered" >              fullContent += c</span>
+<span class="cstat-no" title="statement not covered" >              res.write(`data: ${JSON.stringify({ type: 'content', content: c })}\n\n`)</span>
+            }
+<span class="cstat-no" title="statement not covered" >            if (tc) {</span>
+<span class="cstat-no" title="statement not covered" >              thinkingContent += tc</span>
+<span class="cstat-no" title="statement not covered" >              res.write(`data: ${JSON.stringify({ type: 'thinking', content: tc })}\n\n`)</span>
+            }
+          }
+<span class="cstat-no" title="statement not covered" >          if (j.usage) <span class="cstat-no" title="statement not covered" >usageData = j.usage</span></span>
+        } catch {}
+      }
+<span class="cstat-no" title="statement not covered" >      if (usageData) <span class="cstat-no" title="statement not covered" >await recordAIUsageForRequest(req, { type: 'copywriting', usage: usageData })</span></span>
+      const parsed = <span class="cstat-no" title="statement not covered" >parseCopywritingJson(fullContent)</span>
+      const finalData = <span class="cstat-no" title="statement not covered" >{ type: 'done', result: parsed || { raw_content: fullContent }, raw_content: fullContent }</span>
+<span class="cstat-no" title="statement not covered" >      if (thinkingContent) <span class="cstat-no" title="statement not covered" >finalData.thinking_content = thinkingContent</span></span>
+<span class="cstat-no" title="statement not covered" >      if (usageData) <span class="cstat-no" title="statement not covered" >finalData.usage = usageData</span></span>
+<span class="cstat-no" title="statement not covered" >      res.write(`data: ${JSON.stringify(finalData)}\n\n`)</span>
+<span class="cstat-no" title="statement not covered" >      res.write('data: [DONE]\n\n')</span>
+<span class="cstat-no" title="statement not covered" >      res.end()</span>
+    }
+  } catch (error) {
+<span class="cstat-no" title="statement not covered" >    console.error('[Copywriting] Stream Error:', error)</span>
+<span class="cstat-no" title="statement not covered" >    if (!res.headersSent) <span class="cstat-no" title="statement not covered" >res.status(500).json({ success: false, error: error.message })</span></span>
+    else { <span class="cstat-no" title="statement not covered" >res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`); <span class="cstat-no" title="statement not covered" ></span>res.end() </span>}
+  }
+})
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.post('/api/copywriting/refine', requireUser, ensureUserCanUseOfficialAI, <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { original_content, refinement_instructions, merchant_data, temperature } = <span class="cstat-no" title="statement not covered" >req.body</span>
+<span class="cstat-no" title="statement not covered" >    if (!original_content || !refinement_instructions) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ success: false, error: '缺少 original_content 或 refinement_instructions' })</span>
+    }
+&nbsp;
+    const merchantInfo = <span class="cstat-no" title="statement not covered" >merchant_data ? buildMerchantInfo(merchant_data) : '无'</span>
+    const cfg = <span class="cstat-no" title="statement not covered" >await getAIConfig()</span>
+<span class="cstat-no" title="statement not covered" >    if (!cfg.apiKey) <span class="cstat-no" title="statement not covered" >return res.status(500).json({ success: false, error: 'AI API Key 未配置' })</span></span>
+&nbsp;
+    const isVolcengine = <span class="cstat-no" title="statement not covered" >['volcengine', 'doubao'].includes(cfg.provider?.toLowerCase())</span>
+    const model = <span class="cstat-no" title="statement not covered" >(isVolcengine &amp;&amp; cfg.endpointId) ? cfg.endpointId : cfg.model</span>
+    const body = <span class="cstat-no" title="statement not covered" >{</span>
+      model,
+      messages: [
+        { role: 'system', content: COPYWRITING_SYSTEM_PROMPT },
+        { role: 'user', content: `优化以下申诉文案。\n\n【原始文案】\n${original_content}\n\n【商户信息】\n${merchantInfo}\n\n【修改要求】\n${refinement_instructions}\n\n输出优化后的完整文案，保持JSON格式。` },
+        { role: 'assistant', content: '{' },
+      ],
+      temperature: temperature || 0.3,
+      top_p: 0.7,
+      max_tokens: 2048,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      response_format: { type: 'json_object' },
+    }
+<span class="cstat-no" title="statement not covered" >    if (isVolcengine) {</span>
+<span class="cstat-no" title="statement not covered" >      body.thinking = { type: 'disabled' }</span>
+<span class="cstat-no" title="statement not covered" >      body.service_tier = 'auto'</span>
+    }
+&nbsp;
+    const response = <span class="cstat-no" title="statement not covered" >await fetch(cfg.endpoint, {</span>
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify(body),
+      timeout: 120000,
+    })
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (!response.ok) {</span>
+      const errText = <span class="cstat-no" title="statement not covered" >await response.text().catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >'')</span></span>
+<span class="cstat-no" title="statement not covered" >      return res.status(502).json({ success: false, error: `AI API Error ${response.status}: ${errText.slice(0, 200)}` })</span>
+    }
+&nbsp;
+    const json = <span class="cstat-no" title="statement not covered" >await response.json()</span>
+    const content = <span class="cstat-no" title="statement not covered" >json.choices?.[0]?.message?.content || ''</span>
+    const parsed = <span class="cstat-no" title="statement not covered" >parseCopywritingJson(content)</span>
+<span class="cstat-no" title="statement not covered" >    if (json.usage) <span class="cstat-no" title="statement not covered" >await recordAIUsageForRequest(req, { type: 'copywriting', usage: json.usage })</span></span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    res.json({ success: true, data: parsed || { raw_content: content }, raw_content: content, usage: json.usage || null })</span>
+  } catch (error) {
+<span class="cstat-no" title="statement not covered" >    console.error('[Copywriting] Refine Error:', error)</span>
+<span class="cstat-no" title="statement not covered" >    res.status(500).json({ success: false, error: error.message })</span>
+  }
+})
+&nbsp;
+// ========== 监控告警 API ==========
+&nbsp;
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-05-19T05:45:38.705Z
+            </div>
+        <script src="../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
+    </body>
+</html>
+    

@@ -8,22 +8,26 @@
  * 4. 用户兴趣追踪 — 从对话中提取用户需求/行业/关键词
  */
 
-import { getSystemConfig, getActiveAIModel } from './db.js'
-
-// 内联 AI provider 配置（避免循环依赖）
-async function _getAIConfig() {
-  const active = await getActiveAIModel()
-  if (active) return { provider: active.provider, apiKey: active.api_key, model: active.model_name, endpoint: active.endpoint }
-  const provider = (await getSystemConfig('ai_provider')) || 'deepseek'
-  if (provider === 'zhipu') return { provider, apiKey: await getSystemConfig('zhipu_api_key'), model: (await getSystemConfig('zhipu_model')) || 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' }
-  return { provider, apiKey: await getSystemConfig('deepseek_api_key'), model: (await getSystemConfig('deepseek_model')) || 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' }
-}
+import { getSystemConfig, recordTokenUsage } from './db.js'
+import { getAIConfig } from './shared/aiConfig.js'
 import {
   getActiveProductsForAI, getProducts, updateProduct, getProductById, createProduct,
   upsertUserInterest, getUserInterest,
   createRecommendation, getRecommendations, incrementProductMetric,
-  getActiveContactCards, incrementCardMetric,
 } from './db.js'
+
+async function _recordMallSystemAI(type, usage) {
+  if (!usage) return
+  try {
+    const { trackAIUsage, isUsageTrackerReady } = await import('./ai/usageTracker.js')
+    if (isUsageTrackerReady()) {
+      await trackAIUsage({ userId: 0, type, usage })
+      return
+    }
+  } catch { /* fallback */ }
+  const { recordSystemTokenUsage } = await import('./billing.js')
+  await recordSystemTokenUsage(recordTokenUsage, { type, usage })
+}
 
 // ========== 1. 商品目录 → System Prompt ==========
 
@@ -94,7 +98,7 @@ export async function aiOptimizeProduct(productId) {
   const product = await getProductById(productId)
   if (!product) return null
 
-  const _cfg = await _getAIConfig()
+  const _cfg = await getAIConfig()
   if (!_cfg.apiKey) return null
 
   const optimizePrompt = `你是商品营销优化专家。请优化以下商品信息，使其更吸引目标客户。输出严格JSON。
@@ -125,12 +129,13 @@ export async function aiOptimizeProduct(productId) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_cfg.apiKey}` },
       body: JSON.stringify({
         model: _cfg.model, messages: [{ role: 'user', content: optimizePrompt }],
-        temperature: 0.7, max_tokens: 1000,
+        temperature: 0.3, top_p: 0.7, max_tokens: 1000,
       }),
     })
 
     if (!res.ok) return null
     const data = await res.json()
+    if (data.usage) await _recordMallSystemAI('mall_product_optimize', data.usage)
     const text = data.choices?.[0]?.message?.content || ''
 
     // 解析JSON
@@ -159,18 +164,30 @@ export async function aiOptimizeProduct(productId) {
 /**
  * 批量优化所有活跃商品
  */
-export async function batchOptimizeProducts() {
+export async function batchOptimizeProducts(onProgress) {
   const products = await getProducts({ status: 'active' })
+  const queue = products.filter((p) => {
+    if (!p.ai_optimized_at) return true
+    return (Date.now() - new Date(p.ai_optimized_at).getTime()) >= 24 * 60 * 60 * 1000
+  })
+  const total = queue.length
+  onProgress?.({ phase: 'batch_optimize', message: `共 ${total} 个商品待优化（跳过 24h 内已优化）`, current: 0, total })
   let optimized = 0
-  for (const p of products) {
-    // 跳过24小时内已优化的
-    if (p.ai_optimized_at && (Date.now() - new Date(p.ai_optimized_at).getTime()) < 24 * 60 * 60 * 1000) continue
+  let current = 0
+  for (const p of queue) {
+    current++
+    onProgress?.({
+      phase: 'optimizing',
+      message: `正在优化：${p.name}`,
+      current,
+      total,
+    })
     const result = await aiOptimizeProduct(p.id)
     if (result) optimized++
-    // 避免API过热
     await new Promise(r => setTimeout(r, 2000))
   }
-  return { optimized, total: products.length }
+  onProgress?.({ phase: 'done', message: `批量优化完成，成功 ${optimized} 个`, current: total, total })
+  return { optimized, total: products.length, processed: total }
 }
 
 // ========== 3. AI智能推荐引擎（全AI驱动，无写死规则）==========
@@ -187,7 +204,7 @@ export async function getSmartRecommendations(userId, sessionId, collectedData =
   const userInterest = userId ? await getUserInterest(userId) : null
 
   // 尝试用AI做智能匹配
-  const cfg = await _getAIConfig()
+  const cfg = await getAIConfig()
   if (cfg.apiKey && products.length > 0) {
     try {
       const aiResult = await _aiMatchProducts(cfg, products, { industry, problemType, userInterest, collectedData })
@@ -262,12 +279,13 @@ ${productList}
   const res = await fetch(cfg.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-    body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
-    signal: AbortSignal.timeout(15000),
+    body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, top_p: 0.7, max_tokens: 500 }),
+    signal: AbortSignal.timeout(30000),
   })
   if (!res.ok) return null
 
   const data = await res.json()
+  if (data.usage) await _recordMallSystemAI('mall_recommend', data.usage)
   const text = data.choices?.[0]?.message?.content || ''
   const jsonMatch = text.match(/\[[\s\S]*\]/)
   if (!jsonMatch) return null
@@ -291,24 +309,25 @@ ${productList}
  * AI从对话中提取用户兴趣并更新画像
  */
 export async function updateUserInterestFromConversation(userId, sessionId, collectedData, messages = []) {
-  if (!userId) return
+  if (!userId) return null
 
   const industry = collectedData.industry || ''
   const problemType = collectedData.problem_type || collectedData.violation_reason || ''
 
   // 尝试AI提取兴趣
-  const cfg = await _getAIConfig()
+  const cfg = await getAIConfig()
   if (cfg.apiKey && messages.length >= 2) {
     try {
-      const aiInterest = await _aiExtractInterest(cfg, collectedData, messages)
-      if (aiInterest) {
+      const extracted = await _aiExtractInterest(cfg, collectedData, messages)
+      if (extracted?.interest) {
+        const aiInterest = extracted.interest
         await upsertUserInterest(userId, {
           sessionId, industry, problemType,
           keywords: aiInterest.keywords || [],
           needTags: aiInterest.needTags || [],
           interestScore: aiInterest.interestScore || {},
         })
-        return
+        return extracted.usage || null
       }
     } catch (err) {
       console.error('[Mall] AI兴趣提取失败:', err.message)
@@ -323,6 +342,7 @@ export async function updateUserInterestFromConversation(userId, sessionId, coll
     needTags: [],
     interestScore: {},
   })
+  return null
 }
 
 /**
@@ -355,8 +375,8 @@ ${conversationSnippet}
   const res = await fetch(cfg.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-    body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
-    signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, top_p: 0.7, max_tokens: 500 }),
+    signal: AbortSignal.timeout(30000),
   })
   if (!res.ok) return null
 
@@ -364,7 +384,7 @@ ${conversationSnippet}
   const text = data.choices?.[0]?.message?.content || ''
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) return null
-  return JSON.parse(jsonMatch[0])
+  return { interest: JSON.parse(jsonMatch[0]), usage: data.usage || null }
 }
 
 // ========== 5. 对话中解析推荐标记 ==========
@@ -409,8 +429,14 @@ export async function parseProductRecommendations(aiReply) {
  * AI分析用户对话模式，自动建议新商品/服务
  * 适合在批处理中定期调用（如每日）
  */
-export async function aiSuggestNewProducts(recentAnalyses = []) {
-  const cfg = await _getAIConfig()
+export async function aiSuggestNewProducts(recentAnalyses = [], onProgress) {
+  onProgress?.({
+    phase: 'ai_suggest',
+    message: `正在汇总 ${recentAnalyses.length} 条对话分析并比对现有商品…`,
+    current: 0,
+    total: 0,
+  })
+  const cfg = await getAIConfig()
   if (!cfg.apiKey) return null
 
   const existingProducts = await getProducts({ status: 'active' })
@@ -457,20 +483,33 @@ ${needsSummary}
 - 最多建议3个商品`
 
   try {
+    onProgress?.({
+      phase: 'ai_suggest',
+      message: '正在调用 AI 生成商品建议（通常需 20–60 秒，请稍候）…',
+      current: 0,
+      total: 0,
+    })
     const res = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.5, max_tokens: 1500 }),
-      signal: AbortSignal.timeout(20000),
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, top_p: 0.7, max_tokens: 1500 }),
+      signal: AbortSignal.timeout(120000),
     })
     if (!res.ok) return null
 
     const data = await res.json()
+    if (data.usage) await _recordMallSystemAI('mall_product_suggest', data.usage)
     const text = data.choices?.[0]?.message?.content || ''
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) return null
 
     const suggestions = JSON.parse(jsonMatch[0])
+    onProgress?.({
+      phase: 'ai_suggest',
+      message: `AI 返回 ${suggestions.length} 条商品建议`,
+      current: 0,
+      total: suggestions.length,
+    })
     console.log(`[Mall] AI建议${suggestions.length}个新商品`)
     return suggestions
   } catch (err) {
@@ -482,12 +521,31 @@ ${needsSummary}
 /**
  * AI自动创建商品（将建议转为草稿商品）
  */
-export async function aiAutoCreateProducts(recentAnalyses = []) {
-  const suggestions = await aiSuggestNewProducts(recentAnalyses)
-  if (!suggestions?.length) return { created: 0, suggestions: [] }
+export async function aiAutoCreateProducts(recentAnalyses = [], onProgress) {
+  onProgress?.({ phase: 'analyzing', message: '正在分析用户对话需求…', current: 0, total: 0 })
+  const suggestions = await aiSuggestNewProducts(recentAnalyses, onProgress)
+  if (!suggestions?.length) {
+    onProgress?.({ phase: 'done', message: '暂无新商品建议', current: 0, total: 0 })
+    return { created: 0, suggestions: [] }
+  }
+
+  onProgress?.({
+    phase: 'suggesting',
+    message: `获得 ${suggestions.length} 条商品建议，开始创建草稿…`,
+    current: 0,
+    total: suggestions.length,
+  })
 
   const created = []
+  let idx = 0
   for (const s of suggestions) {
+    idx++
+    onProgress?.({
+      phase: 'creating',
+      message: `创建商品：${s.name}`,
+      current: idx,
+      total: suggestions.length,
+    })
     try {
       const result = await createProduct({
         name: s.name,
@@ -496,11 +554,16 @@ export async function aiAutoCreateProducts(recentAnalyses = []) {
         description: s.description || '',
         tags: s.tags || [],
         targetAudience: s.targetAudience || [],
-        status: 'draft', // 自动创建为草稿，管理员审核后上架
+        status: 'draft',
       })
       created.push({ ...result, name: s.name, reason: s.reason })
 
-      // 自动AI优化描述
+      onProgress?.({
+        phase: 'optimizing',
+        message: `AI 优化描述：${s.name}`,
+        current: idx,
+        total: suggestions.length,
+      })
       await aiOptimizeProduct(result.id).catch(() => {})
     } catch (err) {
       console.error('[Mall] 自动创建商品失败:', s.name, err.message)
@@ -509,6 +572,7 @@ export async function aiAutoCreateProducts(recentAnalyses = []) {
 
   invalidateProductCache()
   console.log(`[Mall] AI自动创建${created.length}个商品草稿`)
+  onProgress?.({ phase: 'done', message: `已创建 ${created.length} 个商品草稿`, current: created.length, total: suggestions.length })
   return { created: created.length, suggestions: created }
 }
 
@@ -520,7 +584,7 @@ export async function aiAutoCreateProducts(recentAnalyses = []) {
  * AI评估违规风险等级：severe/high/medium/low
  */
 export async function aiAssessRisk(collectedData = {}) {
-  const cfg = await _getAIConfig()
+  const cfg = await getAIConfig()
 
   const context = Object.entries(collectedData)
     .filter(([k, v]) => v && !k.startsWith('_'))
@@ -561,8 +625,8 @@ ${context}
     const res = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 300 }),
-      signal: AbortSignal.timeout(10000),
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, top_p: 0.7, max_tokens: 300 }),
+      signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) return { level: 'medium', label: '评估中', description: '正在分析...', confidence: 0 }
 
@@ -572,112 +636,10 @@ ${context}
     if (!jsonMatch) return { level: 'medium', label: '评估中', description: '解析失败', confidence: 0 }
 
     const result = JSON.parse(jsonMatch[0])
-    return { ...result, confidence: 0.9 }
+    return { ...result, confidence: 0.9, _usage: data.usage || null }
   } catch (err) {
     console.error('[Mall] AI风险评估失败:', err.message)
     return { level: 'medium', label: '评估中', description: '评估服务暂时不可用', confidence: 0 }
-  }
-}
-
-// ========== 9. AI生成名片 ==========
-
-/**
- * AI根据业务需求自动生成名片内容
- */
-export async function aiGenerateContactCard(context = {}) {
-  const cfg = await _getAIConfig()
-  if (!cfg.apiKey) return null
-
-  const prompt = `你是商户申诉平台的名片设计AI。根据以下需求生成一个专业的联系人名片。
-
-## 需求
-${context.description || '为商户申诉平台生成一个专业的技术支持人员名片'}
-类型偏好: ${context.category || '自动选择'}
-
-## 输出JSON
-{
-  "name": "真实感的中文姓名",
-  "title": "职位头衔（如：资深申诉顾问、法律合规专家等）",
-  "description": "一句话个人介绍（突出专业能力和服务承诺）",
-  "category": "general|legal|tech|sales|vip",
-  "tags": ["专业标签1", "专业标签2", "专业标签3"],
-  "targetAudience": ["目标客户1", "目标客户2"]
-}
-只输出JSON，名字要有真实感`
-
-  try {
-    const res = await fetch(cfg.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 400 }),
-      signal: AbortSignal.timeout(12000),
-    })
-    if (!res.ok) return null
-
-    const data = await res.json()
-    const text = data.choices?.[0]?.message?.content || ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return null
-    return JSON.parse(jsonMatch[0])
-  } catch (err) {
-    console.error('[Mall] AI名片生成失败:', err.message)
-    return null
-  }
-}
-
-/**
- * AI根据用户对话上下文推荐最合适的名片
- */
-export async function aiRecommendContactCard(collectedData = {}, messages = []) {
-  const cards = await getActiveContactCards()
-  if (cards.length <= 1) return cards[0] || null // 只有一张或没有，直接返回
-
-  const cfg = await _getAIConfig()
-  if (!cfg.apiKey) return cards[0] // AI不可用，返回第一张
-
-  const cardList = cards.map(c =>
-    `[ID:${c.id}] ${c.name} (${c.title || '无头衔'}) | 分类:${c.category} | 标签:${(c.tags || []).join(',')} | 描述:${(c.description || '').slice(0, 60)}`
-  ).join('\n')
-
-  const userContext = [
-    collectedData.industry ? `行业: ${collectedData.industry}` : '',
-    collectedData.problem_type ? `问题: ${collectedData.problem_type}` : '',
-    collectedData.violation_reason ? `违规: ${collectedData.violation_reason}` : '',
-  ].filter(Boolean).join(', ') || '暂无信息'
-
-  const prompt = `从以下联系人名片中，选出最适合当前用户的一个。
-
-用户情况: ${userContext}
-
-名片列表:
-${cardList}
-
-输出JSON: {"id": 最匹配的名片ID, "reason": "推荐理由"}
-只输出JSON`
-
-  try {
-    const res = await fetch(cfg.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 200 }),
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!res.ok) return cards[0]
-
-    const data = await res.json()
-    const text = data.choices?.[0]?.message?.content || ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return cards[0]
-
-    const result = JSON.parse(jsonMatch[0])
-    const matched = cards.find(c => c.id === result.id)
-    if (matched) {
-      await incrementCardMetric(matched.id, 'view_count').catch(() => {})
-      return { ...matched, aiReason: result.reason }
-    }
-    return cards[0]
-  } catch {
-    return cards[0]
   }
 }
 
@@ -690,7 +652,7 @@ ${cardList}
  * @param {string} userMessage - 用户最新砍价消息
  */
 export async function aiBargain(product, bargainHistory = [], userMessage = '') {
-  const cfg = await _getAIConfig()
+  const cfg = await getAIConfig()
   const minPrice = Math.max(product.price * 0.6, 1) // 底线：6折
   const currentOffer = product.price
 
@@ -741,7 +703,7 @@ export async function aiBargain(product, bargainHistory = [], userMessage = '') 
     const res = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages, temperature: 0.7, max_tokens: 400 }),
+      body: JSON.stringify({ model: cfg.model, messages, temperature: 0.3, top_p: 0.7, max_tokens: 400 }),
       signal: AbortSignal.timeout(12000),
     })
     if (!res.ok) return { reply: '系统忙，请稍后再试~', finalPrice: null, accepted: false }
@@ -757,7 +719,7 @@ export async function aiBargain(product, bargainHistory = [], userMessage = '') 
       result.finalPrice = Math.round(minPrice)
       result.reply = result.reply.replace(/\d+(\.\d+)?/, String(result.finalPrice))
     }
-    return result
+    return { ...result, _usage: data.usage || null }
   } catch {
     return { reply: '网络不太好，我们换个时间聊~', finalPrice: null, accepted: false }
   }
@@ -770,7 +732,7 @@ export async function aiBargain(product, bargainHistory = [], userMessage = '') 
  * 这个"人"后续会以此人设与客户沟通帮助解决问题
  */
 export async function aiGenerateVirtualPersona(product, collectedData = {}) {
-  const cfg = await _getAIConfig()
+  const cfg = await getAIConfig()
   if (!cfg.apiKey) {
     return {
       name: '客服小助',
@@ -809,7 +771,7 @@ export async function aiGenerateVirtualPersona(product, collectedData = {}) {
     const res = await fetch(cfg.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 500 }),
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, top_p: 0.7, max_tokens: 500 }),
       signal: AbortSignal.timeout(12000),
     })
     if (!res.ok) return null
@@ -818,7 +780,7 @@ export async function aiGenerateVirtualPersona(product, collectedData = {}) {
     const text = data.choices?.[0]?.message?.content || ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return null
-    return JSON.parse(jsonMatch[0])
+    return { persona: JSON.parse(jsonMatch[0]), _usage: data.usage || null }
   } catch (err) {
     console.error('[Mall] 虚拟人设生成失败:', err.message)
     return null

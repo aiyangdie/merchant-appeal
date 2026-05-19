@@ -1,0 +1,3013 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/db/schema.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">server/db</a> schema.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/152</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/28</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/5</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/135</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a>
+<a name='L517'></a><a href='#L517'>517</a>
+<a name='L518'></a><a href='#L518'>518</a>
+<a name='L519'></a><a href='#L519'>519</a>
+<a name='L520'></a><a href='#L520'>520</a>
+<a name='L521'></a><a href='#L521'>521</a>
+<a name='L522'></a><a href='#L522'>522</a>
+<a name='L523'></a><a href='#L523'>523</a>
+<a name='L524'></a><a href='#L524'>524</a>
+<a name='L525'></a><a href='#L525'>525</a>
+<a name='L526'></a><a href='#L526'>526</a>
+<a name='L527'></a><a href='#L527'>527</a>
+<a name='L528'></a><a href='#L528'>528</a>
+<a name='L529'></a><a href='#L529'>529</a>
+<a name='L530'></a><a href='#L530'>530</a>
+<a name='L531'></a><a href='#L531'>531</a>
+<a name='L532'></a><a href='#L532'>532</a>
+<a name='L533'></a><a href='#L533'>533</a>
+<a name='L534'></a><a href='#L534'>534</a>
+<a name='L535'></a><a href='#L535'>535</a>
+<a name='L536'></a><a href='#L536'>536</a>
+<a name='L537'></a><a href='#L537'>537</a>
+<a name='L538'></a><a href='#L538'>538</a>
+<a name='L539'></a><a href='#L539'>539</a>
+<a name='L540'></a><a href='#L540'>540</a>
+<a name='L541'></a><a href='#L541'>541</a>
+<a name='L542'></a><a href='#L542'>542</a>
+<a name='L543'></a><a href='#L543'>543</a>
+<a name='L544'></a><a href='#L544'>544</a>
+<a name='L545'></a><a href='#L545'>545</a>
+<a name='L546'></a><a href='#L546'>546</a>
+<a name='L547'></a><a href='#L547'>547</a>
+<a name='L548'></a><a href='#L548'>548</a>
+<a name='L549'></a><a href='#L549'>549</a>
+<a name='L550'></a><a href='#L550'>550</a>
+<a name='L551'></a><a href='#L551'>551</a>
+<a name='L552'></a><a href='#L552'>552</a>
+<a name='L553'></a><a href='#L553'>553</a>
+<a name='L554'></a><a href='#L554'>554</a>
+<a name='L555'></a><a href='#L555'>555</a>
+<a name='L556'></a><a href='#L556'>556</a>
+<a name='L557'></a><a href='#L557'>557</a>
+<a name='L558'></a><a href='#L558'>558</a>
+<a name='L559'></a><a href='#L559'>559</a>
+<a name='L560'></a><a href='#L560'>560</a>
+<a name='L561'></a><a href='#L561'>561</a>
+<a name='L562'></a><a href='#L562'>562</a>
+<a name='L563'></a><a href='#L563'>563</a>
+<a name='L564'></a><a href='#L564'>564</a>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a>
+<a name='L568'></a><a href='#L568'>568</a>
+<a name='L569'></a><a href='#L569'>569</a>
+<a name='L570'></a><a href='#L570'>570</a>
+<a name='L571'></a><a href='#L571'>571</a>
+<a name='L572'></a><a href='#L572'>572</a>
+<a name='L573'></a><a href='#L573'>573</a>
+<a name='L574'></a><a href='#L574'>574</a>
+<a name='L575'></a><a href='#L575'>575</a>
+<a name='L576'></a><a href='#L576'>576</a>
+<a name='L577'></a><a href='#L577'>577</a>
+<a name='L578'></a><a href='#L578'>578</a>
+<a name='L579'></a><a href='#L579'>579</a>
+<a name='L580'></a><a href='#L580'>580</a>
+<a name='L581'></a><a href='#L581'>581</a>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a>
+<a name='L604'></a><a href='#L604'>604</a>
+<a name='L605'></a><a href='#L605'>605</a>
+<a name='L606'></a><a href='#L606'>606</a>
+<a name='L607'></a><a href='#L607'>607</a>
+<a name='L608'></a><a href='#L608'>608</a>
+<a name='L609'></a><a href='#L609'>609</a>
+<a name='L610'></a><a href='#L610'>610</a>
+<a name='L611'></a><a href='#L611'>611</a>
+<a name='L612'></a><a href='#L612'>612</a>
+<a name='L613'></a><a href='#L613'>613</a>
+<a name='L614'></a><a href='#L614'>614</a>
+<a name='L615'></a><a href='#L615'>615</a>
+<a name='L616'></a><a href='#L616'>616</a>
+<a name='L617'></a><a href='#L617'>617</a>
+<a name='L618'></a><a href='#L618'>618</a>
+<a name='L619'></a><a href='#L619'>619</a>
+<a name='L620'></a><a href='#L620'>620</a>
+<a name='L621'></a><a href='#L621'>621</a>
+<a name='L622'></a><a href='#L622'>622</a>
+<a name='L623'></a><a href='#L623'>623</a>
+<a name='L624'></a><a href='#L624'>624</a>
+<a name='L625'></a><a href='#L625'>625</a>
+<a name='L626'></a><a href='#L626'>626</a>
+<a name='L627'></a><a href='#L627'>627</a>
+<a name='L628'></a><a href='#L628'>628</a>
+<a name='L629'></a><a href='#L629'>629</a>
+<a name='L630'></a><a href='#L630'>630</a>
+<a name='L631'></a><a href='#L631'>631</a>
+<a name='L632'></a><a href='#L632'>632</a>
+<a name='L633'></a><a href='#L633'>633</a>
+<a name='L634'></a><a href='#L634'>634</a>
+<a name='L635'></a><a href='#L635'>635</a>
+<a name='L636'></a><a href='#L636'>636</a>
+<a name='L637'></a><a href='#L637'>637</a>
+<a name='L638'></a><a href='#L638'>638</a>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a>
+<a name='L646'></a><a href='#L646'>646</a>
+<a name='L647'></a><a href='#L647'>647</a>
+<a name='L648'></a><a href='#L648'>648</a>
+<a name='L649'></a><a href='#L649'>649</a>
+<a name='L650'></a><a href='#L650'>650</a>
+<a name='L651'></a><a href='#L651'>651</a>
+<a name='L652'></a><a href='#L652'>652</a>
+<a name='L653'></a><a href='#L653'>653</a>
+<a name='L654'></a><a href='#L654'>654</a>
+<a name='L655'></a><a href='#L655'>655</a>
+<a name='L656'></a><a href='#L656'>656</a>
+<a name='L657'></a><a href='#L657'>657</a>
+<a name='L658'></a><a href='#L658'>658</a>
+<a name='L659'></a><a href='#L659'>659</a>
+<a name='L660'></a><a href='#L660'>660</a>
+<a name='L661'></a><a href='#L661'>661</a>
+<a name='L662'></a><a href='#L662'>662</a>
+<a name='L663'></a><a href='#L663'>663</a>
+<a name='L664'></a><a href='#L664'>664</a>
+<a name='L665'></a><a href='#L665'>665</a>
+<a name='L666'></a><a href='#L666'>666</a>
+<a name='L667'></a><a href='#L667'>667</a>
+<a name='L668'></a><a href='#L668'>668</a>
+<a name='L669'></a><a href='#L669'>669</a>
+<a name='L670'></a><a href='#L670'>670</a>
+<a name='L671'></a><a href='#L671'>671</a>
+<a name='L672'></a><a href='#L672'>672</a>
+<a name='L673'></a><a href='#L673'>673</a>
+<a name='L674'></a><a href='#L674'>674</a>
+<a name='L675'></a><a href='#L675'>675</a>
+<a name='L676'></a><a href='#L676'>676</a>
+<a name='L677'></a><a href='#L677'>677</a>
+<a name='L678'></a><a href='#L678'>678</a>
+<a name='L679'></a><a href='#L679'>679</a>
+<a name='L680'></a><a href='#L680'>680</a>
+<a name='L681'></a><a href='#L681'>681</a>
+<a name='L682'></a><a href='#L682'>682</a>
+<a name='L683'></a><a href='#L683'>683</a>
+<a name='L684'></a><a href='#L684'>684</a>
+<a name='L685'></a><a href='#L685'>685</a>
+<a name='L686'></a><a href='#L686'>686</a>
+<a name='L687'></a><a href='#L687'>687</a>
+<a name='L688'></a><a href='#L688'>688</a>
+<a name='L689'></a><a href='#L689'>689</a>
+<a name='L690'></a><a href='#L690'>690</a>
+<a name='L691'></a><a href='#L691'>691</a>
+<a name='L692'></a><a href='#L692'>692</a>
+<a name='L693'></a><a href='#L693'>693</a>
+<a name='L694'></a><a href='#L694'>694</a>
+<a name='L695'></a><a href='#L695'>695</a>
+<a name='L696'></a><a href='#L696'>696</a>
+<a name='L697'></a><a href='#L697'>697</a>
+<a name='L698'></a><a href='#L698'>698</a>
+<a name='L699'></a><a href='#L699'>699</a>
+<a name='L700'></a><a href='#L700'>700</a>
+<a name='L701'></a><a href='#L701'>701</a>
+<a name='L702'></a><a href='#L702'>702</a>
+<a name='L703'></a><a href='#L703'>703</a>
+<a name='L704'></a><a href='#L704'>704</a>
+<a name='L705'></a><a href='#L705'>705</a>
+<a name='L706'></a><a href='#L706'>706</a>
+<a name='L707'></a><a href='#L707'>707</a>
+<a name='L708'></a><a href='#L708'>708</a>
+<a name='L709'></a><a href='#L709'>709</a>
+<a name='L710'></a><a href='#L710'>710</a>
+<a name='L711'></a><a href='#L711'>711</a>
+<a name='L712'></a><a href='#L712'>712</a>
+<a name='L713'></a><a href='#L713'>713</a>
+<a name='L714'></a><a href='#L714'>714</a>
+<a name='L715'></a><a href='#L715'>715</a>
+<a name='L716'></a><a href='#L716'>716</a>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a>
+<a name='L726'></a><a href='#L726'>726</a>
+<a name='L727'></a><a href='#L727'>727</a>
+<a name='L728'></a><a href='#L728'>728</a>
+<a name='L729'></a><a href='#L729'>729</a>
+<a name='L730'></a><a href='#L730'>730</a>
+<a name='L731'></a><a href='#L731'>731</a>
+<a name='L732'></a><a href='#L732'>732</a>
+<a name='L733'></a><a href='#L733'>733</a>
+<a name='L734'></a><a href='#L734'>734</a>
+<a name='L735'></a><a href='#L735'>735</a>
+<a name='L736'></a><a href='#L736'>736</a>
+<a name='L737'></a><a href='#L737'>737</a>
+<a name='L738'></a><a href='#L738'>738</a>
+<a name='L739'></a><a href='#L739'>739</a>
+<a name='L740'></a><a href='#L740'>740</a>
+<a name='L741'></a><a href='#L741'>741</a>
+<a name='L742'></a><a href='#L742'>742</a>
+<a name='L743'></a><a href='#L743'>743</a>
+<a name='L744'></a><a href='#L744'>744</a>
+<a name='L745'></a><a href='#L745'>745</a>
+<a name='L746'></a><a href='#L746'>746</a>
+<a name='L747'></a><a href='#L747'>747</a>
+<a name='L748'></a><a href='#L748'>748</a>
+<a name='L749'></a><a href='#L749'>749</a>
+<a name='L750'></a><a href='#L750'>750</a>
+<a name='L751'></a><a href='#L751'>751</a>
+<a name='L752'></a><a href='#L752'>752</a>
+<a name='L753'></a><a href='#L753'>753</a>
+<a name='L754'></a><a href='#L754'>754</a>
+<a name='L755'></a><a href='#L755'>755</a>
+<a name='L756'></a><a href='#L756'>756</a>
+<a name='L757'></a><a href='#L757'>757</a>
+<a name='L758'></a><a href='#L758'>758</a>
+<a name='L759'></a><a href='#L759'>759</a>
+<a name='L760'></a><a href='#L760'>760</a>
+<a name='L761'></a><a href='#L761'>761</a>
+<a name='L762'></a><a href='#L762'>762</a>
+<a name='L763'></a><a href='#L763'>763</a>
+<a name='L764'></a><a href='#L764'>764</a>
+<a name='L765'></a><a href='#L765'>765</a>
+<a name='L766'></a><a href='#L766'>766</a>
+<a name='L767'></a><a href='#L767'>767</a>
+<a name='L768'></a><a href='#L768'>768</a>
+<a name='L769'></a><a href='#L769'>769</a>
+<a name='L770'></a><a href='#L770'>770</a>
+<a name='L771'></a><a href='#L771'>771</a>
+<a name='L772'></a><a href='#L772'>772</a>
+<a name='L773'></a><a href='#L773'>773</a>
+<a name='L774'></a><a href='#L774'>774</a>
+<a name='L775'></a><a href='#L775'>775</a>
+<a name='L776'></a><a href='#L776'>776</a>
+<a name='L777'></a><a href='#L777'>777</a>
+<a name='L778'></a><a href='#L778'>778</a>
+<a name='L779'></a><a href='#L779'>779</a>
+<a name='L780'></a><a href='#L780'>780</a>
+<a name='L781'></a><a href='#L781'>781</a>
+<a name='L782'></a><a href='#L782'>782</a>
+<a name='L783'></a><a href='#L783'>783</a>
+<a name='L784'></a><a href='#L784'>784</a>
+<a name='L785'></a><a href='#L785'>785</a>
+<a name='L786'></a><a href='#L786'>786</a>
+<a name='L787'></a><a href='#L787'>787</a>
+<a name='L788'></a><a href='#L788'>788</a>
+<a name='L789'></a><a href='#L789'>789</a>
+<a name='L790'></a><a href='#L790'>790</a>
+<a name='L791'></a><a href='#L791'>791</a>
+<a name='L792'></a><a href='#L792'>792</a>
+<a name='L793'></a><a href='#L793'>793</a>
+<a name='L794'></a><a href='#L794'>794</a>
+<a name='L795'></a><a href='#L795'>795</a>
+<a name='L796'></a><a href='#L796'>796</a>
+<a name='L797'></a><a href='#L797'>797</a>
+<a name='L798'></a><a href='#L798'>798</a>
+<a name='L799'></a><a href='#L799'>799</a>
+<a name='L800'></a><a href='#L800'>800</a>
+<a name='L801'></a><a href='#L801'>801</a>
+<a name='L802'></a><a href='#L802'>802</a>
+<a name='L803'></a><a href='#L803'>803</a>
+<a name='L804'></a><a href='#L804'>804</a>
+<a name='L805'></a><a href='#L805'>805</a>
+<a name='L806'></a><a href='#L806'>806</a>
+<a name='L807'></a><a href='#L807'>807</a>
+<a name='L808'></a><a href='#L808'>808</a>
+<a name='L809'></a><a href='#L809'>809</a>
+<a name='L810'></a><a href='#L810'>810</a>
+<a name='L811'></a><a href='#L811'>811</a>
+<a name='L812'></a><a href='#L812'>812</a>
+<a name='L813'></a><a href='#L813'>813</a>
+<a name='L814'></a><a href='#L814'>814</a>
+<a name='L815'></a><a href='#L815'>815</a>
+<a name='L816'></a><a href='#L816'>816</a>
+<a name='L817'></a><a href='#L817'>817</a>
+<a name='L818'></a><a href='#L818'>818</a>
+<a name='L819'></a><a href='#L819'>819</a>
+<a name='L820'></a><a href='#L820'>820</a>
+<a name='L821'></a><a href='#L821'>821</a>
+<a name='L822'></a><a href='#L822'>822</a>
+<a name='L823'></a><a href='#L823'>823</a>
+<a name='L824'></a><a href='#L824'>824</a>
+<a name='L825'></a><a href='#L825'>825</a>
+<a name='L826'></a><a href='#L826'>826</a>
+<a name='L827'></a><a href='#L827'>827</a>
+<a name='L828'></a><a href='#L828'>828</a>
+<a name='L829'></a><a href='#L829'>829</a>
+<a name='L830'></a><a href='#L830'>830</a>
+<a name='L831'></a><a href='#L831'>831</a>
+<a name='L832'></a><a href='#L832'>832</a>
+<a name='L833'></a><a href='#L833'>833</a>
+<a name='L834'></a><a href='#L834'>834</a>
+<a name='L835'></a><a href='#L835'>835</a>
+<a name='L836'></a><a href='#L836'>836</a>
+<a name='L837'></a><a href='#L837'>837</a>
+<a name='L838'></a><a href='#L838'>838</a>
+<a name='L839'></a><a href='#L839'>839</a>
+<a name='L840'></a><a href='#L840'>840</a>
+<a name='L841'></a><a href='#L841'>841</a>
+<a name='L842'></a><a href='#L842'>842</a>
+<a name='L843'></a><a href='#L843'>843</a>
+<a name='L844'></a><a href='#L844'>844</a>
+<a name='L845'></a><a href='#L845'>845</a>
+<a name='L846'></a><a href='#L846'>846</a>
+<a name='L847'></a><a href='#L847'>847</a>
+<a name='L848'></a><a href='#L848'>848</a>
+<a name='L849'></a><a href='#L849'>849</a>
+<a name='L850'></a><a href='#L850'>850</a>
+<a name='L851'></a><a href='#L851'>851</a>
+<a name='L852'></a><a href='#L852'>852</a>
+<a name='L853'></a><a href='#L853'>853</a>
+<a name='L854'></a><a href='#L854'>854</a>
+<a name='L855'></a><a href='#L855'>855</a>
+<a name='L856'></a><a href='#L856'>856</a>
+<a name='L857'></a><a href='#L857'>857</a>
+<a name='L858'></a><a href='#L858'>858</a>
+<a name='L859'></a><a href='#L859'>859</a>
+<a name='L860'></a><a href='#L860'>860</a>
+<a name='L861'></a><a href='#L861'>861</a>
+<a name='L862'></a><a href='#L862'>862</a>
+<a name='L863'></a><a href='#L863'>863</a>
+<a name='L864'></a><a href='#L864'>864</a>
+<a name='L865'></a><a href='#L865'>865</a>
+<a name='L866'></a><a href='#L866'>866</a>
+<a name='L867'></a><a href='#L867'>867</a>
+<a name='L868'></a><a href='#L868'>868</a>
+<a name='L869'></a><a href='#L869'>869</a>
+<a name='L870'></a><a href='#L870'>870</a>
+<a name='L871'></a><a href='#L871'>871</a>
+<a name='L872'></a><a href='#L872'>872</a>
+<a name='L873'></a><a href='#L873'>873</a>
+<a name='L874'></a><a href='#L874'>874</a>
+<a name='L875'></a><a href='#L875'>875</a>
+<a name='L876'></a><a href='#L876'>876</a>
+<a name='L877'></a><a href='#L877'>877</a>
+<a name='L878'></a><a href='#L878'>878</a>
+<a name='L879'></a><a href='#L879'>879</a>
+<a name='L880'></a><a href='#L880'>880</a>
+<a name='L881'></a><a href='#L881'>881</a>
+<a name='L882'></a><a href='#L882'>882</a>
+<a name='L883'></a><a href='#L883'>883</a>
+<a name='L884'></a><a href='#L884'>884</a>
+<a name='L885'></a><a href='#L885'>885</a>
+<a name='L886'></a><a href='#L886'>886</a>
+<a name='L887'></a><a href='#L887'>887</a>
+<a name='L888'></a><a href='#L888'>888</a>
+<a name='L889'></a><a href='#L889'>889</a>
+<a name='L890'></a><a href='#L890'>890</a>
+<a name='L891'></a><a href='#L891'>891</a>
+<a name='L892'></a><a href='#L892'>892</a>
+<a name='L893'></a><a href='#L893'>893</a>
+<a name='L894'></a><a href='#L894'>894</a>
+<a name='L895'></a><a href='#L895'>895</a>
+<a name='L896'></a><a href='#L896'>896</a>
+<a name='L897'></a><a href='#L897'>897</a>
+<a name='L898'></a><a href='#L898'>898</a>
+<a name='L899'></a><a href='#L899'>899</a>
+<a name='L900'></a><a href='#L900'>900</a>
+<a name='L901'></a><a href='#L901'>901</a>
+<a name='L902'></a><a href='#L902'>902</a>
+<a name='L903'></a><a href='#L903'>903</a>
+<a name='L904'></a><a href='#L904'>904</a>
+<a name='L905'></a><a href='#L905'>905</a>
+<a name='L906'></a><a href='#L906'>906</a>
+<a name='L907'></a><a href='#L907'>907</a>
+<a name='L908'></a><a href='#L908'>908</a>
+<a name='L909'></a><a href='#L909'>909</a>
+<a name='L910'></a><a href='#L910'>910</a>
+<a name='L911'></a><a href='#L911'>911</a>
+<a name='L912'></a><a href='#L912'>912</a>
+<a name='L913'></a><a href='#L913'>913</a>
+<a name='L914'></a><a href='#L914'>914</a>
+<a name='L915'></a><a href='#L915'>915</a>
+<a name='L916'></a><a href='#L916'>916</a>
+<a name='L917'></a><a href='#L917'>917</a>
+<a name='L918'></a><a href='#L918'>918</a>
+<a name='L919'></a><a href='#L919'>919</a>
+<a name='L920'></a><a href='#L920'>920</a>
+<a name='L921'></a><a href='#L921'>921</a>
+<a name='L922'></a><a href='#L922'>922</a>
+<a name='L923'></a><a href='#L923'>923</a>
+<a name='L924'></a><a href='#L924'>924</a>
+<a name='L925'></a><a href='#L925'>925</a>
+<a name='L926'></a><a href='#L926'>926</a>
+<a name='L927'></a><a href='#L927'>927</a>
+<a name='L928'></a><a href='#L928'>928</a>
+<a name='L929'></a><a href='#L929'>929</a>
+<a name='L930'></a><a href='#L930'>930</a>
+<a name='L931'></a><a href='#L931'>931</a>
+<a name='L932'></a><a href='#L932'>932</a>
+<a name='L933'></a><a href='#L933'>933</a>
+<a name='L934'></a><a href='#L934'>934</a>
+<a name='L935'></a><a href='#L935'>935</a>
+<a name='L936'></a><a href='#L936'>936</a>
+<a name='L937'></a><a href='#L937'>937</a>
+<a name='L938'></a><a href='#L938'>938</a>
+<a name='L939'></a><a href='#L939'>939</a>
+<a name='L940'></a><a href='#L940'>940</a>
+<a name='L941'></a><a href='#L941'>941</a>
+<a name='L942'></a><a href='#L942'>942</a>
+<a name='L943'></a><a href='#L943'>943</a>
+<a name='L944'></a><a href='#L944'>944</a>
+<a name='L945'></a><a href='#L945'>945</a>
+<a name='L946'></a><a href='#L946'>946</a>
+<a name='L947'></a><a href='#L947'>947</a>
+<a name='L948'></a><a href='#L948'>948</a>
+<a name='L949'></a><a href='#L949'>949</a>
+<a name='L950'></a><a href='#L950'>950</a>
+<a name='L951'></a><a href='#L951'>951</a>
+<a name='L952'></a><a href='#L952'>952</a>
+<a name='L953'></a><a href='#L953'>953</a>
+<a name='L954'></a><a href='#L954'>954</a>
+<a name='L955'></a><a href='#L955'>955</a>
+<a name='L956'></a><a href='#L956'>956</a>
+<a name='L957'></a><a href='#L957'>957</a>
+<a name='L958'></a><a href='#L958'>958</a>
+<a name='L959'></a><a href='#L959'>959</a>
+<a name='L960'></a><a href='#L960'>960</a>
+<a name='L961'></a><a href='#L961'>961</a>
+<a name='L962'></a><a href='#L962'>962</a>
+<a name='L963'></a><a href='#L963'>963</a>
+<a name='L964'></a><a href='#L964'>964</a>
+<a name='L965'></a><a href='#L965'>965</a>
+<a name='L966'></a><a href='#L966'>966</a>
+<a name='L967'></a><a href='#L967'>967</a>
+<a name='L968'></a><a href='#L968'>968</a>
+<a name='L969'></a><a href='#L969'>969</a>
+<a name='L970'></a><a href='#L970'>970</a>
+<a name='L971'></a><a href='#L971'>971</a>
+<a name='L972'></a><a href='#L972'>972</a>
+<a name='L973'></a><a href='#L973'>973</a>
+<a name='L974'></a><a href='#L974'>974</a>
+<a name='L975'></a><a href='#L975'>975</a>
+<a name='L976'></a><a href='#L976'>976</a>
+<a name='L977'></a><a href='#L977'>977</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
+import { encrypt, safeEncrypt, hmacHash } from '../utils/crypto.js'
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >migrateEncryptUserData(</span>pool) {
+  const [rows] = <span class="cstat-no" title="statement not covered" >await pool.execute('SELECT id, phone, nickname, last_ip FROM users WHERE phone_hash = "" OR phone_hash IS NULL')</span>
+<span class="cstat-no" title="statement not covered" >  if (rows.length === 0) <span class="cstat-no" title="statement not covered" >return</span></span>
+<span class="cstat-no" title="statement not covered" >  console.log(`🔐 正在加密迁移 ${rows.length} 条用户数据...`)</span>
+<span class="cstat-no" title="statement not covered" >  for (const row of rows) {</span>
+    const phoneHash = <span class="cstat-no" title="statement not covered" >hmacHash(row.phone)</span>
+    const phoneEnc = <span class="cstat-no" title="statement not covered" >safeEncrypt(row.phone)</span>
+    const nicknameEnc = <span class="cstat-no" title="statement not covered" >row.nickname ? safeEncrypt(row.nickname) : ''</span>
+    const ipEnc = <span class="cstat-no" title="statement not covered" >row.last_ip ? safeEncrypt(row.last_ip) : ''</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute(</span>
+      'UPDATE users SET phone = ?, phone_hash = ?, nickname = ?, last_ip = ? WHERE id = ?',
+      [phoneEnc, phoneHash, nicknameEnc, ipEnc, row.id]
+    )
+  }
+<span class="cstat-no" title="statement not covered" >  console.log('🔐 用户数据加密迁移完成')</span>
+}
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >migrateEncryptActionIPs(</span>pool) {
+  const [rows] = <span class="cstat-no" title="statement not covered" >await pool.execute("SELECT id, ip FROM user_actions WHERE ip != '' AND ip IS NOT NULL")</span>
+  let migrated = <span class="cstat-no" title="statement not covered" >0</span>
+<span class="cstat-no" title="statement not covered" >  for (const row of rows) {</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const buf = <span class="cstat-no" title="statement not covered" >Buffer.from(row.ip, 'base64')</span>
+<span class="cstat-no" title="statement not covered" >      if (buf.length &gt;= 33 &amp;&amp; row.ip === buf.toString('base64')) <span class="cstat-no" title="statement not covered" >continue</span></span>
+    } catch { /* needs encryption */ }
+    const ipEnc = <span class="cstat-no" title="statement not covered" >encrypt(row.ip)</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('UPDATE user_actions SET ip = ? WHERE id = ?', [ipEnc, row.id])</span>
+<span class="cstat-no" title="statement not covered" >    migrated++</span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (migrated &gt; 0) <span class="cstat-no" title="statement not covered" >console.log(`🔐 已加密 ${migrated} 条 user_actions IP 记录`)</span></span>
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >runSchemaMigrations(</span>pool) {
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS sessions (
+      id VARCHAR(64) PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      status VARCHAR(20) DEFAULT 'active',
+      collected_data JSON,
+      step INT DEFAULT 0,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：给旧表加 user_id 列（如果不存在）
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD COLUMN user_id INT DEFAULT NULL AFTER id')</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD INDEX idx_user (user_id)')</span>
+  } catch { /* 列已存在，忽略 */ }
+  // 迁移：给 sessions 加 deep_analysis_result 列
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD COLUMN deep_analysis_result MEDIUMTEXT DEFAULT NULL')</span>
+  } catch { /* 列已存在，忽略 */ }
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD COLUMN appeal_guide_snapshot JSON DEFAULT NULL')</span>
+  } catch { /* 列已存在，忽略 */ }
+  // 迁移：messages.content TEXT → MEDIUMTEXT（AI报告可能超过64KB）
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE messages MODIFY content MEDIUMTEXT NOT NULL')</span>
+  } catch { /* 忽略 */ }
+  // 迁移：sessions表添加订单绑定字段
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD COLUMN order_no VARCHAR(100) DEFAULT NULL AFTER user_id')</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('ALTER TABLE sessions ADD COLUMN order_data JSON DEFAULT NULL AFTER order_no')</span>
+  } catch { /* 列已存在，忽略 */ }
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      role VARCHAR(20) NOT NULL,
+      content MEDIUMTEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS admins (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(64) UNIQUE NOT NULL,
+      password VARCHAR(128) NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS system_config (
+      config_key VARCHAR(128) PRIMARY KEY,
+      config_value TEXT,
+      config_label VARCHAR(128),
+      config_group VARCHAR(64) DEFAULT 'general',
+      sort_order INT DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS payment_config (
+      config_key VARCHAR(128) PRIMARY KEY,
+      config_value TEXT,
+      config_label VARCHAR(128),
+      config_group VARCHAR(32) DEFAULT 'wechat',
+      sort_order INT DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      phone VARCHAR(512) NOT NULL,
+      phone_hash VARCHAR(64) UNIQUE NOT NULL,
+      nickname VARCHAR(512) DEFAULT '',
+      balance DECIMAL(10,2) DEFAULT 0.00,
+      api_mode ENUM('official','custom') DEFAULT 'official',
+      custom_api_key VARCHAR(512) DEFAULT '',
+      last_active_at DATETIME DEFAULT NULL,
+      last_ip VARCHAR(512) DEFAULT '',
+      login_count INT DEFAULT 0,
+      total_messages INT DEFAULT 0,
+      total_spent DECIMAL(10,2) DEFAULT 0.00,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：给旧 users 表加新列（包括加密迁移列）
+  const userMigrations = <span class="cstat-no" title="statement not covered" >[</span>
+    'ALTER TABLE users ADD COLUMN last_active_at DATETIME DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN last_ip VARCHAR(512) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN login_count INT DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN total_messages INT DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN total_spent DECIMAL(10,2) DEFAULT 0.00',
+    'ALTER TABLE users ADD COLUMN phone_hash VARCHAR(64) NOT NULL DEFAULT "" AFTER phone',
+    'ALTER TABLE users MODIFY phone VARCHAR(512) NOT NULL',
+    'ALTER TABLE users MODIFY nickname VARCHAR(512) DEFAULT ""',
+    'ALTER TABLE users MODIFY custom_api_key VARCHAR(512) DEFAULT ""',
+    'ALTER TABLE users MODIFY last_ip VARCHAR(512) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN deep_analysis_count INT DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN deep_analysis_month VARCHAR(7) DEFAULT ""',
+  ]
+<span class="cstat-no" title="statement not covered" >  for (const sql of userMigrations) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >await pool.execute(sql) </span>} catch { /* 已存在 */ } </span>}</span>
+&nbsp;
+  // 迁移：加密现有明文数据（phone、nickname、last_ip）
+<span class="cstat-no" title="statement not covered" >  await migrateEncryptUserData(pool)</span>
+&nbsp;
+  // 迁移：添加 phone_hash 唯一索引（替换旧的 phone 唯一索引）
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >await pool.execute('ALTER TABLE users DROP INDEX phone') </span>} catch { /* 索引不存在 */ }</span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >await pool.execute('ALTER TABLE users ADD UNIQUE INDEX idx_phone_hash (phone_hash)') </span>} catch { /* 已存在 */ }</span>
+&nbsp;
+  // 充值订单表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS recharge_orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      status ENUM('pending','confirmed','rejected') DEFAULT 'pending',
+      payment_method VARCHAR(32) DEFAULT '',
+      remark VARCHAR(512) DEFAULT '',
+      admin_note VARCHAR(512) DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      confirmed_at DATETIME DEFAULT NULL,
+      confirmed_by INT DEFAULT NULL,
+      INDEX idx_user (user_id),
+      INDEX idx_status (status),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：给 recharge_orders 加 out_trade_no 列（真实支付订单号）
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >await pool.execute('ALTER TABLE recharge_orders ADD COLUMN out_trade_no VARCHAR(64) DEFAULT "" AFTER remark') </span>} catch { /* 已存在 */ }</span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >await pool.execute('ALTER TABLE recharge_orders ADD INDEX idx_out_trade_no (out_trade_no)') </span>} catch { /* 已存在 */ }</span>
+&nbsp;
+  // 用户行为追踪表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS user_actions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      action VARCHAR(64) NOT NULL,
+      detail VARCHAR(512) DEFAULT '',
+      ip VARCHAR(512) DEFAULT '',
+      user_agent VARCHAR(512) DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user_action (user_id),
+      INDEX idx_action (action),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：user_actions.ip 列扩容（加密后更长）
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >await pool.execute('ALTER TABLE user_actions MODIFY ip VARCHAR(512) DEFAULT ""') </span>} catch { /* 忽略 */ }</span>
+&nbsp;
+  // 迁移：加密 user_actions 中的明文 IP
+<span class="cstat-no" title="statement not covered" >  await migrateEncryptActionIPs(pool)</span>
+&nbsp;
+  // 成功案例知识库
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS success_cases (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) DEFAULT NULL,
+      title VARCHAR(256) NOT NULL DEFAULT '',
+      industry VARCHAR(64) DEFAULT '',
+      problem_type VARCHAR(128) DEFAULT '',
+      collected_data JSON,
+      report_content TEXT,
+      success_summary TEXT,
+      admin_notes TEXT,
+      status ENUM('active','archived') DEFAULT 'active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_industry (industry),
+      INDEX idx_problem (problem_type),
+      INDEX idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // Token消费明细表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS token_usage (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      session_id VARCHAR(64) DEFAULT NULL,
+      type VARCHAR(32) NOT NULL DEFAULT 'chat',
+      input_tokens INT DEFAULT 0,
+      output_tokens INT DEFAULT 0,
+      total_tokens INT DEFAULT 0,
+      cost DECIMAL(10,4) DEFAULT 0.0000,
+      multiplier DECIMAL(5,2) DEFAULT 2.00,
+      api_mode VARCHAR(16) DEFAULT 'official',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_type (type),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS token_usage_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      model_id INT DEFAULT 0,
+      provider VARCHAR(32) DEFAULT '',
+      model_name VARCHAR(128) DEFAULT '',
+      prompt_tokens INT DEFAULT 0,
+      completion_tokens INT DEFAULT 0,
+      total_tokens INT DEFAULT 0,
+      request_type VARCHAR(64) DEFAULT 'chat',
+      cost_yuan DECIMAL(12,6) DEFAULT 0,
+      user_id INT DEFAULT 0,
+      session_id VARCHAR(64) DEFAULT NULL,
+      detail_summary VARCHAR(512) DEFAULT NULL,
+      context_json JSON DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_type (request_type),
+      INDEX idx_created (created_at),
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+<span class="cstat-no" title="statement not covered" >  for (const col of [</span>
+    'ALTER TABLE token_usage ADD COLUMN detail_summary VARCHAR(512) DEFAULT NULL',
+    'ALTER TABLE token_usage ADD COLUMN context_json JSON DEFAULT NULL',
+    'ALTER TABLE token_usage_logs ADD COLUMN detail_summary VARCHAR(512) DEFAULT NULL',
+    'ALTER TABLE token_usage_logs ADD COLUMN context_json JSON DEFAULT NULL',
+    'ALTER TABLE token_usage_logs ADD COLUMN user_id INT DEFAULT 0',
+    'ALTER TABLE token_usage_logs ADD COLUMN session_id VARCHAR(64) DEFAULT NULL',
+  ]) {
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >await pool.execute(col) </span>} catch { /* exists */ }</span>
+  }
+&nbsp;
+  // 申诉文案表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS appeal_texts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      user_id INT NOT NULL,
+      business_model TEXT,
+      refund_rules TEXT,
+      complaint_cause TEXT,
+      complaint_resolution TEXT,
+      supplementary TEXT,
+      input_tokens INT DEFAULT 0,
+      output_tokens INT DEFAULT 0,
+      cost DECIMAL(10,4) DEFAULT 0.0000,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 迁移：appeal_texts 加申诉进度跟踪字段
+  const appealTrackCols = <span class="cstat-no" title="statement not covered" >{</span>
+    appeal_status: "ENUM('generated','submitted','under_review','approved','rejected','resubmitted') DEFAULT 'generated'",
+    user_feedback: 'TEXT DEFAULT NULL',
+    submitted_at: 'DATETIME DEFAULT NULL',
+    result_at: 'DATETIME DEFAULT NULL',
+    rejection_reason: 'VARCHAR(500) DEFAULT NULL',
+    resubmit_count: 'INT DEFAULT 0',
+  }
+<span class="cstat-no" title="statement not covered" >  for (const [col, def] of Object.entries(appealTrackCols)) {</span>
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >await pool.execute(`SELECT ${col} FROM appeal_texts LIMIT 0`) </span>}</span>
+    catch { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >await pool.execute(`ALTER TABLE appeal_texts ADD COLUMN ${col} ${def}`) </span>} catch {} </span>}
+  }
+&nbsp;
+  // 投诉材料整理表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS complaint_docs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      user_id INT NOT NULL,
+      doc_title VARCHAR(256) DEFAULT '',
+      complaint_summary TEXT,
+      merchant_info TEXT,
+      violation_detail TEXT,
+      evidence_list TEXT,
+      timeline TEXT,
+      appeal_points TEXT,
+      full_document MEDIUMTEXT,
+      input_tokens INT DEFAULT 0,
+      output_tokens INT DEFAULT 0,
+      cost DECIMAL(10,4) DEFAULT 0.0000,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // ========== AI 自进化系统表 ==========
+&nbsp;
+  // AI 规则库：存储 AI 自动生成/优化的规则
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS ai_rules (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      category ENUM('collection_strategy','question_template','industry_knowledge','violation_strategy','conversation_pattern','diagnosis_rule','empathy','efficiency','other') NOT NULL,
+      rule_key VARCHAR(128) NOT NULL,
+      rule_name VARCHAR(256) NOT NULL DEFAULT '',
+      rule_content JSON NOT NULL,
+      source ENUM('ai_generated','admin_manual','system_default') DEFAULT 'ai_generated',
+      status ENUM('active','pending_review','archived','rejected') DEFAULT 'pending_review',
+      effectiveness_score DECIMAL(5,2) DEFAULT 0.00,
+      usage_count INT DEFAULT 0,
+      version INT DEFAULT 1,
+      parent_id INT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_category_key_version (category, rule_key, version),
+      INDEX idx_category_status (category, status),
+      INDEX idx_effectiveness (effectiveness_score DESC),
+      INDEX idx_parent (parent_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：扩展 category ENUM（支持 empathy/efficiency/other）
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute(</span>
+      "ALTER TABLE ai_rules MODIFY COLUMN category ENUM('collection_strategy','question_template','industry_knowledge','violation_strategy','conversation_pattern','diagnosis_rule','empathy','efficiency','other') NOT NULL"
+    )
+  } catch { /* ENUM 已是最新，忽略 */ }
+&nbsp;
+  // 对话分析结果：每次对话结束后 AI 异步分析
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS conversation_analyses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      user_id INT DEFAULT NULL,
+      industry VARCHAR(64) DEFAULT '',
+      problem_type VARCHAR(128) DEFAULT '',
+      total_turns INT DEFAULT 0,
+      collection_turns INT DEFAULT 0,
+      fields_collected INT DEFAULT 0,
+      fields_skipped INT DEFAULT 0,
+      fields_refused INT DEFAULT 0,
+      completion_rate DECIMAL(5,2) DEFAULT 0.00,
+      professionalism_score DECIMAL(5,2) DEFAULT 0.00,
+      appeal_success_rate DECIMAL(5,2) DEFAULT 0.00,
+      user_satisfaction DECIMAL(5,2) DEFAULT 0.00,
+      response_quality JSON,
+      user_sentiment VARCHAR(32) DEFAULT 'neutral',
+      drop_off_point VARCHAR(128) DEFAULT '',
+      collection_efficiency JSON,
+      sentiment_trajectory JSON,
+      suggestions JSON,
+      raw_analysis MEDIUMTEXT,
+      analyzed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_analyzed (analyzed_at),
+      INDEX idx_industry (industry),
+      INDEX idx_sentiment (user_sentiment)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 自动添加新列（兼容旧数据库）
+<span class="cstat-no" title="statement not covered" >  for (const col of [</span>
+    "professionalism_score DECIMAL(5,2) DEFAULT 0.00 AFTER completion_rate",
+    "appeal_success_rate DECIMAL(5,2) DEFAULT 0.00 AFTER professionalism_score",
+    "user_satisfaction DECIMAL(5,2) DEFAULT 0.00 AFTER appeal_success_rate",
+    "response_quality JSON AFTER user_satisfaction",
+    "active_rule_ids JSON AFTER raw_analysis",
+  ]) {
+<span class="cstat-no" title="statement not covered" >    await pool.execute(`ALTER TABLE conversation_analyses ADD COLUMN ${col}`).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {})</span>
+  }
+&nbsp;
+  // learning_metrics 新增聚合列
+<span class="cstat-no" title="statement not covered" >  for (const col of [</span>
+    "avg_professionalism DECIMAL(5,2) DEFAULT 0.00 AFTER avg_user_satisfaction",
+    "avg_appeal_success DECIMAL(5,2) DEFAULT 0.00 AFTER avg_professionalism",
+    "product_recommendation_count INT DEFAULT 0 AFTER avg_appeal_success",
+  ]) {
+<span class="cstat-no" title="statement not covered" >    await pool.execute(`ALTER TABLE learning_metrics ADD COLUMN ${col}`).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {})</span>
+  }
+&nbsp;
+  // 规则变更日志：审计追踪
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS rule_change_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      rule_id INT NOT NULL,
+      action ENUM('created','updated','activated','archived','rejected','auto_promoted') NOT NULL,
+      old_content JSON,
+      new_content JSON,
+      reason TEXT,
+      changed_by VARCHAR(32) DEFAULT 'system',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_rule (rule_id),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 学习指标：每日聚合的效果数据
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS learning_metrics (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      metric_date DATE NOT NULL,
+      total_conversations INT DEFAULT 0,
+      avg_collection_turns DECIMAL(5,2) DEFAULT 0.00,
+      avg_completion_rate DECIMAL(5,2) DEFAULT 0.00,
+      avg_user_satisfaction DECIMAL(5,2) DEFAULT 0.00,
+      completion_count INT DEFAULT 0,
+      drop_off_count INT DEFAULT 0,
+      top_drop_off_fields JSON,
+      top_improvements JSON,
+      rules_generated INT DEFAULT 0,
+      rules_promoted INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_date (metric_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // ========== AI 智能标签 &amp; 聚合 &amp; 熔断 ==========
+&nbsp;
+  // 对话标签：AI自动打标分类
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS conversation_tags (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      analysis_id INT DEFAULT NULL,
+      difficulty ENUM('easy','medium','hard','extreme') DEFAULT 'medium',
+      user_type ENUM('first_time','returning','experienced','vip') DEFAULT 'first_time',
+      quality_score DECIMAL(5,2) DEFAULT 0.00,
+      outcome ENUM('completed','abandoned','partial','redirected') DEFAULT 'partial',
+      tags JSON,
+      industry_cluster VARCHAR(64) DEFAULT '',
+      violation_cluster VARCHAR(64) DEFAULT '',
+      pattern_flags JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_session (session_id),
+      INDEX idx_analysis (analysis_id),
+      INDEX idx_difficulty (difficulty),
+      INDEX idx_outcome (outcome),
+      INDEX idx_industry_cluster (industry_cluster),
+      INDEX idx_quality (quality_score DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 知识聚合簇：跨对话模式聚合
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS knowledge_clusters (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      cluster_type ENUM('industry_pattern','violation_pattern','question_effectiveness','user_behavior','success_factor') NOT NULL,
+      cluster_key VARCHAR(128) NOT NULL,
+      cluster_name VARCHAR(256) DEFAULT '',
+      insight_data JSON NOT NULL,
+      sample_count INT DEFAULT 0,
+      confidence DECIMAL(5,2) DEFAULT 0.00,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_type_key (cluster_type, cluster_key),
+      INDEX idx_type_confidence (cluster_type, confidence DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 引擎健康状态：熔断器 + 监控
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS engine_health (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      component VARCHAR(64) NOT NULL,
+      status ENUM('healthy','degraded','circuit_open','recovering') DEFAULT 'healthy',
+      error_count INT DEFAULT 0,
+      success_count INT DEFAULT 0,
+      last_error TEXT,
+      last_success_at DATETIME DEFAULT NULL,
+      last_error_at DATETIME DEFAULT NULL,
+      circuit_opened_at DATETIME DEFAULT NULL,
+      metadata JSON,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_component (component)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 探索实验：AI自主探索的A/B测试记录
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS exploration_experiments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      experiment_name VARCHAR(128) NOT NULL,
+      rule_id INT DEFAULT NULL,
+      hypothesis TEXT,
+      status ENUM('running','completed','aborted','failed') DEFAULT 'running',
+      variant_a JSON,
+      variant_b JSON,
+      sample_a INT DEFAULT 0,
+      sample_b INT DEFAULT 0,
+      result_a JSON,
+      result_b JSON,
+      winner ENUM('a','b','inconclusive') DEFAULT NULL,
+      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ended_at DATETIME DEFAULT NULL,
+      INDEX idx_status (status),
+      INDEX idx_rule (rule_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // ========== 字段变更记录 ==========
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS field_change_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      field_key VARCHAR(64) NOT NULL,
+      field_label VARCHAR(64) DEFAULT '',
+      old_value TEXT,
+      new_value TEXT,
+      change_source ENUM('ai_extract','user_edit','ai_correction','system') DEFAULT 'ai_extract',
+      change_reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_session (session_id),
+      INDEX idx_field (field_key),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // ========== 日程安排 ==========
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS schedules (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(256) NOT NULL,
+      description TEXT,
+      scheduled_time DATETIME NOT NULL,
+      type ENUM('reminder','task','meeting','deadline') DEFAULT 'reminder',
+      status ENUM('pending','completed','cancelled') DEFAULT 'pending',
+      completed_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_status (status),
+      INDEX idx_scheduled_time (scheduled_time)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // ========== AI 智能商城 ==========
+&nbsp;
+  // 商品表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS mall_products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(256) NOT NULL,
+      category VARCHAR(64) DEFAULT '',
+      price DECIMAL(10,2) DEFAULT 0.00,
+      original_price DECIMAL(10,2) DEFAULT 0.00,
+      description TEXT,
+      ai_description TEXT,
+      image_url VARCHAR(512) DEFAULT '',
+      tags JSON,
+      target_audience JSON,
+      status ENUM('active','draft','archived','sold_out') DEFAULT 'draft',
+      sort_order INT DEFAULT 0,
+      view_count INT DEFAULT 0,
+      click_count INT DEFAULT 0,
+      purchase_count INT DEFAULT 0,
+      recommendation_score DECIMAL(5,2) DEFAULT 50.00,
+      ai_optimized_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_status (status),
+      INDEX idx_category (category),
+      INDEX idx_recommendation (recommendation_score DESC),
+      INDEX idx_sort (sort_order, id DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 用户兴趣画像
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS user_interests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      session_id VARCHAR(64) DEFAULT '',
+      industry VARCHAR(64) DEFAULT '',
+      problem_type VARCHAR(128) DEFAULT '',
+      keywords JSON,
+      need_tags JSON,
+      interest_score JSON,
+      last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_user (user_id),
+      INDEX idx_session (session_id),
+      INDEX idx_industry (industry)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 商品推荐记录
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS product_recommendations (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      session_id VARCHAR(64) DEFAULT '',
+      product_id INT NOT NULL,
+      reason VARCHAR(256) DEFAULT '',
+      match_score DECIMAL(5,2) DEFAULT 0.00,
+      status ENUM('pending','shown','clicked','purchased','dismissed') DEFAULT 'pending',
+      shown_at DATETIME DEFAULT NULL,
+      clicked_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_session (session_id),
+      INDEX idx_product (product_id),
+      INDEX idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // AI行为日志表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS ai_activity_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      action VARCHAR(128) NOT NULL,
+      category VARCHAR(64) DEFAULT 'general',
+      detail TEXT,
+      tokens_used INT DEFAULT 0,
+      cost DECIMAL(10,6) DEFAULT 0,
+      duration_ms INT DEFAULT 0,
+      status ENUM('success','failed','pending') DEFAULT 'success',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_created (created_at DESC),
+      INDEX idx_category (category)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 订单表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_no VARCHAR(64) NOT NULL UNIQUE,
+      user_id INT NOT NULL,
+      product_id INT NOT NULL,
+      product_name VARCHAR(256) NOT NULL,
+      price DECIMAL(10,2) NOT NULL,
+      status ENUM('paid','serving','completed','refunded') DEFAULT 'paid',
+      persona JSON,
+      collected_data JSON,
+      service_messages JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_status (status),
+      INDEX idx_order_no (order_no),
+      INDEX idx_created (created_at DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  // 迁移：orders 表重命名 price → amount，扩展 status ENUM，添加新列
+  const orderMigrations = <span class="cstat-no" title="statement not covered" >[</span>
+    "ALTER TABLE orders CHANGE COLUMN price amount DECIMAL(10,2) NOT NULL",
+    "ALTER TABLE orders MODIFY COLUMN status ENUM('pending','created','paid','serving','completed','cancelled','refunded') DEFAULT 'pending'",
+    "ALTER TABLE orders ADD COLUMN session_id VARCHAR(64) DEFAULT NULL",
+    "ALTER TABLE orders ADD COLUMN payment_method VARCHAR(32) DEFAULT ''",
+    "ALTER TABLE orders ADD COLUMN payment_time DATETIME DEFAULT NULL",
+    "ALTER TABLE orders ADD COLUMN completed_time DATETIME DEFAULT NULL",
+  ]
+<span class="cstat-no" title="statement not covered" >  for (const sql of orderMigrations) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >await pool.execute(sql) </span>} catch { /* 已存在 */ } </span>}</span>
+&nbsp;
+  // AI 模型管理表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS ai_models (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      provider VARCHAR(50) NOT NULL,
+      display_name VARCHAR(100) NOT NULL,
+      api_key VARCHAR(1000) DEFAULT '',
+      model_name VARCHAR(100) NOT NULL,
+      endpoint VARCHAR(500) NOT NULL,
+      is_active TINYINT(1) DEFAULT 0,
+      is_enabled TINYINT(1) DEFAULT 1,
+      is_free TINYINT(1) DEFAULT 0,
+      sort_order INT DEFAULT 0,
+      health_status VARCHAR(20) DEFAULT 'unknown',
+      last_check_at DATETIME DEFAULT NULL,
+      last_error VARCHAR(500) DEFAULT NULL,
+      consecutive_fails INT DEFAULT 0,
+      response_ms INT DEFAULT NULL,
+      extra JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_provider_model (provider, model_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 兼容旧表：添加新字段（已有表不会被 CREATE TABLE IF NOT EXISTS 修改）
+  const healthCols = <span class="cstat-no" title="statement not covered" >['health_status', 'last_check_at', 'last_error', 'consecutive_fails', 'response_ms']</span>
+<span class="cstat-no" title="statement not covered" >  for (const col of healthCols) {</span>
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >await pool.execute(`SELECT ${col} FROM ai_models LIMIT 0`) </span>}</span>
+    catch { 
+      const colDefs = <span class="cstat-no" title="statement not covered" >{</span>
+        health_status: "VARCHAR(20) DEFAULT 'unknown'",
+        last_check_at: 'DATETIME DEFAULT NULL',
+        last_error: 'VARCHAR(500) DEFAULT NULL',
+        consecutive_fails: 'INT DEFAULT 0',
+        response_ms: 'INT DEFAULT NULL',
+      }
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >await pool.execute(`ALTER TABLE ai_models ADD COLUMN ${col} ${colDefs[col]}`) </span>} catch {}</span>
+    }
+  }
+&nbsp;
+  // 预设常见 AI 模型供应商（INSERT IGNORE 幂等）
+  const aiModelPresets = <span class="cstat-no" title="statement not covered" >[</span>
+    // --- 国内模型 ---
+    ['zhipu',     '智谱GLM-4-Flash（免费）',   '', 'glm-4.7-flash',     'https://open.bigmodel.cn/api/paas/v4/chat/completions',  1, 1, 1, 1],
+    ['zhipu',     '智谱GLM-4-Plus',           '', 'glm-4-plus',        'https://open.bigmodel.cn/api/paas/v4/chat/completions',  0, 1, 0, 2],
+    ['zhipu',     '智谱GLM-4-Long',           '', 'glm-4-long',        'https://open.bigmodel.cn/api/paas/v4/chat/completions',  0, 1, 0, 3],
+    ['deepseek',  'DeepSeek-Chat',            '', 'deepseek-chat',     'https://api.deepseek.com/chat/completions',              0, 1, 0, 4],
+    ['deepseek',  'DeepSeek-Reasoner',        '', 'deepseek-reasoner', 'https://api.deepseek.com/chat/completions',              0, 1, 0, 5],
+    ['qwen',      '通义千问-Turbo',            '', 'qwen-turbo',        'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 6],
+    ['qwen',      '通义千问-Plus',             '', 'qwen-plus',         'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 7],
+    ['qwen',      '通义千问-Max',              '', 'qwen-max',          'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 8],
+    ['qwen',      '通义千问-Long',             '', 'qwen-long',         'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 0, 1, 0, 9],
+    ['moonshot',  'Moonshot Kimi-v1-8K',      '', 'moonshot-v1-8k',    'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 10],
+    ['moonshot',  'Moonshot Kimi-v1-32K',     '', 'moonshot-v1-32k',   'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 11],
+    ['moonshot',  'Moonshot Kimi-v1-128K',    '', 'moonshot-v1-128k',  'https://api.moonshot.cn/v1/chat/completions',            0, 1, 0, 12],
+    ['baichuan',  '百川Baichuan4',            '', 'Baichuan4',         'https://api.baichuan-ai.com/v1/chat/completions',        0, 1, 0, 13],
+    ['yi',        '零一万物Yi-Lightning',      '', 'yi-lightning',      'https://api.lingyiwanwu.com/v1/chat/completions',        0, 1, 0, 14],
+    ['yi',        '零一万物Yi-Large',          '', 'yi-large',          'https://api.lingyiwanwu.com/v1/chat/completions',        0, 1, 0, 15],
+    ['doubao',    '字节豆包-Lite-32K',         '', 'doubao-lite-32k',   'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 0, 1, 0, 16],
+    ['doubao',    '字节豆包-Pro-32K',          '', 'doubao-pro-32k',    'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 0, 1, 0, 17],
+    ['volcengine','火山方舟DeepSeek-V3.1',     '', 'deepseek-v3-1-250821', 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', 0, 1, 0, 17.5],
+    ['spark',     '讯飞星火-Lite（免费）',      '', 'generalv3',         'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 1, 18],
+    ['spark',     '讯飞星火-Pro',              '', 'generalv3.5',       'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 0, 19],
+    ['spark',     '讯飞星火-Max',              '', 'general4.0',        'https://spark-api-open.xf-yun.com/v1/chat/completions', 0, 1, 0, 20],
+    ['minimax',   'MiniMax abab6.5s',         '', 'abab6.5s-chat',     'https://api.minimax.chat/v1/text/chatcompletion_v2',     0, 1, 0, 21],
+    ['stepfun',   '阶跃星辰Step-1-8K',        '', 'step-1-8k',         'https://api.stepfun.com/v1/chat/completions',            0, 1, 0, 22],
+    ['stepfun',   '阶跃星辰Step-2-16K',       '', 'step-2-16k',        'https://api.stepfun.com/v1/chat/completions',            0, 1, 0, 23],
+    ['hunyuan',   '腾讯混元-Lite（免费）',      '', 'hunyuan-lite',      'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 1, 24],
+    ['hunyuan',   '腾讯混元-Standard',         '', 'hunyuan-standard',  'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 0, 25],
+    ['hunyuan',   '腾讯混元-Pro',              '', 'hunyuan-pro',       'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', 0, 1, 0, 26],
+    // --- SiliconFlow 免费模型 ---
+    ['siliconflow','SiliconFlow Qwen2.5-7B（免费）','','Qwen/Qwen2.5-7B-Instruct','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 30],
+    ['siliconflow','SiliconFlow GLM4-9B（免费）','', 'THUDM/glm-4-9b-chat','https://api.siliconflow.cn/v1/chat/completions',     0, 1, 1, 31],
+    ['siliconflow','SiliconFlow DeepSeek-V3（免费）','','deepseek-ai/DeepSeek-V3','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 32],
+    ['siliconflow','SiliconFlow Yi-1.5-9B（免费）','','01-ai/Yi-1.5-9B-Chat-16K','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 33],
+    ['siliconflow','SiliconFlow Llama3-8B（免费）','','meta-llama/Meta-Llama-3-8B-Instruct','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 34],
+    ['siliconflow','SiliconFlow InternLM2.5-7B（免费）','','internlm/internlm2_5-7b-chat','https://api.siliconflow.cn/v1/chat/completions', 0, 1, 1, 35],
+    // --- 国际模型 ---
+    ['openai',    'OpenAI GPT-4o-mini',       '', 'gpt-4o-mini',       'https://api.openai.com/v1/chat/completions',             0, 1, 0, 40],
+    ['openai',    'OpenAI GPT-4o',            '', 'gpt-4o',            'https://api.openai.com/v1/chat/completions',             0, 1, 0, 41],
+    ['openai',    'OpenAI GPT-4-Turbo',       '', 'gpt-4-turbo',       'https://api.openai.com/v1/chat/completions',             0, 1, 0, 42],
+    ['openai',    'OpenAI o1-mini',            '', 'o1-mini',           'https://api.openai.com/v1/chat/completions',             0, 1, 0, 43],
+    ['anthropic', 'Claude 3.5 Sonnet',        '', 'claude-3-5-sonnet-20241022', 'https://api.anthropic.com/v1/messages',         0, 1, 0, 44],
+    ['anthropic', 'Claude 3.5 Haiku',         '', 'claude-3-5-haiku-20241022',  'https://api.anthropic.com/v1/messages',         0, 1, 0, 45],
+    ['gemini',    'Google Gemini 2.0 Flash',  '', 'gemini-2.0-flash',  'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 0, 1, 0, 46],
+    ['gemini',    'Google Gemini 1.5 Pro',    '', 'gemini-1.5-pro',    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 0, 1, 0, 47],
+    ['groq',      'Groq Llama3-70B（免费）',   '', 'llama3-70b-8192',   'https://api.groq.com/openai/v1/chat/completions',       0, 1, 1, 48],
+    ['groq',      'Groq Mixtral-8x7B（免费）', '', 'mixtral-8x7b-32768','https://api.groq.com/openai/v1/chat/completions',       0, 1, 1, 49],
+    // --- 自定义 ---
+    ['custom',    '自定义模型',                '', 'custom-model',      'https://your-api.com/v1/chat/completions',               0, 0, 0, 99],
+  ]
+<span class="cstat-no" title="statement not covered" >  for (const [provider, name, key, model, endpoint, active, enabled, free, order] of aiModelPresets) {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute(</span>
+      'INSERT IGNORE INTO ai_models (provider, display_name, api_key, model_name, endpoint, is_active, is_enabled, is_free, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [provider, name, key, model, endpoint, active, enabled, free, order]
+    )
+  }
+&nbsp;
+  // DeepSeek 多账号余额管理表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS deepseek_accounts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      label VARCHAR(100) NOT NULL DEFAULT '',
+      api_key VARCHAR(1000) NOT NULL,
+      is_enabled TINYINT(1) DEFAULT 1,
+      total_balance DECIMAL(12,2) DEFAULT NULL,
+      granted_balance DECIMAL(12,2) DEFAULT NULL,
+      topped_up_balance DECIMAL(12,2) DEFAULT NULL,
+      is_available TINYINT(1) DEFAULT NULL,
+      warning_threshold DECIMAL(10,2) DEFAULT 10.00,
+      last_check_at DATETIME DEFAULT NULL,
+      last_error VARCHAR(500) DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 管理端 AI 简报持久化（每 scope + context_key 一条）
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS admin_ai_reports (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      scope VARCHAR(64) NOT NULL,
+      context_key VARCHAR(64) NOT NULL DEFAULT 'default',
+      markdown MEDIUMTEXT NOT NULL,
+      meta_json JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_scope_context (scope, context_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 管理端异步任务（商城 AI 生成/优化等）
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS admin_jobs (
+      id VARCHAR(36) PRIMARY KEY,
+      type VARCHAR(64) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'running',
+      phase VARCHAR(64) DEFAULT '',
+      message VARCHAR(512) DEFAULT '',
+      current_step INT DEFAULT 0,
+      total_steps INT DEFAULT 0,
+      result_json JSON,
+      error TEXT,
+      meta_json JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_status_type (status, type),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 资金审计日志表
+<span class="cstat-no" title="statement not covered" >  await pool.execute(`</span>
+    CREATE TABLE IF NOT EXISTS financial_audit (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      type VARCHAR(50) NOT NULL COMMENT 'purchase_deduct|recharge_confirm|admin_adjust|refund',
+      amount DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '正数=入账, 负数=出账',
+      balance_after DECIMAL(10,2) DEFAULT 0 COMMENT '操作后余额',
+      ref_id VARCHAR(64) DEFAULT '' COMMENT '关联订单号/流水号',
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user_id (user_id),
+      INDEX idx_type (type),
+      INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+&nbsp;
+  // 迁移：将旧 system_config 中的 API Key 迁移到 ai_models 表
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const oldZhipuKey = <span class="cstat-no" title="statement not covered" >await getSystemConfig('zhipu_api_key')</span>
+<span class="cstat-no" title="statement not covered" >    if (oldZhipuKey) {</span>
+      const encKey = <span class="cstat-no" title="statement not covered" >safeEncrypt(oldZhipuKey)</span>
+<span class="cstat-no" title="statement not covered" >      await pool.execute("UPDATE ai_models SET api_key = ? WHERE provider = 'zhipu' AND api_key = ''", [encKey])</span>
+    }
+    const oldDeepseekKey = <span class="cstat-no" title="statement not covered" >await getSystemConfig('deepseek_api_key')</span>
+<span class="cstat-no" title="statement not covered" >    if (oldDeepseekKey) {</span>
+      const encKey = <span class="cstat-no" title="statement not covered" >safeEncrypt(oldDeepseekKey)</span>
+<span class="cstat-no" title="statement not covered" >      await pool.execute("UPDATE ai_models SET api_key = ? WHERE provider = 'deepseek' AND api_key = ''", [encKey])</span>
+    }
+  } catch {}
+&nbsp;
+  // 默认管理员（bcrypt 哈希密码）
+  const [admins] = <span class="cstat-no" title="statement not covered" >await pool.execute('SELECT COUNT(*) as cnt FROM admins')</span>
+<span class="cstat-no" title="statement not covered" >  if (admins[0].cnt === 0) {</span>
+    const envPwd = <span class="cstat-no" title="statement not covered" >process.env.ADMIN_INITIAL_PASSWORD</span>
+    let initialPassword
+<span class="cstat-no" title="statement not covered" >    if (envPwd &amp;&amp; envPwd.length &gt;= 12) {</span>
+<span class="cstat-no" title="statement not covered" >      initialPassword = envPwd</span>
+    } else {
+<span class="cstat-no" title="statement not covered" >      initialPassword = crypto.randomBytes(16).toString('hex')</span>
+<span class="cstat-no" title="statement not covered" >      console.warn('\n⚠️  未设置 ADMIN_INITIAL_PASSWORD（≥12 字符），已生成随机管理员密码：')</span>
+<span class="cstat-no" title="statement not covered" >      console.warn(`   用户名: admin  密码: ${initialPassword}`)</span>
+<span class="cstat-no" title="statement not covered" >      console.warn('   请立即登录后台修改密码，并在 server/.env 中设置 ADMIN_INITIAL_PASSWORD 以便复现部署。\n')</span>
+    }
+    const hash = <span class="cstat-no" title="statement not covered" >bcrypt.hashSync(initialPassword, 12)</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute('INSERT INTO admins (username, password) VALUES (?, ?)', ['admin', hash])</span>
+  } else {
+    const [adminRow] = <span class="cstat-no" title="statement not covered" >await pool.execute("SELECT id FROM admins WHERE username = 'admin' LIMIT 1")</span>
+<span class="cstat-no" title="statement not covered" >    if (adminRow.length &gt; 0) {</span>
+<span class="cstat-no" title="statement not covered" >      console.warn('⚠️  请确认生产环境管理员 admin 已使用强密码（勿使用默认 admin123）')</span>
+    }
+    // 迁移：如果旧密码是明文，升级为 bcrypt
+    const [allAdmins] = <span class="cstat-no" title="statement not covered" >await pool.execute('SELECT id, password FROM admins')</span>
+<span class="cstat-no" title="statement not covered" >    for (const a of allAdmins) {</span>
+<span class="cstat-no" title="statement not covered" >      if (!a.password.startsWith('$2a$') &amp;&amp; !a.password.startsWith('$2b$')) {</span>
+        const hash = <span class="cstat-no" title="statement not covered" >bcrypt.hashSync(a.password, 12)</span>
+<span class="cstat-no" title="statement not covered" >        await pool.execute('UPDATE admins SET password = ? WHERE id = ?', [hash, a.id])</span>
+      }
+    }
+  }
+&nbsp;
+  // 系统配置（使用 INSERT IGNORE 保证幂等）
+  const sysDefaults = <span class="cstat-no" title="statement not covered" >[</span>
+    ['site_name',           '微信商户号申诉助手',       '网站名称',                     'general', 1],
+    ['site_description',    '智能生成专业申诉材料',      '网站描述',                     'general', 2],
+    ['welcome_message',     '',                         '自定义欢迎语（留空使用默认）',    'general', 3],
+    ['admin_email',         '',                         '管理员邮箱',                    'general', 4],
+    ['enable_chat',         '1',                        '启用聊天功能（1=开启 0=关闭）',   'general', 5],
+    ['announcement',        '',                         '前台公告内容（留空不显示）',      'general', 6],
+    ['copyright_text',      '© 2026 微信商户号申诉助手', '版权信息',                     'general', 7],
+    ['ai_provider',         'siliconflow',             'AI服务商（deepseek / zhipu / siliconflow）',  'ai',      9],
+    ['deepseek_api_key',    '',                         'DeepSeek API Key',             'ai',      10],
+    ['deepseek_model',      'deepseek-chat',            'DeepSeek 模型名称',             'ai',      11],
+    ['zhipu_api_key',       '',                         '智谱AI API Key（GLM免费模型）',  'ai',      12],
+    ['zhipu_model',         'glm-4.7-flash',            '智谱AI 模型名称',               'ai',      13],
+    ['siliconflow_api_key', '',                         'SiliconFlow API Key',          'ai',      14],
+    ['siliconflow_model',   'deepseek-ai/DeepSeek-V3',  'SiliconFlow 模型名称',          'ai',      15],
+    ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      16],
+    ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      17],
+    ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      18],
+    ['recharge_enabled',    '1',                       '启用用户充值功能',               'recharge', 20],
+    ['recharge_amounts',    '10,30,50,100,200,500',    '预设充值金额（逗号分隔）',        'recharge', 21],
+    ['recharge_min_amount', '10',                      '最低充值金额（元）',              'recharge', 22],
+    ['recharge_qr_wechat',  '',                        '微信收款二维码图片URL',           'recharge', 23],
+    ['recharge_qr_alipay',  '',                        '支付宝收款二维码图片URL',          'recharge', 24],
+    ['recharge_instructions','扫码支付后，请在下方输入您的支付截图备注或交易单号，管理员确认后余额将自动到账。', '充值说明文字', 'recharge', 25],
+    ['tech_contact_enabled', '1',                       '启用技术人员名片',                'contact', 30],
+    ['tech_contact_name',    '',                         '技术人员姓名',                    'contact', 31],
+    ['tech_contact_title',   'AI申诉助手技术顾问',         '职位头衔',                       'contact', 32],
+    ['tech_contact_phone',   '',                         '联系电话',                        'contact', 33],
+    ['tech_contact_wechat',  '',                         '微信号',                          'contact', 34],
+    ['tech_contact_email',   '',                         '邮箱',                            'contact', 35],
+    ['tech_contact_qr',      '',                        '微信二维码图片URL',                'contact', 36],
+    ['tech_contact_desc',    '专业商户申诉解决方案，有问题随时联系我', '名片描述语',            'contact', 37],
+    ['xianyu_app_key',       '',                        '闲管家 AppKey',               'xianyu',  1],
+    ['xianyu_app_secret',    '',                        '闲管家 AppSecret',             'xianyu',  2],
+    ['xianyu_app_type',      '进销存',                   '应用类型',                      'xianyu',  3],
+    ['xianyu_app_mode',      '自研系统',                  '应用模式',                      'xianyu',  4],
+    ['xianyu_app_name',      '艾阳的店铺',                '应用名称',                      'xianyu',  5],
+    ['xianyu_app_status',    '已上线',                    '应用状态',                      'xianyu',  6],
+    ['xianyu_created_at',    '2026-03-17 19:39:40',     '创建时间',                      'xianyu',  7],
+  ]
+<span class="cstat-no" title="statement not covered" >  for (const [key, value, label, group, order] of sysDefaults) {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute(</span>
+      'INSERT IGNORE INTO system_config (config_key, config_value, config_label, config_group, sort_order) VALUES (?, ?, ?, ?, ?)',
+      [key, value, label, group, order]
+    )
+  }
+&nbsp;
+  // 支付配置：微信支付 + 支付宝 双通道
+  const payDefaults = <span class="cstat-no" title="statement not covered" >[</span>
+    ['wx_enabled',          '0',       '启用微信支付（1=开启 0=关闭）',   'wechat',  1],
+    ['wx_mch_id',           '',        '微信商户号 (MchID)',              'wechat',  2],
+    ['wx_app_id',           '',        '微信应用ID (AppID)',             'wechat',  3],
+    ['wx_api_key',          '',        '微信API密钥 (APIv2 Key)',        'wechat',  4],
+    ['wx_api_v3_key',       '',        '微信APIv3密钥',                  'wechat',  5],
+    ['wx_serial_no',        '',        '微信证书序列号',                  'wechat',  6],
+    ['wx_private_key',      '',        '微信私钥内容（或文件路径）',       'wechat',  7],
+    ['wx_notify_url',       '',        '微信支付回调地址',                'wechat',  8],
+    ['wx_mode',             'sandbox', '微信支付模式（sandbox/production）','wechat', 9],
+    ['ali_enabled',         '0',       '启用支付宝（1=开启 0=关闭）',     'alipay',  20],
+    ['ali_app_id',          '',        '支付宝应用ID (AppID)',           'alipay',  21],
+    ['ali_private_key',     '',        '支付宝应用私钥',                 'alipay',  22],
+    ['ali_public_key',      '',        '支付宝公钥',                    'alipay',  23],
+    ['ali_gateway',         'https://openapi.alipay.com/gateway.do', '支付宝网关地址', 'alipay', 24],
+    ['ali_notify_url',      '',        '支付宝回调地址',                 'alipay',  25],
+    ['ali_return_url',      '',        '支付宝同步跳转地址',              'alipay',  26],
+    ['ali_mode',            'sandbox', '支付宝模式（sandbox/production）','alipay',  27],
+  ]
+<span class="cstat-no" title="statement not covered" >  for (const [key, value, label, group, order] of payDefaults) {</span>
+<span class="cstat-no" title="statement not covered" >    await pool.execute(</span>
+      'INSERT IGNORE INTO payment_config (config_key, config_value, config_label, config_group, sort_order) VALUES (?, ?, ?, ?, ?)',
+      [key, value, label, group, order]
+    )
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { initOpsCenterTables } = <span class="cstat-no" title="statement not covered" >await import('../opsCenter.js')</span>
+<span class="cstat-no" title="statement not covered" >    await initOpsCenterTables()</span>
+  } catch (err) {
+<span class="cstat-no" title="statement not covered" >    console.warn('[OpsCenter] 表初始化跳过:', err.message)</span>
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  console.log('✅ MySQL 数据库初始化完成')</span>
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-05-19T05:45:38.996Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

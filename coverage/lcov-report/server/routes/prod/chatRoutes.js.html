@@ -1,0 +1,451 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/routes/prod/chatRoutes.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">server/routes/prod</a> chatRoutes.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/65</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/57</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/64</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+  createSession, getSession, addMessage, getMessages, getUserById, getActiveAIModel,
+  incrementUserMessages, patchSessionCollectedData,
+} from '../../db.js'
+import { chatWithAI, getAIConfig } from '../../ai.js'
+import { createTurnBilling } from '../../billing.js'
+import { schedulePostConversationAnalysis } from '../../evolution.js'
+/**
+ * chatRoutes
+ */
+export function <span class="fstat-no" title="function not covered" >registerChatRoutes(</span>app, ctx) {
+  const { signToken, requireUser, requireAdmin, optionalUser, requireAdminOrQueryToken, authLimiter, chatLimiter, ensureUserCanUseOfficialAI, recordAIUsageForRequest, logFinancialActivity, unwrapMallUsagePayload, unwrapPersonaPayload } = <span class="cstat-no" title="statement not covered" >ctx</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >app.post('/api/chat', chatLimiter, requireUser, <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    let { sessionId, content } = <span class="cstat-no" title="statement not covered" >req.body</span>
+<span class="cstat-no" title="statement not covered" >    if (!content || !content.trim()) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ error: '消息内容不能为空' })</span>
+    }
+&nbsp;
+    const userId = <span class="cstat-no" title="statement not covered" >req.userId</span>
+    const user = <span class="cstat-no" title="statement not covered" >await getUserById(userId)</span>
+<span class="cstat-no" title="statement not covered" >    if (!user) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(401).json({ error: '请先登录后再使用', needLogin: true })</span>
+    }
+    const activeModel = <span class="cstat-no" title="statement not covered" >await getActiveAIModel()</span>
+    const isModelFree = <span class="cstat-no" title="statement not covered" >activeModel?.is_free === 1</span>
+    const hasPayment = <span class="cstat-no" title="statement not covered" >(user.api_mode === 'custom' &amp;&amp; user.custom_api_key) || (user.api_mode === 'official' &amp;&amp; (parseFloat(user.balance) &gt; 0 || isModelFree))</span>
+<span class="cstat-no" title="statement not covered" >    if (!hasPayment) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(402).json({</span>
+        error: '⚠️ 您的账户余额不足，无法使用咨询服务。\n\n请先充值后再继续对话。',
+        needRecharge: true,
+        balance: parseFloat(user.balance)
+      })
+    }
+&nbsp;
+    let apiKeyToUse = <span class="cstat-no" title="statement not covered" >null</span>
+    let isOfficialMode = <span class="cstat-no" title="statement not covered" >false</span>
+<span class="cstat-no" title="statement not covered" >    if (user.api_mode === 'custom' &amp;&amp; user.custom_api_key) {</span>
+<span class="cstat-no" title="statement not covered" >      apiKeyToUse = user.custom_api_key</span>
+    } else <span class="cstat-no" title="statement not covered" >if (user.api_mode === 'official' &amp;&amp; (parseFloat(user.balance) &gt; 0 || isModelFree)) {</span>
+<span class="cstat-no" title="statement not covered" >      apiKeyToUse = null</span>
+<span class="cstat-no" title="statement not covered" >      isOfficialMode = !isModelFree </span>// 免费模型不扣费
+    }
+&nbsp;
+    let isNew = <span class="cstat-no" title="statement not covered" >false</span>
+<span class="cstat-no" title="statement not covered" >    if (!sessionId) {</span>
+<span class="cstat-no" title="statement not covered" >      sessionId = uuidv4()</span>
+<span class="cstat-no" title="statement not covered" >      await createSession(sessionId, user.id)</span>
+<span class="cstat-no" title="statement not covered" >      isNew = true</span>
+    } else {
+      const existing = <span class="cstat-no" title="statement not covered" >await getSession(sessionId)</span>
+<span class="cstat-no" title="statement not covered" >      if (!existing) {</span>
+<span class="cstat-no" title="statement not covered" >        sessionId = uuidv4()</span>
+<span class="cstat-no" title="statement not covered" >        await createSession(sessionId, user.id)</span>
+<span class="cstat-no" title="statement not covered" >        isNew = true</span>
+      } else <span class="cstat-no" title="statement not covered" >if (!existing.user_id || String(existing.user_id) !== String(user.id)) {</span>
+<span class="cstat-no" title="statement not covered" >        return res.status(403).json({ error: '无权访问此会话' })</span>
+      }
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (isNew) {</span>
+<span class="cstat-no" title="statement not covered" >      await addMessage(sessionId, 'assistant', LOCAL_WELCOME)</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    await addMessage(sessionId, 'user', content)</span>
+<span class="cstat-no" title="statement not covered" >    await incrementUserMessages(user.id)</span>
+    const allMessages = <span class="cstat-no" title="statement not covered" >await getMessages(sessionId)</span>
+&nbsp;
+    let responseText
+    let usedAI = <span class="cstat-no" title="statement not covered" >false</span>
+    let tokenInfo = <span class="cstat-no" title="statement not covered" >null</span>
+&nbsp;
+    // 有付费能力 → AI 处理所有对话
+    const session = <span class="cstat-no" title="statement not covered" >await getSession(sessionId)</span>
+    const aiCollectedData = <span class="cstat-no" title="statement not covered" >session?.collected_data || {}</span>
+    const aiResult = <span class="cstat-no" title="statement not covered" >await chatWithAI(allMessages, apiKeyToUse, aiCollectedData)</span>
+<span class="cstat-no" title="statement not covered" >    if (aiResult &amp;&amp; aiResult.error) {</span>
+      // AI 调用返回了具体错误
+      const errMap = <span class="cstat-no" title="statement not covered" >{</span>
+        'API_KEY_INVALID': '⚠️ **AI 服务配置异常（API Key 无效）**\n\n请联系管理员在后台「系统配置 → AI配置」中更新有效的 API Key。\n\n如果您使用的是自定义 API Key，请在「API设置」中检查您的 Key 是否正确。',
+        'API_BALANCE_INSUFFICIENT': '⚠️ **AI API 余额不足**\n\n平台的 AI 服务额度已用完，请联系管理员充值 API 额度。',
+        'API_RATE_LIMIT': '⚠️ **请求过于频繁**\n\n当前 AI 服务请求量较大，请稍等几秒后重新发送消息。',
+        'NETWORK_ERROR': '⚠️ **网络连接超时**\n\n无法连接到 AI 服务器，请稍后重试。如果持续超时，请联系管理员检查服务器网络。',
+      }
+<span class="cstat-no" title="statement not covered" >      responseText = errMap[aiResult.error] || `⚠️ AI 服务暂时不可用（错误代码: ${aiResult.error}），请稍后再试或联系管理员。`</span>
+    } else <span class="cstat-no" title="statement not covered" >if (aiResult &amp;&amp; aiResult.response) {</span>
+<span class="cstat-no" title="statement not covered" >      responseText = aiResult.response</span>
+<span class="cstat-no" title="statement not covered" >      usedAI = true</span>
+      // 官方 API 模式扣费
+<span class="cstat-no" title="statement not covered" >      if (isOfficialMode &amp;&amp; user &amp;&amp; aiResult.inputTokens !== undefined) {</span>
+        const multiplierStr = <span class="cstat-no" title="statement not covered" >await getSystemConfig('cost_multiplier')</span>
+        const multiplier = <span class="cstat-no" title="statement not covered" >parseFloat(multiplierStr || '2')</span>
+<span class="cstat-no" title="statement not covered" >        tokenInfo = calculateCost(aiResult.inputTokens, aiResult.outputTokens, multiplier)</span>
+        const deductResult = <span class="cstat-no" title="statement not covered" >await deductBalance(user.id, tokenInfo.cost)</span>
+<span class="cstat-no" title="statement not covered" >        if (deductResult.success) {</span>
+<span class="cstat-no" title="statement not covered" >          await incrementUserSpent(user.id, tokenInfo.cost)</span>
+<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >await recordTokenUsage({ userId: user.id, sessionId, type: 'chat', inputTokens: aiResult.inputTokens, outputTokens: aiResult.outputTokens, totalTokens: aiResult.inputTokens + aiResult.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) </span>} catch {}</span>
+        }
+      }
+    } else {
+      // AI 返回 null（无 API Key 配置或网络彻底断开）
+<span class="cstat-no" title="statement not covered" >      responseText = `⚠️ **AI 服务未配置**\n\n系统尚未配置 AI API Key，请联系管理员在后台「系统配置 → AI配置」中配置服务商和API Key。`</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    await addMessage(sessionId, 'assistant', responseText)</span>
+&nbsp;
+    const updatedBalance = <span class="cstat-no" title="statement not covered" >user ? (await getUserById(user.id))?.balance : null</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    res.json({</span>
+      sessionId, message: responseText, isNew, usedAI,
+      balance: updatedBalance,
+      tokenUsage: tokenInfo || null,
+    })
+  } catch (err) {
+<span class="cstat-no" title="statement not covered" >    console.error('Chat error:', err)</span>
+<span class="cstat-no" title="statement not covered" >    res.status(500).json({ error: '处理消息失败' })</span>
+  }
+})
+&nbsp;
+// ========== 获取已保存的深度分析结果 ==========
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-05-19T05:45:38.705Z
+            </div>
+        <script src="../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
+    </body>
+</html>
+    

@@ -1,6 +1,7 @@
 // ========== 本地规则引擎：信息收集 + 智能答疑（不消耗 AI Token） ==========
 
 import { BUILT_IN_CASES, VIOLATION_KNOWLEDGE, matchViolation, matchBuiltInCases, assessRisk, generateMaterialChecklist } from './knowledgeBase.js'
+import { WELCOME_MESSAGE } from './ai.js'
 
 // 信息收集字段定义（顺序很重要：先了解业务 → 再了解问题 → 再收集详细信息）
 const INFO_FIELDS = [
@@ -86,17 +87,8 @@ const TOTAL_STEPS = INFO_FIELDS.length
 // 期望数字输入的字段（不能把纯数字当垃圾输入）
 const NUMERIC_FIELDS = new Set(['merchant_id', 'legal_id_last4', 'bank_account_last4', 'contact_phone', 'miniprogram_appid'])
 
-// AI-First 欢迎消息（鼓励用户一次性说出多个信息）
-const LOCAL_WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
-
-不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
-
-💼 **先说说您的情况吧：**
-
-比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
-
-💡 有问题随时问我，比如"为什么要这个信息"。
-🔒 您的信息只用于本次咨询，不会泄露。`
+// 与 ai.js WELCOME_MESSAGE 统一
+const LOCAL_WELCOME = WELCOME_MESSAGE
 
 // "为什么"问题检测
 const WHY_PATTERNS = [

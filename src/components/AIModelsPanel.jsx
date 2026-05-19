@@ -1,11 +1,63 @@
 import React, { useState, useEffect } from 'react'
+import { getTokenTypeLabel, TOKEN_USAGE_TYPE_META } from '../constants/tokenUsageTypes.js'
 
+/**
+ * AI 模型管理面板组件
+ * @description 管理员后台组件，用于管理和监控系统中配置的所有 AI 模型
+ * 
+ * 核心功能：
+ * 1. 模型列表 — 显示所有已配置的 AI 模型，包括供应商、模型名称、API Key 状态、健康状态
+ * 2. 健康检测 — 单个检测或一键批量检测模型可用性，显示响应时间和错误信息
+ * 3. 模型切换 — 将某个模型设为当前使用模型，支持故障自动切换
+ * 4. API Key 管理 — 配置/修改 API Key，支持掩码显示保护敏感信息
+ * 5. 智能导入 — 粘贴 API Key 自动识别平台（DeepSeek/智谱/千问/OpenAI 等 20+ 供应商）
+ * 6. 用量统计 — Token 消耗统计、费用统计、每日趋势图表、按模型分组统计
+ * 7. 模型 CRUD — 添加自定义模型、启用/禁用、删除模型
+ * 8. 数据修复 — 修复加密乱码数据的工具
+ * 
+ * 健康状态类型：
+ * - healthy: 正常运行（绿色）
+ * - error: 请求错误（红色）
+ * - timeout: 请求超时（橙色）
+ * - rate_limited: 被限流（黄色）
+ * - auth_failed: Key 无效（红色）
+ * - balance_empty: 余额耗尽（橙色）
+ * - no_key: 未配置 Key（灰色）
+ * - unknown: 未知状态（灰色）
+ * 
+ * 排序规则：
+ * 1. 当前使用模型优先
+ * 2. 已启用的在已禁用的前面
+ * 3. 已配置 Key 的在未配置的前面
+ * 4. 健康状态从好到差排列
+ * 
+ * 数据来源：
+ * - /api/admin/ai-models — 获取模型列表
+ * - /api/admin/ai-models/health — 获取模型健康状态
+ * - /api/admin/ai-models/{id}/check — 单个模型检测
+ * - /api/admin/ai-models/check-all — 批量检测
+ * - /api/admin/ai-models/test — 测试连接
+ * - /api/admin/token-usage — Token 用量统计
+ * - /api/admin/ai-models/auto-import — 智能导入
+ * 
+ * @param {Object} props
+ * @param {Function} props.adminFetch - 管理员认证 fetch 函数，返回带 Authorization 头的 Response
+ * @param {Function} props.showToast - 显示全局 Toast 通知回调 (message: string) => void
+ */
+
+/** 供应商图标映射 — 用于模型卡片左上角显示 */
 const PROVIDER_ICONS = {
   zhipu: '🧠', deepseek: '🐋', qwen: '☁️', moonshot: '🌙',
   baichuan: '🏔️', yi: '⚡', openai: '🤖', siliconflow: '🔮', custom: '🔧',
   doubao: '🪨', spark: '✨', minimax: '💫', stepfun: '🚀',
   hunyuan: '🌊', anthropic: '🧬', gemini: '💎', groq: '⚡',
+  volcengine: '🌋',
 }
+
+const TYPE_LABELS = Object.fromEntries(
+  Object.keys(TOKEN_USAGE_TYPE_META).map((k) => [k, getTokenTypeLabel(k)])
+)
+/** 供应商颜色映射 — 不同供应商使用不同背景色和文字色 */
 const PROVIDER_COLORS = {
   zhipu: 'bg-purple-50 text-purple-700 border-purple-200',
   deepseek: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -16,6 +68,7 @@ const PROVIDER_COLORS = {
   openai: 'bg-green-50 text-green-700 border-green-200',
   siliconflow: 'bg-pink-50 text-pink-700 border-pink-200',
   doubao: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  volcengine: 'bg-red-50 text-red-700 border-red-200',
   spark: 'bg-amber-50 text-amber-700 border-amber-200',
   minimax: 'bg-violet-50 text-violet-700 border-violet-200',
   stepfun: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -41,7 +94,12 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
   const [importKey, setImportKey] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState(null)
+  const [usageData, setUsageData] = useState(null)
+  const [usageLoading, setUsageLoading] = useState(false)
+  const [usageError, setUsageError] = useState('')
+  const [showUsage, setShowUsage] = useState(false)
 
+  /** 获取模型列表和健康状态，优先使用 /health 接口，失败时 fallback 到普通接口 */
   async function fetchModels() {
     try {
       const res = await adminFetch('/api/admin/ai-models/health')
@@ -57,6 +115,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
 
   useEffect(() => { fetchModels() }, [])
 
+  /** 一键批量检测所有模型健康状态，自动统计可用数量 */
   async function handleCheckAll() {
     setChecking(true)
     showToast('正在批量检测所有模型...')
@@ -71,6 +130,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     finally { setChecking(false) }
   }
 
+  /** 单个模型健康检测 */
   async function handleCheckSingle(model) {
     setCheckingId(model.id)
     try {
@@ -83,6 +143,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     finally { setCheckingId(null) }
   }
 
+  /** 测试模型连接性，发送测试请求并显示结果 */
   async function handleTest(model) {
     setTesting(p => ({ ...p, [model.id]: true }))
     setTestResults(p => ({ ...p, [model.id]: null }))
@@ -100,6 +161,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } finally { setTesting(p => ({ ...p, [model.id]: false })) }
   }
 
+  /** 激活/切换到指定模型 */
   async function handleActivate(model) {
     try {
       const res = await adminFetch(`/api/admin/ai-models/${model.id}/activate`, {
@@ -111,6 +173,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } catch { showToast('激活失败') }
   }
 
+  /** 保存模型的 API Key */
   async function handleSaveKey(model) {
     try {
       const res = await adminFetch(`/api/admin/ai-models/${model.id}`, {
@@ -123,6 +186,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } catch { showToast('保存失败') }
   }
 
+  /** 启用/禁用模型 */
   async function handleToggleEnabled(model) {
     try {
       await adminFetch(`/api/admin/ai-models/${model.id}`, {
@@ -133,6 +197,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } catch {}
   }
 
+  /** 删除模型，当前使用模型无法删除 */
   async function handleDelete(model) {
     if (!confirm(`确定删除 ${model.display_name}？`)) return
     try {
@@ -143,6 +208,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } catch { showToast('删除失败') }
   }
 
+  /** 添加自定义模型 */
   async function handleAdd() {
     if (!addForm.provider || !addForm.modelName || !addForm.endpoint) { showToast('请填写完整'); return }
     try {
@@ -156,6 +222,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     } catch { showToast('添加失败') }
   }
 
+  /** 智能导入：根据 API Key 自动识别供应商并批量导入模型 */
   async function handleAutoImport() {
     if (!importKey.trim()) { showToast('请输入 API Key'); return }
     setImporting(true)
@@ -178,6 +245,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
     finally { setImporting(false) }
   }
 
+  /** 修复加密乱码数据（不可逆操作） */
   async function handleFixData() {
     if (!confirm('确认修复加密乱码数据？无法恢复的数据将被替换为占位符。')) return
     try {
@@ -185,6 +253,74 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
       const data = await res.json()
       showToast(data.message || '修复完成')
     } catch { showToast('修复失败') }
+  }
+
+  /** 获取 Token 用量统计数据，包含总量/今日/按类型/每日趋势 */
+  async function fetchUsage() {
+    setUsageLoading(true)
+    setUsageError('')
+    try {
+      const res = await adminFetch('/api/admin/token-usage?limit=50&page=1')
+      const data = await res.json()
+      const stats = data.stats || {}
+      const mapped = {
+        total: {
+          total_tokens: parseInt(stats.totals?.total_tokens || 0),
+          total_prompt: parseInt(stats.totals?.total_input || 0),
+          total_completion: parseInt(stats.totals?.total_output || 0),
+          total_cost: parseFloat(stats.totals?.total_cost || 0),
+          total_requests: parseInt(stats.totals?.total_requests || 0),
+        },
+        today: {
+          total_tokens: parseInt(stats.today?.tokens || stats.today?.total_tokens || 0),
+          total_prompt: parseInt(stats.today?.input_tokens || 0),
+          total_completion: parseInt(stats.today?.output_tokens || 0),
+          total_cost: parseFloat(stats.today?.cost || 0),
+          total_requests: parseInt(stats.today?.requests || 0),
+        },
+        by_provider: (stats.byType || []).map(t => ({
+          provider: t.type,
+          model_name: t.type || '',
+          requests: parseInt(t.cnt || 0),
+          prompt_tokens: parseInt(t.input_tokens || 0),
+          completion_tokens: parseInt(t.output_tokens || 0),
+          total_tokens: parseInt(t.tokens || 0),
+          cost_yuan: parseFloat(t.cost || 0),
+          last_used: null,
+        })),
+        daily: (stats.daily || []).map(d => ({
+          date: d.day,
+          total_tokens: parseInt(d.tokens || 0),
+          prompt_tokens: parseInt(d.input_tokens || 0),
+          completion_tokens: parseInt(d.output_tokens || 0),
+          cost_yuan: parseFloat(d.cost || 0),
+          requests: parseInt(d.requests || 0),
+        })),
+      }
+      setUsageData(mapped)
+    } catch (e) {
+      setUsageError(e.message || '获取用量统计失败')
+      showToast('获取用量统计失败: ' + (e.message || ''))
+    }
+    finally { setUsageLoading(false) }
+  }
+
+  /** 格式化 Token 数量显示，自动转换为 K/M 单位 */
+  function formatTokens(n) {
+    if (!n || isNaN(n)) return '0'
+    const num = parseFloat(n)
+    if (isNaN(num)) return '0'
+    if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M'
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+    return num.toString()
+  }
+
+  /** 格式化费用显示，保留4位小数，添加人民币符号 */
+  function formatCost(n) {
+    if (!n) return '¥0.00'
+    const parsed = parseFloat(n)
+    if (isNaN(parsed)) return '¥0.00'
+    return '¥' + parsed.toFixed(4)
   }
 
   if (loading) return <div className="flex items-center justify-center py-20 text-gray-400">加载中...</div>
@@ -200,10 +336,8 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
             {models.length > 0 && (
               <span className="ml-2">
                 <span className="text-green-500">{models.filter(m => m.health_status === 'healthy').length}✓</span>
-                {models.filter(m => m.health_status === 'error' || m.health_status === 'timeout' || m.health_status === 'auth_failed').length > 0 && (
-                  <span className="text-red-400 ml-1">{models.filter(m => ['error','timeout','auth_failed','balance_empty'].includes(m.health_status)).length}✗</span>
-                )}
-                <span className="text-gray-300 ml-1">{models.filter(m => m.health_status === 'unknown' || !m.health_status).length}?</span>
+                <span className="text-red-400 ml-1">{models.filter(m => ['error','timeout','auth_failed','balance_empty'].includes(m.health_status)).length}✗</span>
+                <span className="text-gray-300 ml-1">{models.filter(m => m.health_status === 'unknown' || !m.health_status || m.health_status === 'no_key').length}?</span>
               </span>
             )}
           </p>
@@ -218,10 +352,15 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
             )}
             {checking ? '检测中...' : '一键检测'}
           </button>
-          <button onClick={() => { setShowImport(!showImport); setShowAdd(false) }}
+          <button onClick={() => { setShowImport(!showImport); setShowAdd(false); setShowUsage(false) }}
             className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             智能导入
+          </button>
+          <button onClick={() => { setShowUsage(!showUsage); if (!showUsage) fetchUsage(); setShowAdd(false); setShowImport(false) }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${showUsage ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200'}`}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            用量统计
           </button>
           <button onClick={() => { setShowAdd(!showAdd); setShowImport(false) }}
             className="px-3 py-1.5 text-xs font-medium bg-wechat-green text-white rounded-lg hover:bg-wechat-green/90 transition-colors flex items-center gap-1">
@@ -241,7 +380,7 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
           <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
             <span className="text-lg">🪄</span> 智能导入 — 粘贴 API Key 自动识别平台
           </h4>
-          <p className="text-xs text-gray-500">支持自动检测: DeepSeek / 智谱 / 通义千问 / Moonshot / SiliconFlow / 零一万物 / 讯飞星火 / 阶跃星辰 / OpenAI / Groq</p>
+          <p className="text-xs text-gray-500">支持自动检测: DeepSeek / 智谱 / 通义千问 / Moonshot / SiliconFlow / 零一万物 / 讯飞星火 / 阶跃星辰 / OpenAI / Groq / 火山方舟</p>
           <div className="flex items-center gap-2">
             <input type="password" value={importKey} onChange={e => setImportKey(e.target.value)}
               className="flex-1 px-3 py-2 text-sm border border-purple-200 rounded-lg font-mono bg-white focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
@@ -274,6 +413,144 @@ export default function AIModelsPanel({ adminFetch, showToast }) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Token Usage Stats */}
+      {showUsage && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="text-lg">📊</span> Token 用量统计（近30天）
+            </h4>
+            <button onClick={fetchUsage} disabled={usageLoading}
+              className="px-2 py-1 text-[10px] font-medium bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors flex items-center gap-1">
+              {usageLoading ? (
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              ) : '🔄 刷新'}
+            </button>
+          </div>
+
+          {usageLoading && !usageData ? (
+            <div className="text-center py-6 text-gray-400 text-xs">加载中...</div>
+          ) : usageError && !usageData ? (
+            <div className="flex flex-col items-center justify-center py-6 gap-2">
+              <div className="text-red-400 text-xs">{usageError}</div>
+              <button onClick={fetchUsage} className="text-[10px] text-orange-600 hover:text-orange-800 px-3 py-1.5 rounded-lg hover:bg-orange-50 border border-orange-200 transition-colors">重试</button>
+            </div>
+          ) : usageData ? (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="bg-white rounded-lg p-3 border border-orange-100 text-center">
+                  <div className="text-[10px] text-gray-400 mb-1">总Token</div>
+                  <div className="text-lg font-bold text-orange-600">{formatTokens(usageData.total?.total_tokens)}</div>
+                  <div className="text-[10px] text-gray-400">今日 {formatTokens(usageData.today?.total_tokens)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-orange-100 text-center">
+                  <div className="text-[10px] text-gray-400 mb-1">输入Token</div>
+                  <div className="text-lg font-bold text-blue-600">{formatTokens(usageData.total?.total_prompt)}</div>
+                  <div className="text-[10px] text-gray-400">今日 {formatTokens(usageData.today?.total_prompt)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-orange-100 text-center">
+                  <div className="text-[10px] text-gray-400 mb-1">输出Token</div>
+                  <div className="text-lg font-bold text-green-600">{formatTokens(usageData.total?.total_completion)}</div>
+                  <div className="text-[10px] text-gray-400">今日 {formatTokens(usageData.today?.total_completion)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-orange-100 text-center">
+                  <div className="text-[10px] text-gray-400 mb-1">预估费用</div>
+                  <div className="text-lg font-bold text-red-600">{formatCost(usageData.total?.total_cost)}</div>
+                  <div className="text-[10px] text-gray-400">今日 {formatCost(usageData.today?.total_cost)}</div>
+                </div>
+              </div>
+
+              {/* By Provider Table */}
+              {usageData.by_provider?.length > 0 && (
+                <div className="bg-white rounded-lg border border-orange-100 overflow-hidden">
+                  <div className="px-3 py-2 bg-orange-50/50 border-b border-orange-100">
+                    <span className="text-xs font-medium text-gray-600">按模型统计</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400 border-b border-gray-50">
+                          <th className="text-left px-3 py-1.5 font-medium">模型</th>
+                          <th className="text-right px-3 py-1.5 font-medium">请求次数</th>
+                          <th className="text-right px-3 py-1.5 font-medium">输入</th>
+                          <th className="text-right px-3 py-1.5 font-medium">输出</th>
+                          <th className="text-right px-3 py-1.5 font-medium">总Token</th>
+                          <th className="text-right px-3 py-1.5 font-medium">费用</th>
+                          <th className="text-right px-3 py-1.5 font-medium">最后使用</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usageData.by_provider.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-50 last:border-0">
+                            <td className="px-3 py-1.5">
+                              <span className="font-medium text-gray-700">{TYPE_LABELS[row.provider] || row.provider}</span>
+                            </td>
+                            <td className="text-right px-3 py-1.5 text-gray-600">{row.requests}</td>
+                            <td className="text-right px-3 py-1.5 text-blue-600">{formatTokens(row.prompt_tokens)}</td>
+                            <td className="text-right px-3 py-1.5 text-green-600">{formatTokens(row.completion_tokens)}</td>
+                            <td className="text-right px-3 py-1.5 font-medium text-gray-700">{formatTokens(row.total_tokens)}</td>
+                            <td className="text-right px-3 py-1.5 text-red-600 font-medium">{formatCost(row.cost_yuan)}</td>
+                            <td className="text-right px-3 py-1.5 text-gray-400">{row.last_used ? new Date(row.last_used).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Daily Trend */}
+              {usageData.daily?.length > 0 && (() => {
+                const days = usageData.daily.slice(0, 7)
+                const maxTokens = Math.max(...days.map(d => d.total_tokens || 0), 1)
+                return (
+                  <div className="bg-white rounded-lg border border-orange-100 overflow-hidden">
+                    <div className="px-4 py-2.5 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-700">📊 每日趋势（近{days.length}天）</span>
+                      <span className="text-[10px] text-orange-400 font-medium">Token / 费用</span>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {days.map((day, i) => {
+                        const pct = ((day.total_tokens || 0) / maxTokens * 100)
+                        const dateStr = day.date ? (day.date.includes('T') ? day.date.slice(5, 10) : String(day.date).slice(5, 10)) : '--'
+                        return (
+                          <div key={i} className="group px-4 py-2.5 hover:bg-orange-50/30 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <span className="text-[11px] text-gray-400 font-mono w-[46px] flex-shrink-0 tabular-nums">{dateStr}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="relative h-5 bg-gray-100 rounded-md overflow-hidden">
+                                  <div
+                                    className="absolute inset-y-0 left-0 rounded-md bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-300 transition-all duration-500 ease-out flex items-center justify-end pr-2 shadow-sm"
+                                    style={{ width: `${Math.max(pct, 6)}%` }}
+                                  >
+                                    <span className="text-[10px] text-white/90 font-semibold drop-shadow-sm leading-none">{formatTokens(day.total_tokens)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[11px] text-gray-500 font-medium w-[52px] text-right flex-shrink-0 tabular-nums">{formatCost(day.cost_yuan)}</span>
+                            </div>
+                            {day.requests > 1 && (
+                              <div className="ml-[58px] mt-0.5 text-[9px] text-gray-300">{day.requests} 次请求</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {usageData.total?.total_requests === 0 && (
+                <div className="text-center py-4 text-gray-400 text-xs">暂无用量数据，使用文案生成功能后将自动记录</div>
+              )}
+            </>
+          ) : !usageLoading ? (
+            <div className="text-center py-6 text-gray-400 text-xs">点击"用量统计"按钮加载数据</div>
+          ) : null}
         </div>
       )}
 

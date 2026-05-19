@@ -1,48 +1,17 @@
-import { getSystemConfig, getActiveAIModel } from './db.js'
+import { getSystemConfig } from './db.js'
 import { countTokens, countMessagesTokens } from './tokenizer.js'
 import { loadActiveRulesForPrompt } from './evolution.js'
 import { loadProductCatalogForPrompt } from './mall.js'
+import { getAIConfig } from './shared/aiConfig.js'
+import { loadPublishedPrompt } from './prompts/promptLoader.js'
+import { DEFAULT_COLLECTION_OVERLAY, PROMPT_SAFETY_BASELINE } from './prompts/collectionOverlayDefault.js'
+export { checkWeightedCollectionReady } from './prompts/collectionWeights.js'
 
 // ========== 多模型 AI Provider 抽象层 ==========
 
-/**
- * 读取当前激活的 AI 模型配置（从 ai_models 表）
- * 支持传入 customApiKey 覆盖系统配置
- */
-async function getAIConfig(customApiKey = null) {
-  const active = await getActiveAIModel()
-  const temperature = parseFloat((await getSystemConfig('ai_temperature')) || '0.7')
-
-  if (active) {
-    return {
-      provider: active.provider,
-      apiKey: customApiKey || active.api_key,
-      model: active.model_name,
-      endpoint: active.endpoint,
-      temperature,
-    }
-  }
-
-  // 回退：从旧 system_config 读取（兼容）
-  const provider = (await getSystemConfig('ai_provider')) || 'deepseek'
-  const FALLBACK = {
-    deepseek: { key: 'deepseek_api_key', model: 'deepseek_model', defaultModel: 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' },
-    zhipu:    { key: 'zhipu_api_key',    model: 'zhipu_model',    defaultModel: 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' },
-    siliconflow: { key: 'siliconflow_api_key', model: 'siliconflow_model', defaultModel: 'deepseek-ai/DeepSeek-V3', endpoint: 'https://api.siliconflow.cn/v1/chat/completions' },
-  }
-  const fb = FALLBACK[provider] || FALLBACK.deepseek
-  return {
-    provider,
-    apiKey: customApiKey || await getSystemConfig(fb.key),
-    model: (await getSystemConfig(fb.model)) || fb.defaultModel,
-    endpoint: fb.endpoint,
-    temperature,
-  }
-}
-
 // ========== AI Chat 集成（多模型支持） ==========
 
-const BASE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥有8年微信支付/支付宝/抖音/快手/美团等全平台风控申诉实战经验，累计处理1800+商户申诉案件，整体成功率82%，二次申诉成功率71%。你的核心价值是帮商家用最少的时间和成本解决商户号问题。
+const CORE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥有8年微信支付/支付宝/抖音/快手/美团等全平台风控申诉实战经验，累计处理1800+商户申诉案件，整体成功率82%，二次申诉成功率71%。你的核心价值是帮商家用最少的时间和成本解决商户号问题。
 
 ## 用户水平自动识别（极其重要）
 你必须在前2轮对话中判断用户的经验水平，并自动调整沟通方式：
@@ -328,41 +297,8 @@ const BASE_SYSTEM_PROMPT = `你是"全平台商户号申诉战略顾问"，拥�
 - 未申诉的冻结期一般为180天
 - 冻结期间可以正常提交申诉，不需要等180天期满
 
-## 阶段性诊断行为规范
-
-### 收到行业信息时
-立刻给出行业洞察："您做XX行业的，这个行业最常见的风控问题是XX，申诉重点是XX。我之前处理过很多类似案件..."
-
-### 收到处罚类型时
-立刻给出难度评估："XX处罚属于X难度，首次申诉成功率大概在XX%左右。关键是要准备好XX材料..."
-
-### 收到违规原因时（最关键的信息）
-立刻执行三层推理，给出完整诊断：
-① 风控触发分析："根据我的经验，这个违规原因通常是因为XX触发了风控系统..."
-② 证据链规划："要反驳这个判定，我们需要准备XX、XX、XX这几类核心证据..."
-③ 案例引用："之前有个做XX的客户也是这个情况，用了XX方法，X天就通过了"
-④ 风险预警（如有）："不过需要注意，如果您有XX情况，需要先处理好再申诉"
-
-### 收到投诉信息时
-如果有未处理投诉，立刻预警："⚠️ 投诉未处理是申诉被驳回的第一大原因！建议您先100%处理完投诉再提交申诉。处理方式是..."
-
-### 收到申诉历史时
-如果有被驳回经历，立刻调整策略："被驳回过的案件需要换个打法。建议先打95017转3查一下具体驳回原因，这样我可以针对性地帮您优化材料"
-
-## 信息收集流程（AI-First：你全权驱动）
-你负责通过自然对话收集以下关键信息，顺序由你根据对话上下文灵活决定：
-- 核心三要素（必须优先）：行业类型、处罚类型、违规原因
-- 商户基本信息：商户号、商户名称、公司全称、统一社会信用代码
-- 法人信息：法人姓名、身份证后四位
-- 业务信息：经营模式、投诉情况、退款政策
-- 账户信息：开户银行、结算账户后四位、联系电话
-- 申诉历史：是否申诉过、结果如何
-
-收集策略：
-- 先问核心三要素，拿到后立刻给出专业诊断，让用户感受到价值
-- 用户主动提供的额外信息要全部接收，不要忽略
-- 用户说"不知道"或"忘了"的非必填字段可跳过，不要反复追问
-- 收到关键信息后自然过渡到下一个问题，不要机械地逐项询问
+## 信息收集与对话节奏
+具体「怎么问、怎么答、阶段诊断话术」见本条 system 消息末尾的【收集阶段指令】（_instruction）。你仍须掌握上述风控与申诉知识，并在收集时引用用户已填数据。
 
 ## 生成报告格式
 当收到buildReportPrompt的指令时，输出完整报告，每部分≤300字，语言正式严谨，可直接复制用于微信申诉提交。报告包含：案情评估、投诉处理方法、退款规则、投诉原因详情、业务模式、整改说明，以及详细的申诉提交指南。
@@ -413,7 +349,7 @@ async function buildSystemPrompt(collectedData = {}) {
   try { productCatalog = await loadProductCatalogForPrompt() } catch { /* 商品加载失败不影响主流程 */ }
 
   const keys = Object.keys(collectedData)
-  if (keys.length === 0) return BASE_SYSTEM_PROMPT + dynamicRules + productCatalog
+  if (keys.length === 0) return CORE_SYSTEM_PROMPT + dynamicRules + productCatalog
 
   const fieldLabels = {
     problem_type: '处罚类型', violation_reason: '违规原因',
@@ -531,19 +467,16 @@ async function buildSystemPrompt(collectedData = {}) {
     dataSection += `\n行业提示：${collectedData._industry_tip}\n`
   }
 
-  return BASE_SYSTEM_PROMPT + dataSection + dynamicRules + productCatalog
+  return CORE_SYSTEM_PROMPT + dataSection + dynamicRules + productCatalog
 }
 
-const WELCOME_MESSAGE = `您好！我是全平台商户号申诉专家，8年实战经验，处理过1800+案件~
+export const WELCOME_MESSAGE = `您好！我是全平台商户号申诉专家，8年实战经验，处理过1800+案件~
 
 不管是交易拦截、收款限额、支付权限关闭、资金冻结还是商户号封禁，我都能帮您分析情况、制定方案、生成可直接提交的申诉材料。
 
-💼 先简单说说您的情况吧——您是做什么业务的？遇到了什么问题？
+先简单说说您的情况：做什么行业、遇到什么问题？例如「餐饮，商户号被冻结了」——随便说，我能听懂。
 
-随便说就行，比如"我做餐饮的，商户号被冻结了"，我就能开始帮您分析了~
-
-💡 右侧面板会实时显示已收集的信息，方便您随时查看。
-🔒 所有数据仅用于本次咨询。`
+右侧面板会实时显示已收集的信息。您的数据仅用于本次咨询，不会外泄。`
 
 export function getWelcomeMessage() {
   return WELCOME_MESSAGE
@@ -564,16 +497,15 @@ async function callAIChat(chatHistory, customApiKey, collectedData = {}) {
   ]
 
   // 构建请求体（所有 OpenAI 兼容接口通用参数）
-  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature, max_tokens: 4096, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.2 }
+  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature || 0.3, max_tokens: 4096, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0 }
 
-  // 带超时和重试的请求
   const MAX_RETRIES = 2
   let res = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30000)
+      const timeout = setTimeout(() => controller.abort(), 120000)
       res = await fetch(cfg.endpoint, {
         method: 'POST',
         headers: {
@@ -877,8 +809,9 @@ export async function chatWithAI(chatHistory, customApiKey, collectedData = {}) 
 
 /**
  * 流式 AI 对话：返回 SSE 流，供路由层直接 pipe 给前端
+ * @param {object} [options] - { signal?: AbortSignal }
  */
-export async function streamChatWithAI(chatHistory, customApiKey, collectedData = {}) {
+export async function streamChatWithAI(chatHistory, customApiKey, collectedData = {}, options = {}) {
   const cfg = await getAIConfig(customApiKey)
   if (!cfg.apiKey) throw new Error('NO_API_KEY')
 
@@ -891,10 +824,15 @@ export async function streamChatWithAI(chatHistory, customApiKey, collectedData 
     })),
   ]
 
-  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature, max_tokens: 4096, stream: true, stream_options: { include_usage: true }, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.2 }
+  const reqBody = { model: cfg.model, messages, temperature: cfg.temperature || 0.3, max_tokens: 4096, stream: true, stream_options: { include_usage: true }, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0 }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60000)
+  const timeout = setTimeout(() => controller.abort(), 120000)
+  const externalSignal = options.signal
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
 
   const res = await fetch(cfg.endpoint, {
     method: 'POST',
@@ -918,7 +856,7 @@ export async function streamChatWithAI(chatHistory, customApiKey, collectedData 
 
   // 本地预估input tokens作为fallback（当API不返回usage时使用）
   const inputTokens = countMessagesTokens(messages)
-  return { body: res.body, inputTokens }
+  return { body: res.body, inputTokens, abortController: controller }
 }
 
 // ========== AI 智能字段提取（从混乱输入中抓取有用信息） ==========
@@ -949,8 +887,12 @@ export async function extractFieldsWithAI(userMessage, collectedData = {}, curre
     { key: 'license_no', label: '统一社会信用代码', hint: '18位字母+数字', example: '91110105MA5XXXXXX7' },
     { key: 'legal_name', label: '法人姓名', hint: '营业执照上的法定代表人', example: '张三' },
     { key: 'legal_id_last4', label: '身份证后四位', hint: '4位数字或3位数字+X', example: '5678' },
+    { key: 'business_scenario', label: '经营场景', hint: '线上/线下/都有', example: '小程序和门店都有→线上线下结合' },
+    { key: 'miniprogram_name', label: '小程序/公众号名称', hint: '名称或「没有」', example: '美味点餐' },
+    { key: 'miniprogram_appid', label: '小程序AppID', hint: 'wx开头，可跳过', example: 'wx1234567890abcdef' },
     { key: 'complaint_status', label: '投诉情况', hint: '有无投诉/投诉数量/投诉原因', example: '有5个投诉→有5个未处理投诉' },
     { key: 'refund_policy', label: '退款政策', hint: '退款流程和规则', example: '7天无理由→7天无理由退款' },
+    { key: 'order_info', label: '交易订单号', hint: '4200开头的微信支付订单号+商品说明', example: '420000284420251129... - 代理记账' },
     { key: 'bank_name', label: '开户银行', hint: '结算账户银行', example: '工商银行' },
     { key: 'bank_account_last4', label: '结算账户后四位', hint: '4位数字', example: '1234' },
     { key: 'contact_phone', label: '联系电话', hint: '11位手机号', example: '13812345678' },
@@ -1051,6 +993,11 @@ ${contextMsgs || '（无历史）'}
 用户可能一次性说很多信息，例如：
 "我是做餐饮的，开了个奶茶店，微信收款被限额了，说我交易异常，商户号是1409570162"
 → 应提取：industry="餐饮（奶茶店）", problem_type="收款限额", violation_reason="涉嫌交易异常", merchant_id="1409570162", business_model="线下门店"
+
+## 【格式识别】
+- 微信支付订单号：4200 开头约 28 位数字 → order_info
+- 小程序 AppID：wx 开头 → miniprogram_appid
+- 统一社会信用代码：18 位字母数字 → license_no
 
 ## 【信息修正检测 — 极其重要】
 ✅ 用户纠正已有信息时，correction必须设为true，并提取修正后的值：
@@ -1225,8 +1172,10 @@ ${info || '（暂无）'}
 ## 评估标准
 1. 核心三要素（行业+处罚类型+违规原因）是否齐全？缺任何一个都不能ready
 2. 身份信息（商户号 或 公司名 或 法人名）至少有一个？
-3. 有了核心三要素+身份信息，是否能写出有针对性的申诉材料？
-4. 还有什么关键信息缺失会严重影响申诉质量？
+3. 资金冻结/封禁类：开户银行、结算账户后四位、联系电话应尽量齐全
+4. 涉嫌纠纷/投诉类：投诉情况应明确（是否已处理）
+5. 有了核心三要素+身份信息+场景必填项，是否能写出有针对性的申诉材料？
+6. 还有什么关键信息缺失会严重影响申诉质量？next_question 应具体、口语化
 
 ## 评分规则
 - 0-30：核心信息不足，无法生成
@@ -1284,114 +1233,23 @@ ${info || '（暂无）'}
 // ========== AI-First: 收集阶段对话指令构建 ==========
 
 /**
- * 构建信息收集阶段的 AI 对话指令
- * AI-First 架构：让 AI 自主驱动整个信息收集对话，不再依赖本地规则引擎
- * @param {string} extractionNote - 已提取字段的系统提示（可选）
- * @param {string} dynamicNote - 行业动态字段提示（可选）
+ * 构建信息收集阶段的 AI 对话指令（运营中心 chat_collection 可覆盖）
  */
-export function buildCollectionInstruction(extractionNote = '', dynamicNote = '') {
-  return `你是顶尖全平台商户号申诉战略顾问，8年实战经验，1800+成功案例，整体成功率82%，二次申诉成功率71%。你不是普通客服——你是能深度推理、精准诊断、给出战略级建议的专家顾问。${extractionNote}${dynamicNote}
-
-【你的核心竞争力——三层深度推理】
-你要像资深律师一样思考每个案件，拿到关键信息后立刻执行三层推理：
-
-第一层·风控触发推演（拿到行业+违规原因后立刻执行）：
-- 这个行业的典型交易模式是什么？（频率、金额、时间分布、对手方特征）
-- 微信/支付宝/抖音风控的哪一层最可能触发？（规则引擎→模型层→人工审核）
-- 具体触发点是什么？（如：客单价突变→套现模型；退款率>5%→纠纷规则；凌晨密集交易→异常时段）
-- 是误判还是确实有风险？误判原因是什么？
-
-第二层·证据链逆向设计（基于触发点反推需要什么证据）：
-- 需要什么类型的证据来反驳风控判定？
-- 证据之间如何形成完整链条？（下单→付款→发货→物流→签收→评价=完整交易闭环）
-- 哪些证据是审核人员最看重的？（行业不同重点不同）
-- 用户缺少某些证据时的替代方案
-
-第三层·战略决策（综合判断最优路径）：
-- 先申诉还是先处理投诉？先整改还是先提交？
-- 需不需要先打95017/95188摸底？
-- 是否建议同时准备Plan B（如新主体申请）？
-- 时间窗口把控：补充资料通道24小时限制、二次申诉间隔3-5天、连续5次失败风险
-
-【实战案例库——对话中自然引用，增强用户信心】
-微商/社交电商：
-- 交易拦截→朋友圈经营记录+客户聊天截图+发货物流凭证，3-5天通过
-- 一件代发需额外提供供应商合作协议
-游戏/陪玩/代练：
-- 收款限额→平台入驻证明+接单记录+对局截图+客户评价，5天恢复
-- 涉及充值代充需证明货源合法
-直播带货：
-- 权限关闭→3场直播回放录屏+对应下单截图+发货单+物流签收，7天恢复
-知识付费/教育：
-- 交易纠纷→先处理全部退款+课程交付证明+完善退费机制，二次申诉5天通过
-跨境代购：
-- 商户号封禁→海关进口报关单+专柜购买小票+品牌代理协议+法人视频认证，20天
-餐饮外卖：
-- 交易拦截→门店实景6张+美团店铺截图+食品经营许可证+活动海报，3天解封
-SaaS/技术服务：
-- 延迟结算→软著证书+5份客户合同（脱敏）+系统后台截图+客户使用反馈，5天
-盲盒潮玩：
-- 收款限额→商品实拍+定价机制说明+概率公示+保底机制证明，3天
-美容/医美：
-- 预付费纠纷→卫生许可证+从业资质+门店实景+价目表公示，注意广告法合规
-二次申诉（被驳回）：
-- 先打95017转3查具体驳回原因→针对性补增量证据→间隔3-5天→材料量1.5-2倍
-
-【阶段感知诊断——收到关键信息时的即时反应】
-
-收到行业信息时→立刻给行业洞察：
-"您做XX行业的，这个行业最常见的风控问题是XX，申诉重点是XX。我之前处理过很多类似案件..."
-
-收到处罚类型时→立刻评估难度：
-"XX处罚属于X难度，首次申诉成功率大概XX%。关键是要准备好XX材料..."
-资金冻结→主动提醒结算账户信息的重要性
-商户号封禁→提醒可能需要法人视频认证+建议准备Plan B
-
-收到违规原因时→立刻执行三层推理并给出完整诊断：
-① "根据我的经验，这个违规原因通常是因为XX触发了风控系统..."
-② "要反驳这个判定，我们需要准备XX、XX、XX这几类核心证据..."
-③ "之前有个做XX的客户也是这个情况，用了XX方法，X天就通过了"
-④ 风险预警（如有）："不过需要注意，如果您有XX情况，需要先处理好再申诉"
-
-收到投诉信息时→如有未处理投诉立刻预警：
-"投诉未处理是申诉被驳回的第一大原因！建议先100%处理完投诉再提交申诉。处理方式：联系投诉用户→原路全额退款→引导在投诉页面留言'已解决'"
-
-收到申诉历史时→如有驳回立刻调整策略：
-"被驳回过的案件需要换个打法。建议先打95017转3查一下具体驳回原因，这样我可以针对性帮您优化材料"
-
-【反幻觉铁律——违反即失败】
-⛔ 100%基于用户已提供的信息，严禁编造、脑补任何细节
-⛔ 用户说"游戏陪练"→只说"游戏陪练"，绝不自动加"王者荣耀"等
-⛔ 确认信息只复述原话，不修饰不扩展
-⛔ 用户没说的=不存在
-⛔ 审核员能看到真实交易数据，任何编造数字都会被识破——必须提醒用户
-
-【信息修正规则】
-✅ 用户说"不对""搞错了"→立刻确认要改哪个，确认新值
-✅ 前后矛盾→温和提醒，让用户确认
-
-【严禁事项】
-⛔ 绝不说"我不能上网""我无法访问网络"等技术限制
-⛔ 绝不编造时间日期——用户问时间就说"您看下手机就知道了"
-⛔ 绝不说"我是AI""我是语言模型"——你就是专业申诉顾问
-⛔ 绝不讨论技术原理
-
-【处理跑题】
-- 闲聊/无关问题→1句话带过，自然拉回正题
-- 用户骂人/发泄→共情但不纠缠，拉回正事
-
-【对话风格——像资深顾问朋友】
-1. 说大白话，别整术语，像微信聊天
-2. 自然过渡，别机械一问一答。收到信息后顺带给个专业判断再问下一个
-3. 收到关键信息（行业+违规原因）后，主动给出初步诊断和成功率预估
-4. 100-200字简短回复，一次只问一个问题
-5. 用户急/有情绪→先共情（"理解，换谁都着急"），再继续
-6. 体现你见多识广——"这种情况我处理过很多，关键是..."
-7. 用户提供额外信息（日活、交易量等），积极接收并用于诊断
-8. 不要用"亲""您好"等客服腔，不要过多emoji
-9. 每次给出具体可执行的下一步行动，不给模糊建议
-10. 用户焦虑时先共情再给方案："理解，换谁都着急。不过这种情况我见得多了，关键是..."
-11. 对资金冻结案件主动提醒结算账户信息的重要性`
+export async function buildCollectionInstruction(extractionNote = '', dynamicNote = '', collectedData = {}) {
+  const overlay = await loadPublishedPrompt('chat_collection', DEFAULT_COLLECTION_OVERLAY)
+  const d = collectedData || {}
+  let phaseNote = ''
+  if (!d.industry || String(d.industry).trim() === '' || d.industry === '用户暂未提供') {
+    phaseNote = '【本轮优先】行业与经营场景尚未确认。请用选择题式追问（如餐饮外卖/线下门店/线上小程序/教育培训），确认后再问处罚类型；勿展开长篇深度分析。'
+  } else if (!d.problem_type || d.problem_type === '用户暂未提供') {
+    phaseNote = '【本轮优先】请确认处罚类型（限制收款、资金冻结、商户号封禁等），并说明这将影响申诉指导中的流程步骤。'
+  } else if (!d.violation_reason || d.violation_reason === '用户暂未提供') {
+    phaseNote = '【本轮优先】请让用户复述平台违约记录中的「违规原因」原文（可复制粘贴），不要替用户概括。'
+  } else if (d._industry_tip) {
+    phaseNote = `【行业提示】${d._industry_tip} — 可简要告知用户：信息收集越完整，右侧「申诉指导」的材料清单与 95017 话术越贴合您的行业。`
+  }
+  const parts = [overlay, phaseNote, extractionNote, dynamicNote, PROMPT_SAFETY_BASELINE].filter(Boolean)
+  return parts.join('\n\n')
 }
 
 // ========== 导出 ==========

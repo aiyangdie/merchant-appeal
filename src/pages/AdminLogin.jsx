@@ -1,13 +1,36 @@
+/**
+ * @fileoverview 管理员登录页面
+ * @description 提供管理员账号密码登录表单，登录成功后跳转到管理后台控制台
+ * @module AdminLogin
+ *
+ * 路由：/admin
+ */
+
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+/**
+ * 管理员登录页面组件
+ * @description 显示登录表单，验证用户名密码，成功后存储 token 并跳转
+ * @returns {JSX.Element} 管理员登录页面
+ */
 export default function AdminLogin() {
+  /** 用户名输入值 */
   const [username, setUsername] = useState('')
+  /** 密码输入值 */
   const [password, setPassword] = useState('')
+  /** 错误提示信息 */
   const [error, setError] = useState('')
+  /** 登录加载状态 */
   const [loading, setLoading] = useState(false)
+  /** 导航函数 */
   const navigate = useNavigate()
 
+  /**
+   * 处理登录表单提交
+   * @param {Event} e - 表单提交事件
+   * @description 调用后端登录 API，成功后存储 token 到 localStorage 并跳转到控制台
+   */
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
@@ -37,6 +60,7 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center px-4">
       <div className="w-full max-w-sm animate-scale-in">
+        {/* Logo 和标题 */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#07C160] to-[#06ae56] flex items-center justify-center shadow-lg">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,13 +71,16 @@ export default function AdminLogin() {
           <p className="text-[13px] text-gray-400 mt-1">微信商户号申诉助手</p>
         </div>
 
+        {/* 登录表单 */}
         <form onSubmit={handleLogin} className="bg-white rounded-2xl p-6 space-y-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          {/* 错误提示 */}
           {error && (
             <div className="bg-red-50 text-red-500 text-[12px] px-3 py-2 rounded-xl border border-red-100">
               {error}
             </div>
           )}
 
+          {/* 用户名输入 */}
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-1.5">用户名</label>
             <input
@@ -66,6 +93,7 @@ export default function AdminLogin() {
             />
           </div>
 
+          {/* 密码输入 */}
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-1.5">密码</label>
             <input
@@ -78,6 +106,7 @@ export default function AdminLogin() {
             />
           </div>
 
+          {/* 登录按钮 */}
           <button
             type="submit"
             disabled={loading}
@@ -91,6 +120,7 @@ export default function AdminLogin() {
           </p>
         </form>
 
+        {/* 返回首页链接 */}
         <div className="text-center mt-5">
           <a href="/" className="text-[11px] text-gray-300 hover:text-gray-500 transition-colors">
             返回首页

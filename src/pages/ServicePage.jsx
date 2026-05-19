@@ -1,9 +1,39 @@
+/**
+ * @fileoverview 客服服务页面
+ * @description 管理员/客服与用户针对特定订单的专属沟通页面
+ * @module ServicePage
+ *
+ * 功能：
+ * - 加载订单详情和客服 persona 信息
+ * - 实时聊天界面，支持 Markdown 渲染
+ * - 快捷问题按钮，快速发送常见问题
+ * - 自动滚动到最新消息
+ *
+ * 路由：/service/:orderNo
+ */
+
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import DOMPurify from 'dompurify'
 import { useParams, useNavigate } from 'react-router-dom'
 
+/**
+ * 简单的 Markdown 解析器
+ * @description 将 Markdown 文本转换为 HTML（支持粗体、斜体、标题、列表、代码块）
+ * @param {string} text - 原始 Markdown 文本
+ * @returns {string} 转换后的 HTML 字符串
+ *
+ * 支持的语法：
+ * - **粗体** / *斜体*
+ * - # H1 / ## H2 / ### H3
+ * - 无序列表 (- item) / 有序列表 (1. item)
+ * - `行内代码`
+ *
+ * 注意：这不是完整的 Markdown 解析器，仅覆盖聊天场景中常用的语法
+ */
 function parseMarkdown(text) {
   if (!text) return ''
   let html = text
+  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
   html = html.replace(/^### (.+)$/gm, '<h3 class="text-base font-bold mt-3 mb-1">$1</h3>')
@@ -14,27 +44,46 @@ function parseMarkdown(text) {
   html = html.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">$1</code>')
   html = html.replace(/\n\n/g, '</p><p class="mt-2">')
   html = html.replace(/\n/g, '<br/>')
-  return '<p>' + html + '</p>'
+  return DOMPurify.sanitize('<p>' + html + '</p>')
 }
 
+/**
+ * 客服服务页面组件
+ * @description 显示订单详情和客服聊天界面
+ * @returns {JSX.Element} 客服聊天页面
+ */
 export default function ServicePage() {
+  /** URL 参数中的订单号 */
   const { orderNo } = useParams()
+  /** 导航函数 */
   const navigate = useNavigate()
+  /** 订单详情数据 */
   const [order, setOrder] = useState(null)
+  /** 聊天消息列表 */
   const [messages, setMessages] = useState([])
+  /** 输入框内容 */
   const [input, setInput] = useState('')
+  /** 是否正在等待 AI 回复 */
   const [loading, setLoading] = useState(false)
+  /** 错误信息 */
   const [error, setError] = useState(null)
+  /** 初始加载状态 */
   const [initialLoading, setInitialLoading] = useState(true)
+  /** 自动滚动锚点 */
   const bottomRef = useRef(null)
+  /** 输入框 DOM 引用 */
   const inputRef = useRef(null)
 
+  /**
+   * 获取认证请求头
+   * @returns {Object} 包含 Authorization 的请求头对象
+   */
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('appeal_token')
     return token ? { Authorization: `Bearer ${token}` } : {}
   }, [])
 
-  // 加载订单详情
+  /** 加载订单详情和聊天历史 */
   useEffect(() => {
     async function loadOrder() {
       try {
@@ -49,12 +98,15 @@ export default function ServicePage() {
     loadOrder()
   }, [orderNo, getAuthHeaders])
 
-  // 自动滚动
+  /** 新消息到达时自动滚动到底部 */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 发送消息
+  /**
+   * 发送消息给客服
+   * @description 将用户消息添加到聊天列表，并调用后端 API 获取回复
+   */
   async function sendMessage() {
     if (!input.trim() || loading) return
     const userMsg = input.trim()
@@ -81,6 +133,7 @@ export default function ServicePage() {
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
+  /** 初始加载中状态 */
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50/30 flex items-center justify-center">
@@ -94,6 +147,7 @@ export default function ServicePage() {
     )
   }
 
+  /** 错误状态 */
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50/30 flex items-center justify-center p-4">
@@ -108,6 +162,7 @@ export default function ServicePage() {
     )
   }
 
+  /** 客服 persona 信息 */
   const persona = order?.persona || {}
 
   return (
@@ -115,16 +170,20 @@ export default function ServicePage() {
       {/* 顶部导航 */}
       <header className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/80">
         <div className="px-4 py-3 flex items-center gap-3">
+          {/* 返回按钮 */}
           <button onClick={() => navigate('/')} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
           </button>
+          {/* 客服头像 */}
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-lg shadow-sm flex-shrink-0">
             {persona.avatar || '👨‍💼'}
           </div>
+          {/* 客服信息 */}
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-bold text-gray-900 truncate">{persona.name || '专属顾问'}</h1>
             <p className="text-[11px] text-gray-400 truncate">{persona.title || '服务顾问'} · {order?.productName}</p>
           </div>
+          {/* 在线状态 */}
           <div className="flex items-center gap-1">
             <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-medium rounded-full border border-green-100">在线</span>
           </div>

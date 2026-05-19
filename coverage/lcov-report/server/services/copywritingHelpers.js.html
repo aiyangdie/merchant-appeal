@@ -1,0 +1,451 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/services/copywritingHelpers.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">server/services</a> copywritingHelpers.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/47</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/30</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/3</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/26</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export const COPYWRITING_APPEAL_TYPES = <span class="cstat-no" title="statement not covered" >{</span>
+  situation_statement: '情况说明',
+  commitment_letter: '承诺书',
+  rectification_report: '整改报告',
+  customer_service_script: '客服沟通话术',
+  urgent_appeal: '加急申诉文案',
+  rejection_supplement: '驳回补充申诉材料',
+  phone_script: '95017电话沟通文案',
+  full_package: '全套申诉材料',
+}
+&nbsp;
+export const COPYWRITING_SYSTEM_PROMPT = <span class="cstat-no" title="statement not covered" >`你是商户号申诉文案专家，专注于微信支付、支付宝商户号处罚申诉领域。你必须严格遵循以下规则和指南来生成高质量申诉文案。</span>
+&nbsp;
+## 核心原则
+1. 基于真实情况撰写，绝不编造事实、伪造数据或虚构整改措施
+2. 话术必须柔和合规，使用"经营不规范""管理疏忽""流程不完善"等中性表述
+3. 绝对禁用敏感词汇：套现、刷单、洗钱、虚假交易、赌博、欺诈、传销、非法集资、违规套码、二清、资金池、跑分、色情、涉赌
+4. 逻辑严谨，证据链完整，每个主张都有对应的事实或数据支撑
+5. 数据量化整改成效，用具体数字说明改进幅度（如"投诉率下降85%""异常交易占比降至0.3%"）
+&nbsp;
+## 文案结构规范
+所有申诉文案必须遵循四段式结构：
+- 第一段「认错」：诚恳承认问题，不推诿不辩解，表达深刻反思
+- 第二段「原因」：客观分析问题根源，区分主观因素和客观因素
+- 第三段「整改」：详细说明已采取的整改措施和取得的量化成效
+- 第四段「恳请」：恳请平台给予改正机会，表达合规经营决心
+&nbsp;
+## 平台规则知识
+### 微信支付常见处罚类型
+- 限制收款：通常因交易异常、投诉率过高触发，需提供交易真实性证明
+- 冻结资金：涉嫌违规交易时触发，需说明资金来源和用途
+- 关闭支付权限：严重违规导致，需全面整改并承诺合规
+- 降级商户等级：风险指标超标，需改善经营数据
+&nbsp;
+### 支付宝常见处罚类型
+- 限制收款：因交易风险、违规经营触发
+- 冻结账户：涉嫌欺诈或严重违规，需提供合规证明
+- 限制提现：资金异常流动，需说明资金用途
+- 关闭收钱功能：严重违规，需全面整改
+&nbsp;
+### 申诉审核要点
+- 审核人员关注：整改是否彻底、是否可能再犯、经营是否合规
+- 有利因素：首次违规、主动整改、投诉率下降、交易量恢复
+- 不利因素：多次违规、整改不彻底、仍有投诉、涉嫌欺诈
+&nbsp;
+## 写作风格指南
+- 语气：诚恳、谦逊、专业，避免过于卑微或过于强硬
+- 用词：正式书面语，避免口语化表达和网络用语
+- 数据：所有数据必须合理可信，整改前后对比要明显
+- 证据：列举具体可查的证据类型（培训记录、监控截图、制度文件等）
+- 承诺：具体可执行的承诺，避免空泛表态
+&nbsp;
+## 常见整改措施参考
+- 人员方面：组织合规培训、设立风控专员、建立考核机制
+- 制度方面：完善交易审核流程、建立异常预警机制、制定应急预案
+- 技术方面：升级监控系统、部署风控规则、接入实名认证
+- 管理方面：加强供应商审核、优化客服响应、建立投诉处理SOP
+&nbsp;
+## JSON输出规范
+- 严格输出合法JSON格式，不包含任何多余文字、注释或markdown标记
+- JSON字段值使用中文内容
+- 数组字段至少包含2个元素
+- content字段必须包含完整的文案正文
+- 所有字段都必须填写，不得留空`
+&nbsp;
+export const COPYWRITING_PROMPTS = <span class="cstat-no" title="statement not covered" >{</span>
+  situation_statement: `写《情况说明》。商户：{merchant_info}\n结构：基本信息→经营情况→异常原因→证据→诚恳表态。500-800字。正式诚恳。\n输出JSON：{"title":"","content":"","key_points":[],"evidence_list":[],"warnings":[]}`,
+&nbsp;
+  commitment_letter: `写《合规经营承诺书》。商户：{merchant_info}\n结构：承诺人→承诺事项(5条+)→违约责任→期限→签名。300-500字。郑重坚定。\n输出JSON：{"title":"","content":"","commitment_items":[],"validity_period":""}`,
+&nbsp;
+  rectification_report: `写《整改报告》。商户：{merchant_info}\n结构：问题概述→原因→措施(即时/短期/长期)→成效→保障。800-1200字。认真务实。\n输出JSON：{"title":"","content":"","immediate_actions":[],"short_term_actions":[],"long_term_actions":[],"evidence_list":[]}`,
+&nbsp;
+  customer_service_script: `写客服沟通话术。商户：{merchant_info}\n3场景(在线客服/用户回访/补充材料)，每场景含开场白/核心/Q&amp;A/结束语。礼貌专业。\n输出JSON：{"scenes":[{"scene_name":"","opening":"","key_points":[],"qa":[{"question":"","answer":""}],"closing":""}],"tips":[]}`,
+&nbsp;
+  urgent_appeal: `写加急申诉文案。商户：{merchant_info}\n紧急原因→核心诉求→证据→诚恳表态。200-400字。紧迫有礼。\n输出JSON：{"title":"","content":"","urgent_reason":"","key_evidence":[],"expected_resolution":""}`,
+&nbsp;
+  rejection_supplement: `写驳回补充申诉。商户：{merchant_info}\n驳回：{rejection_info}\n感谢→逐条回应→补充整改→恳请审核。500-800字。感恩诚恳。\n输出JSON：{"title":"","content":"","rejection_responses":[{"rejection_point":"","response":"","new_evidence":""}],"additional_evidence":[],"summary":""}`,
+&nbsp;
+  phone_script: `写95017电话文案。商户：{merchant_info}\n自我介绍→来电目的→核心诉求→证据→请求处理。含脚本/Q&amp;A/注意事项。礼貌坚定。\n输出JSON：{"script":"","key_talking_points":[],"anticipated_questions":[{"question":"","answer":""}],"do_list":[],"dont_list":[],"follow_up":""}`,
+&nbsp;
+  full_package: `生成全套申诉材料。商户：{merchant_info}\n含：情况说明+承诺书+整改报告+客服话术+95017电话文案。逻辑一致，证据互证。\n输出JSON：{"situation_statement":{"title":"","content":""},"commitment_letter":{"title":"","content":""},"rectification_report":{"title":"","content":""},"customer_service_script":{"opening":"","key_points":[],"closing":""},"phone_script":{"script":"","key_points":[]},"evidence_checklist":[],"submission_order":[]}`,
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >buildMerchantInfo(</span>data) {
+  const fieldMap = <span class="cstat-no" title="statement not covered" >{</span>
+    merchant_name: '商户名称', merchant_id: '商户号', platform: '平台',
+    industry: '所属行业', ban_type: '处罚类型', ban_reason: '封禁/处罚原因',
+    ban_time: '处罚时间', business_model: '经营模式', business_address: '经营地址',
+    monthly_revenue: '月均交易额', complaint_count: '投诉数量',
+    violation_details: '违规详情', rectification_status: '已整改情况',
+    contact_name: '联系人', contact_phone: '联系电话',
+  }
+  const parts = <span class="cstat-no" title="statement not covered" >[]</span>
+<span class="cstat-no" title="statement not covered" >  for (const [key, label] of Object.entries(fieldMap)) {</span>
+<span class="cstat-no" title="statement not covered" >    if (data[key]) <span class="cstat-no" title="statement not covered" >parts.push(`${label}：${data[key]}`)</span></span>
+  }
+<span class="cstat-no" title="statement not covered" >  if (data.extra_info) <span class="cstat-no" title="statement not covered" >parts.push(`补充信息：${data.extra_info}`)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (data.rejection_reason) <span class="cstat-no" title="statement not covered" >parts.push(`驳回原因：${data.rejection_reason}`)</span></span>
+<span class="cstat-no" title="statement not covered" >  return parts.length &gt; 0 ? parts.join('\n') : '商户信息待补充'</span>
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >copywritingNeedsDeepThinking(</span>appealType, data) {
+<span class="cstat-no" title="statement not covered" >  if (data.enable_deep_thinking === true) <span class="cstat-no" title="statement not covered" >return true</span></span>
+<span class="cstat-no" title="statement not covered" >  if (data.enable_deep_thinking === false) <span class="cstat-no" title="statement not covered" >return false</span></span>
+<span class="cstat-no" title="statement not covered" >  return false</span>
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >parseCopywritingJson(</span>content) {
+<span class="cstat-no" title="statement not covered" >  if (!content) <span class="cstat-no" title="statement not covered" >return null</span></span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >return JSON.parse(content) </span>} catch {}</span>
+  let c = <span class="cstat-no" title="statement not covered" >content.trim()</span>
+<span class="cstat-no" title="statement not covered" >  if (c.startsWith('```json')) <span class="cstat-no" title="statement not covered" >c = c.slice(7)</span></span>
+  else <span class="cstat-no" title="statement not covered" >if (c.startsWith('```')) <span class="cstat-no" title="statement not covered" >c = c.slice(3)</span></span>
+<span class="cstat-no" title="statement not covered" >  if (c.endsWith('```')) <span class="cstat-no" title="statement not covered" >c = c.slice(0, -3)</span></span>
+<span class="cstat-no" title="statement not covered" >  c = c.trim()</span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >return JSON.parse(c) </span>} catch {}</span>
+  let depth = <span class="cstat-no" title="statement not covered" >0,</span> start = <span class="cstat-no" title="statement not covered" >-1</span>
+<span class="cstat-no" title="statement not covered" >  for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; c.length; i++) {</span>
+<span class="cstat-no" title="statement not covered" >    if (c[i] === '{') { <span class="cstat-no" title="statement not covered" >if (depth === 0) <span class="cstat-no" title="statement not covered" >start = i; <span class="cstat-no" title="statement not covered" ></span></span>depth++ </span>}</span>
+    else <span class="cstat-no" title="statement not covered" >if (c[i] === '}') { <span class="cstat-no" title="statement not covered" >depth--; <span class="cstat-no" title="statement not covered" ></span>if (depth === 0 &amp;&amp; start &gt;= 0) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >return JSON.parse(c.slice(start, i + 1)) </span>} catch { <span class="cstat-no" title="statement not covered" >start = -1 </span>} </span>} </span>}</span>
+  }
+<span class="cstat-no" title="statement not covered" >  return null</span>
+}</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-05-19T05:45:38.705Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

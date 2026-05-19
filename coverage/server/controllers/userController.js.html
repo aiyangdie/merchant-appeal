@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">57.14% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/28</span>
+                <span class='fraction'>0/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">60% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/10</span>
+                <span class='fraction'>0/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">60.86% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/23</span>
+                <span class='fraction'>0/23</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -125,32 +125,32 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -178,33 +178,33 @@ class UserController {
   /**
    * Handle User Registration
    */
-  async register(req, res) {
-    try {
-      const { phone, nickname } = req.body;
-      const result = await userService.register(phone, nickname);
+<span class="fstat-no" title="function not covered" >  as</span>ync register(req, res) {
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const { phone, nickname } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+      const result = <span class="cstat-no" title="statement not covered" >await userService.register(phone, nickname);</span>
 <span class="cstat-no" title="statement not covered" >      res.json(result);</span>
     } catch (error) {
-      logger.error('Controller: Register error', error);
-      if (error.message === 'INVALID_PHONE') return res.status(400).json({ error: '请输入有效的手机号' });
-      <span class="missing-if-branch" title="if path not taken" >I</span>if (error.message === 'INVALID_NICKNAME') <span class="cstat-no" title="statement not covered" >return res.status(400).json({ error: '名称格式不正确' });</span>
-      res.status(500).json({ error: '注册失败' });
+<span class="cstat-no" title="statement not covered" >      logger.error('Controller: Register error', error);</span>
+<span class="cstat-no" title="statement not covered" >      if (error.message === 'INVALID_PHONE') <span class="cstat-no" title="statement not covered" >return res.status(400).json({ error: '请输入有效的手机号' });</span></span>
+<span class="cstat-no" title="statement not covered" >      if (error.message === 'INVALID_NICKNAME') <span class="cstat-no" title="statement not covered" >return res.status(400).json({ error: '名称格式不正确' });</span></span>
+<span class="cstat-no" title="statement not covered" >      res.status(500).json({ error: '注册失败' });</span>
     }
   }
 &nbsp;
   /**
    * Handle User Login
    */
-  async login(req, res) {
-    try {
-      const { phone } = req.body;
-      if (!phone) return res.status(400).json({ error: '请输入手机号' });
+<span class="fstat-no" title="function not covered" >  as</span>ync login(req, res) {
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const { phone } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+<span class="cstat-no" title="statement not covered" >      if (!phone) <span class="cstat-no" title="statement not covered" >return res.status(400).json({ error: '请输入手机号' });</span></span>
       
-      const result = await userService.login(phone);
+      const result = <span class="cstat-no" title="statement not covered" >await userService.login(phone);</span>
 <span class="cstat-no" title="statement not covered" >      res.json(result);</span>
     } catch (error) {
-      logger.error('Controller: Login error', error);
-      <span class="missing-if-branch" title="if path not taken" >I</span>if (error.message === 'USER_NOT_FOUND') <span class="cstat-no" title="statement not covered" >return res.status(404).json({ error: '该手机号未注册，请先注册' });</span>
-      res.status(500).json({ error: '登录失败' });
+<span class="cstat-no" title="statement not covered" >      logger.error('Controller: Login error', error);</span>
+<span class="cstat-no" title="statement not covered" >      if (error.message === 'USER_NOT_FOUND') <span class="cstat-no" title="statement not covered" >return res.status(404).json({ error: '该手机号未注册，请先注册' });</span></span>
+<span class="cstat-no" title="statement not covered" >      res.status(500).json({ error: '登录失败' });</span>
     }
   }
 &nbsp;
@@ -232,7 +232,7 @@ export default new UserController();
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-22T10:17:55.697Z
+                at 2026-05-19T05:45:38.996Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

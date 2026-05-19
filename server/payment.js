@@ -10,37 +10,60 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { mapToPaymentRuntime, resolvePemOrPath, loadPaymentConfigMap } from './paymentConfigBridge.js'
 
 // ==================== 微信支付 v3 ====================
 
 class WechatPay {
   constructor() {
+    this.mchId = ''
+    this.apiV3Key = ''
+    this.serialNo = ''
+    this.appId = ''
+    this.notifyUrl = ''
+    this.privateKey = null
+    this.platformCert = null
+    /** null=未在后台指定开关；true/false=显式开关 */
+    this._adminEnabled = null
+    this._applyFromEnv()
+  }
+
+  _applyFromEnv() {
     this.mchId = process.env.WECHAT_PAY_MCH_ID || ''
     this.apiV3Key = process.env.WECHAT_PAY_API_V3_KEY || ''
     this.serialNo = process.env.WECHAT_PAY_SERIAL_NO || ''
     this.appId = process.env.WECHAT_PAY_APP_ID || ''
     this.notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL || ''
-    this.privateKey = null
-    this.platformCert = null
-
-    // 加载私钥
-    const keyPath = process.env.WECHAT_PAY_PRIVATE_KEY_PATH || ''
-    if (keyPath && fs.existsSync(keyPath)) {
-      this.privateKey = fs.readFileSync(keyPath, 'utf8')
-    }
-
-    // 加载平台证书
-    const certPath = process.env.WECHAT_PAY_CERT_PATH || ''
-    if (certPath && fs.existsSync(certPath)) {
-      this.platformCert = fs.readFileSync(certPath, 'utf8')
-    }
+    this.privateKey = resolvePemOrPath(process.env.WECHAT_PAY_PRIVATE_KEY_PATH || '')
+    this.platformCert = resolvePemOrPath(process.env.WECHAT_PAY_CERT_PATH || '')
   }
 
-  /**
-   * 检查微信支付是否已配置
-   */
+  /** 管理后台 payment_config → 运行时（DB 优先，空则保留 .env） */
+  applyFromDb(map = {}) {
+    const w = mapToPaymentRuntime(map).wechat
+    if (w.enabled) this._adminEnabled = true
+    else if (w.disabledExplicit) {
+      const touched = ['wx_mch_id', 'wx_app_id', 'wx_api_v3_key', 'wx_serial_no', 'wx_private_key', 'wx_notify_url']
+        .some((k) => (map[k] || '').trim())
+      this._adminEnabled = touched ? false : null
+    } else this._adminEnabled = null
+
+    if (w.mchId) this.mchId = w.mchId
+    if (w.appId) this.appId = w.appId
+    if (w.apiV3Key) this.apiV3Key = w.apiV3Key
+    if (w.serialNo) this.serialNo = w.serialNo
+    if (w.notifyUrl) this.notifyUrl = w.notifyUrl
+    if (w.privateKey) this.privateKey = w.privateKey
+    if (w.platformCert) this.platformCert = w.platformCert
+  }
+
   isConfigured() {
     return !!(this.mchId && this.apiV3Key && this.serialNo && this.privateKey && this.appId)
+  }
+
+  isActive() {
+    if (this._adminEnabled === false) return false
+    return this.isConfigured() && (this._adminEnabled === true || this._adminEnabled === null)
   }
 
   /**
@@ -117,8 +140,8 @@ class WechatPay {
    */
   verifyNotifySignature(timestamp, nonce, body, signature) {
     if (!this.platformCert) {
-      console.warn('微信支付平台证书未配置，跳过签名验证')
-      return true // 如果没有平台证书，暂时跳过验证（生产环境必须配置）
+      console.error('微信支付平台证书未配置，拒绝验签')
+      return false
     }
     const message = `${timestamp}\n${nonce}\n${body}\n`
     const verify = crypto.createVerify('RSA-SHA256')
@@ -218,19 +241,48 @@ class WechatPay {
 
 class Alipay {
   constructor() {
+    this.appId = ''
+    this.privateKey = ''
+    this.alipayPublicKey = ''
+    this.notifyUrl = ''
+    this.returnUrl = ''
+    this.gateway = 'https://openapi.alipay.com/gateway.do'
+    this._adminEnabled = null
+    this._applyFromEnv()
+  }
+
+  _applyFromEnv() {
     this.appId = process.env.ALIPAY_APP_ID || ''
     this.privateKey = process.env.ALIPAY_PRIVATE_KEY || ''
     this.alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY || ''
     this.notifyUrl = process.env.ALIPAY_NOTIFY_URL || ''
     this.returnUrl = process.env.ALIPAY_RETURN_URL || ''
-    this.gateway = 'https://openapi.alipay.com/gateway.do' // 生产环境网关
   }
 
-  /**
-   * 检查支付宝是否已配置
-   */
+  applyFromDb(map = {}) {
+    const a = mapToPaymentRuntime(map).alipay
+    if (a.enabled) this._adminEnabled = true
+    else if (a.disabledExplicit) {
+      const touched = ['ali_app_id', 'ali_private_key', 'ali_public_key', 'ali_notify_url', 'ali_return_url']
+        .some((k) => (map[k] || '').trim())
+      this._adminEnabled = touched ? false : null
+    } else this._adminEnabled = null
+
+    if (a.appId) this.appId = a.appId
+    if (a.privateKey) this.privateKey = a.privateKey
+    if (a.alipayPublicKey) this.alipayPublicKey = a.alipayPublicKey
+    if (a.notifyUrl) this.notifyUrl = a.notifyUrl
+    if (a.returnUrl) this.returnUrl = a.returnUrl
+    if (a.gateway) this.gateway = a.gateway
+  }
+
   isConfigured() {
     return !!(this.appId && this.privateKey && this.alipayPublicKey)
+  }
+
+  isActive() {
+    if (this._adminEnabled === false) return false
+    return this.isConfigured() && (this._adminEnabled === true || this._adminEnabled === null)
   }
 
   /**
@@ -674,11 +726,19 @@ const codePay = new CodePay()
  */
 export function getPaymentChannels() {
   return {
-    wechat: wechatPay.isConfigured(),
-    alipay: alipay.isConfigured(),
+    wechat: wechatPay.isActive(),
+    alipay: alipay.isActive(),
     epay: easyPay.isConfigured(),
     codepay: codePay.isConfigured(),
   }
+}
+
+/** 启动或保存后台配置后，从 payment_config 表刷新支付运行时 */
+export async function reloadPaymentFromDb() {
+  const map = await loadPaymentConfigMap()
+  wechatPay.applyFromDb(map)
+  alipay.applyFromDb(map)
+  return getPaymentChannels()
 }
 
 /**

@@ -1,5 +1,23 @@
+/**
+ * @fileoverview 申诉全流程指导面板
+ * @description 右侧滑出面板，包含申诉流程指导、投诉回复话术、95017电话话术三大模块
+ * @module AppealGuidePanel
+ * 
+ * 核心功能：
+ * 1. 申诉进度追踪 — 可视化进度条，支持状态更新（已生成→已提交→审核中→通过/驳回）
+ * 2. 智能重申策略 — 被驳回后 AI 生成改进方案（改进行动、补充材料、文案修改）
+ * 3. 成功率评估 — 展示申诉成功率百分比、风险因素、积极因素
+ * 4. 流程步骤 — 可展开的步骤列表，含材料清单勾选、操作步骤、提示
+ * 5. 投诉话术 — 按投诉类型生成首次回复、处理方案、结单引导话术
+ * 6. 电话话术 — 拨打 95017 的准备信息、步骤脚本、注意事项
+ */
+
 import React, { useState, useEffect } from 'react'
 
+/**
+ * 优先级配色方案
+ * @description 用于步骤卡片和改进行动的优先级标签
+ */
 const PRIORITY_COLORS = {
   urgent: 'bg-red-50 border-red-200 text-red-700',
   required: 'bg-blue-50 border-blue-200 text-blue-700',
@@ -8,12 +26,24 @@ const PRIORITY_COLORS = {
   info: 'bg-gray-50 border-gray-200 text-gray-500',
 }
 
+/**
+ * 优先级标签映射
+ * @description 将优先级键名映射为中文显示
+ */
 const PRIORITY_LABELS = {
   urgent: '紧急', required: '必须', recommended: '建议', important: '重要', info: '了解',
 }
 
+/**
+ * 投诉类型选项
+ * @description 用于选择投诉类型生成对应话术
+ */
 const COMPLAINT_TYPES = ['退款', '服务不满意', '商品问题', '未收到货', '其他']
 
+/**
+ * 申诉进度状态定义
+ * @description 定义申诉流程的各个阶段及其图标和颜色
+ */
 const APPEAL_STATUSES = [
   { key: 'generated', label: '已生成', icon: '📝', color: 'gray' },
   { key: 'submitted', label: '已提交', icon: '📤', color: 'blue' },
@@ -22,7 +52,41 @@ const APPEAL_STATUSES = [
   { key: 'rejected', label: '驳回', icon: '❌', color: 'red' },
 ]
 
-export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders }) {
+/**
+ * 申诉全流程指导面板主组件
+ * @description 三标签页面板：申诉流程指导、投诉回复话术、95017电话话术
+ * 
+ * Tab 1 — 申诉流程指导：
+ * - 申诉进度追踪（进度条 + 状态更新按钮）
+ * - 智能重申策略（驳回后生成改进方案）
+ * - 结果反馈建议（通过/驳回/提交的后续提示）
+ * - 成功率评估卡片（百分比 + 风险因素）
+ * - 流程步骤（可展开，含材料清单勾选）
+ * 
+ * Tab 2 — 投诉回复话术：
+ * - 投诉类型选择器（退款/服务/商品/未收到货/其他）
+ * - 时间线提醒（处理时间要求）
+ * - 话术模板（首次回复/处理方案/结单引导，支持一键复制）
+ * 
+ * Tab 3 — 95017电话话术：
+ * - 拨打前准备信息
+ * - 分步拨打指南
+ * - 参考话术脚本（支持复制）
+ * - 注意事项
+ * - 一键拨打按钮
+ * 
+ * @param {Object} props
+ * @param {string} props.sessionId - 会话 ID
+ * @param {Function} props.onClose - 关闭面板回调
+ * @param {Function} props.getAuthHeaders - 获取认证请求头回调 () => {Authorization: 'Bearer xxx'}
+ */
+const READINESS_LABELS = {
+  minimal: { label: '信息不足', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  actionable: { label: '可生成指导', color: 'bg-sky-50 text-sky-800 border-sky-200' },
+  report_ready: { label: '信息较完整', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+}
+
+export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders, dataVersion = 0 }) {
   const [tab, setTab] = useState('guide') // guide | reply | phone
   const [guide, setGuide] = useState(null)
   const [reply, setReply] = useState(null)
@@ -39,6 +103,7 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
   const [resultFeedback, setResultFeedback] = useState(null) // {type, title, tips[]}
   const [resubmitStrategy, setResubmitStrategy] = useState(null)
   const [strategyLoading, setStrategyLoading] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   useEffect(() => {
     if (sessionId) {
@@ -47,6 +112,29 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
       loadProgress()
     }
   }, [sessionId])
+
+  useEffect(() => {
+    if (sessionId && dataVersion > 0) {
+      loadGuide()
+      loadReply(selectedComplaintType)
+    }
+  }, [dataVersion])
+
+  useEffect(() => {
+    if (!guide) return
+    const precheck = {}
+    if (guide.suggested_material_checks && typeof guide.suggested_material_checks === 'object') {
+      for (const [name, on] of Object.entries(guide.suggested_material_checks)) {
+        if (on) precheck[name] = true
+      }
+    }
+    if (Array.isArray(guide.auto_checked_materials)) {
+      for (const name of guide.auto_checked_materials) precheck[name] = true
+    }
+    if (Object.keys(precheck).length) {
+      setCheckedMaterials(prev => ({ ...prev, ...precheck }))
+    }
+  }, [guide?.suggested_material_checks, guide?.auto_checked_materials])
 
   async function loadProgress() {
     try {
@@ -158,17 +246,39 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
     finally { setStrategyLoading(false) }
   }
 
-  async function loadGuide() {
+  async function loadGuide(opts = {}) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/appeal-guide`, { headers: getAuthHeaders() })
+      const q = opts.regenerate ? '?regenerate=1' : ''
+      const res = await fetch(`/api/sessions/${sessionId}/appeal-guide${q}`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setGuide(data)
       if (data.steps?.length > 0) setExpandedStep(data.steps[0].id)
+      if (data.auto_checked_materials?.length) {
+        const pre = {}
+        for (const name of data.auto_checked_materials) pre[name] = true
+        setCheckedMaterials(prev => ({ ...pre, ...prev }))
+      }
+      if (data.material_checks && typeof data.material_checks === 'object') {
+        setCheckedMaterials(prev => ({ ...prev, ...data.material_checks }))
+      }
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
+  }
+
+  async function regenerateGuide() {
+    setRegenerating(true)
+    try {
+      await fetch(`/api/sessions/${sessionId}/appeal-guide/generate`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      })
+      await loadGuide({ regenerate: true })
+      await loadReply(selectedComplaintType)
+    } catch (e) { setError(e.message || '重新生成失败') }
+    finally { setRegenerating(false) }
   }
 
   async function loadReply(type) {
@@ -210,10 +320,59 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
     if (error) return <div className="text-center py-10"><p className="text-sm text-red-500 bg-red-50 rounded-lg px-4 py-3 mx-4">{error}</p><button onClick={loadGuide} className="mt-3 text-sm text-blue-500">重试</button></div>
     if (!guide) return null
 
-    const { success_estimate, violation_info } = guide
+    const { success_estimate, violation_info, industry_context, completeness, missing_fields } = guide
+    const readiness = completeness?.readiness || 'minimal'
+    const readinessMeta = READINESS_LABELS[readiness] || READINESS_LABELS.minimal
+    const noIndustry = !industry_context?.key && !(violation_info?.industry && violation_info.industry !== '未知')
 
     return (
       <div className="space-y-3">
+        <div className="rounded-xl p-3 border border-gray-100 bg-white shadow-sm space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-gray-800">
+                🏭 {industry_context?.key || violation_info?.industry || '行业未识别'}
+              </p>
+              {industry_context?.appealTips && (
+                <p className="text-[10px] text-gray-500 mt-1 leading-relaxed line-clamp-3" title={industry_context.appealTips}>
+                  {industry_context.appealTips}
+                </p>
+              )}
+            </div>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium flex-shrink-0 ${readinessMeta.color}`}>
+              {readinessMeta.label}
+            </span>
+          </div>
+          {missing_fields?.length > 0 && (
+            <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5 border border-amber-100">
+              还缺关键信息：{missing_fields.slice(0, 4).join('、')}{missing_fields.length > 4 ? '…' : ''}
+            </p>
+          )}
+          {guide.industry_tip && (
+            <p className="text-[10px] text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 border border-emerald-100">
+              🏭 {guide.industry_tip}
+            </p>
+          )}
+          {noIndustry && (
+            <p className="text-[10px] text-indigo-700 bg-indigo-50 rounded-lg px-2 py-1.5 border border-indigo-100">
+              请先在左侧对话中说明您的行业与经营场景，指导内容才会按行业定制。
+            </p>
+          )}
+          {readiness !== 'minimal' && (
+            <button
+              type="button"
+              onClick={regenerateGuide}
+              disabled={regenerating || loading}
+              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+            >
+              {regenerating ? '⏳ AI 生成中…' : '🔄 重新生成行业化指导'}
+            </button>
+          )}
+          {guide.snapshot_meta?.reason === 'generated' && (
+            <p className="text-[9px] text-gray-400">已更新 AI 行业化快照</p>
+          )}
+        </div>
+
         {/* 申诉进度追踪 */}
         {appealProgress && (
           <div className="rounded-xl p-4 border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-purple-50/50">
@@ -546,6 +705,20 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
           </div>
         </div>
 
+        {reply.ai_enhanced && (
+          <p className="text-[10px] text-indigo-600 bg-indigo-50 rounded-lg px-2 py-1.5 border border-indigo-100">
+            ✨ 已根据您的行业信息增强话术（{reply.industry_context?.key || reply.industry}）
+          </p>
+        )}
+        {reply.complaint_hints?.length > 0 && (
+          <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+            <p className="text-[10px] font-bold text-emerald-800 mb-1">行业提示</p>
+            {reply.complaint_hints.map((h, i) => (
+              <p key={i} className="text-[10px] text-emerald-700">• {h}</p>
+            ))}
+          </div>
+        )}
+
         {/* 时间线提醒 */}
         <div className="bg-red-50 rounded-xl p-3 border border-red-100">
           <h4 className="text-xs font-bold text-red-700 mb-1.5">⏰ 投诉处理时间要求</h4>
@@ -611,6 +784,21 @@ export default function AppealGuidePanel({ sessionId, onClose, getAuthHeaders })
             ))}
           </div>
         </div>
+
+        {ps.followup && (
+          <div className="bg-white rounded-xl p-3.5 border border-indigo-100">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-indigo-700">🔄 催审跟进话术</h4>
+              <button onClick={() => copyText(ps.followup, 'phone_followup')}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all ${
+                  copiedKey === 'phone_followup' ? 'bg-green-500 text-white' : 'bg-gray-50 text-gray-500 border border-gray-200 hover:border-blue-300'
+                }`}>{copiedKey === 'phone_followup' ? '✓ 已复制' : '复制'}</button>
+            </div>
+            <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+              {ps.followup}
+            </div>
+          </div>
+        )}
 
         {/* 话术脚本 */}
         <div className="bg-white rounded-xl p-3.5 border border-gray-100">

@@ -13,17 +13,7 @@
  * 9. 定时任务 — 30分钟分析 / 2小时升降级 / 每日聚合+聚类
  */
 
-import { getSystemConfig, getActiveAIModel } from './db.js'
-
-// 内联 AI provider 配置（避免与 ai.js 循环依赖）
-async function getAIConfig() {
-  const active = await getActiveAIModel()
-  if (active) return { provider: active.provider, apiKey: active.api_key, model: active.model_name, endpoint: active.endpoint }
-  // 回退
-  const provider = (await getSystemConfig('ai_provider')) || 'deepseek'
-  if (provider === 'zhipu') return { provider, apiKey: await getSystemConfig('zhipu_api_key'), model: (await getSystemConfig('zhipu_model')) || 'glm-4.7-flash', endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions' }
-  return { provider, apiKey: await getSystemConfig('deepseek_api_key'), model: (await getSystemConfig('deepseek_model')) || 'deepseek-chat', endpoint: 'https://api.deepseek.com/chat/completions' }
-}
+import { getAIConfig } from './shared/aiConfig.js'
 import {
   saveConversationAnalysis, getUnanalyzedSessions, getActiveRules, getAllAIRules, getAIRuleById,
   createAIRule, updateRuleEffectiveness, incrementRuleUsage,
@@ -49,6 +39,34 @@ const ANALYSIS_COOLDOWN = 10 * 60 * 1000 // 同一session 10分钟内不重复�
 /** 每小时分析配额：防止API费用失控 */
 let _analysisQuota = { count: 0, resetAt: 0 }
 const MAX_ANALYSES_PER_HOUR = 30
+
+/** 有效的 category ENUM 值 */
+const VALID_CATEGORIES = new Set([
+  'collection_strategy', 'question_template', 'industry_knowledge',
+  'violation_strategy', 'conversation_pattern', 'diagnosis_rule',
+  'empathy', 'efficiency', 'other',
+])
+
+/** 将 AI 返回的建议类型映射为合法的 category ENUM 值 */
+function normalizeCategory(type) {
+  if (!type || typeof type !== 'string') return 'other'
+  const normalized = type.toLowerCase().trim()
+  if (VALID_CATEGORIES.has(normalized)) return normalized
+  // 模糊匹配常见变体
+  const ALIASES = {
+    'collections': 'collection_strategy', 'collect': 'collection_strategy',
+    'question': 'question_template', 'template': 'question_template', 'questions': 'question_template',
+    'industry': 'industry_knowledge', 'knowledge': 'industry_knowledge',
+    'violation': 'violation_strategy', 'strategy': 'violation_strategy',
+    'conversation': 'conversation_pattern', 'pattern': 'conversation_pattern',
+    'diagnosis': 'diagnosis_rule', 'diagnose': 'diagnosis_rule',
+    'empathetic': 'empathy', 'emotion': 'empathy',
+    'efficient': 'efficiency',
+  }
+  if (ALIASES[normalized]) return ALIASES[normalized]
+  console.log(`[Evolution] 无法识别的规则类型 "${type}"，归类为 "other"`)
+  return 'other'
+}
 
 function checkAnalysisQuota() {
   const now = Date.now()
@@ -347,9 +365,13 @@ ${conversationSummary}
     const data = await response.json()
     const rawText = data.choices?.[0]?.message?.content || ''
     const usage = data.usage || {}
-    // 记录系统级token消耗
     try {
-      await recordTokenUsage({ userId: 0, sessionId: null, type: 'evolution_analysis', inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0, cost: 0, multiplier: 1, apiMode: 'system' })
+      const { trackAIUsage, isUsageTrackerReady } = await import('./ai/usageTracker.js')
+      if (isUsageTrackerReady() && usage) {
+        await trackAIUsage({ userId: 0, type: 'evolution_analysis', usage, provider: cfg.provider, modelName: cfg.model })
+      } else {
+        await recordTokenUsage({ userId: 0, sessionId: null, type: 'evolution_analysis', inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0, cost: 0, multiplier: 1, apiMode: 'system' })
+      }
     } catch {}
 
     try {
@@ -402,7 +424,7 @@ export async function generateRulesFromAnalysis(analysis) {
     if (!proposal.category || !proposal.ruleKey) continue
     try {
       const result = await createAIRule({
-        category: proposal.category,
+        category: normalizeCategory(proposal.category),
         ruleKey: proposal.ruleKey,
         ruleName: proposal.ruleName || proposal.ruleKey,
         ruleContent: proposal.content || {},
@@ -425,7 +447,7 @@ export async function generateRulesFromAnalysis(analysis) {
     const ruleKey = `sug_${sug.type}_${sug.field || 'general'}_${Date.now()}`
     try {
       const result = await createAIRule({
-        category: sug.type,
+        category: normalizeCategory(sug.type),
         ruleKey,
         ruleName: sug.recommended?.slice(0, 100) || sug.reason?.slice(0, 100) || ruleKey,
         ruleContent: {
@@ -532,7 +554,12 @@ export async function autoReviewRule(ruleId) {
     const rawText = data.choices?.[0]?.message?.content || ''
     const usage = data.usage || {}
     try {
-      await recordTokenUsage({ userId: 0, sessionId: null, type: 'auto_review', inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0, cost: 0, multiplier: 1, apiMode: 'system' })
+      const { trackAIUsage, isUsageTrackerReady } = await import('./ai/usageTracker.js')
+      if (isUsageTrackerReady() && usage) {
+        await trackAIUsage({ userId: 0, type: 'auto_review', usage, provider: cfg.provider, modelName: cfg.model })
+      } else {
+        await recordTokenUsage({ userId: 0, sessionId: null, type: 'auto_review', inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0, cost: 0, multiplier: 1, apiMode: 'system' })
+      }
     } catch {}
     let parsed
     try { parsed = JSON.parse(rawText) } catch {
@@ -622,6 +649,9 @@ export async function loadActiveRulesForPrompt() {
     violation_strategy: '违规应对策略',
     conversation_pattern: '对话模式优化',
     diagnosis_rule: '诊断规则',
+    empathy: '共情表达优化',
+    efficiency: '对话效率优化',
+    other: '其他优化规则',
   }
 
   const sections = {}
@@ -635,15 +665,25 @@ export async function loadActiveRulesForPrompt() {
     }
   }
 
+  const RULE_DESC_MAX = 200
+  const PROMPT_MAX_CHARS = 4000
+
   let prompt = '\n\n## 🧠 AI自学习规则库（基于历史对话优化）\n'
   for (const [key, label] of Object.entries(SECTION_CONFIG)) {
     if (sections[key].length === 0) continue
     prompt += `\n### ${label}\n`
     for (const r of sections[key]) {
       const c = r.rule_content
-      const desc = c.description || c.action || c.template || (typeof c === 'string' ? c : JSON.stringify(c))
+      let desc = c.description || c.action || c.template || (typeof c === 'string' ? c : JSON.stringify(c))
+      if (desc.length > RULE_DESC_MAX) desc = `${desc.slice(0, RULE_DESC_MAX)}…`
       prompt += `- **${r.rule_name}**: ${desc}\n`
+      if (prompt.length >= PROMPT_MAX_CHARS) break
     }
+    if (prompt.length >= PROMPT_MAX_CHARS) break
+  }
+  if (prompt.length > PROMPT_MAX_CHARS) {
+    prompt = `${prompt.slice(0, PROMPT_MAX_CHARS)}…\n`
+    console.warn(`[Evolution] 规则 prompt 已截断至 ${PROMPT_MAX_CHARS} 字符`)
   }
 
   // 异步批量更新使用次数
@@ -1298,7 +1338,7 @@ export async function runExplorationCycle() {
 
       // 创建探索性规则
       const ruleResult = await createAIRule({
-        category: sug.type || 'conversation_pattern',
+        category: normalizeCategory(sug.type || 'conversation_pattern'),
         ruleKey,
         ruleName: `[探索] ${sug.field || sug.type} 优化`,
         ruleContent: {

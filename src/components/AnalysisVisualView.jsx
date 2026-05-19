@@ -1,13 +1,14 @@
 import React from 'react'
+import DOMPurify from 'dompurify'
 
 // 清理 markdown 标记，返回纯净 HTML
 function mdToHtml(text) {
   if (!text) return ''
-  return text
+  return DOMPurify.sanitize(text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">$1</code>')
+    .replace(/`(.*?)`/g, '<code class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">$1</code>'))
 }
 
 // 清理 markdown 标记，返回纯文本

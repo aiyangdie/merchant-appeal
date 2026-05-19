@@ -1,35 +1,119 @@
-import React, { useState, useEffect, useCallback } from 'react'
+/**
+ * @fileoverview 管理员后台页面
+ * 系统管理员的全功能运营和管理面板，包含14个子模块
+ *
+ * 核心功能模块：
+ *   - 仪表盘：系统概览、会话统计、用户活跃、收入趋势、案件处理效率
+ *   - 知识库：规则管理和知识条目管理
+ *   - 数据分析：用户行为、会话趋势、功能使用统计
+ *   - 用户管理：用户列表、搜索、余额调整、删除
+ *   - 订单管理：闲管家订单查看、状态筛选、发货管理、地址查看
+ *   - 充值管理：充值记录、支付方式配置
+ *   - AI模型：模型配置、健康检查、Token使用统计
+ *   - Token明细：用户Token消费、功能分类、每日趋势
+ *   - DS余额：DeepSeek API 余额查询和管理
+ *   - AI日志：AI 活动日志、调用记录
+ *   - AI进化：自进化引擎、规则库、对话分析、知识聚合
+ *   - 商品管理：商城商品 CRUD、AI 辅助生成、推荐统计
+ *   - 日程安排：日程创建、编辑、状态切换
+ *   - 监控告警：系统资源、进程、数据库连接池、告警管理
+ *   - 数据备份：手动/自动备份、备份历史、删除管理
+ *   - 系统设置：基本设置、AI配置、支付配置、安全设置、闲管家配置
+ *
+ * 子组件：
+ *   - MiniChart: 迷你柱状图（用于趋势展示）
+ *   - HourlyChart: 24小时分布图
+ *   - ConfigField: 配置项编辑器（支持开关/模式/文本/数字/密码/URL等类型）
+ *   - SessionItem: 会话列表项
+ * 关键依赖：
+ *   - useNavigate (react-router-dom): 路由导航
+ *   - orderUtils: 订单格式化工具函数
+ *   - 各类 Panel 组件: 功能子面板
+ *
+ * 注意事项：
+ *   - 文件非常大（>128KB），包含大量内联逻辑
+ *   - SENSITIVE_KEYS 定义了需要密码掩码的配置项
+ *   - ConfigField 自动推断输入类型（toggle/mode/textarea/number/url/sensitive）
+ *   - 所有管理操作需要管理员认证（通过 getAuthHeaders 或 token）
+ */
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import DOMPurify from 'dompurify'
 import { useNavigate } from 'react-router-dom'
+import { formatOrderAmount, formatOrderStatusLabel, formatRefundStatusLabel, formatFullAddress, formatConsignLabel, ORDER_STATUS_MAP, REFUND_STATUS_MAP } from '../utils/orderUtils'
 import ChatMessage from '../components/ChatMessage'
 import ReportCard from '../components/ReportCard'
 import AnalysisVisualView from '../components/AnalysisVisualView'
-import EvolutionPanel from '../components/EvolutionPanel'
-import MallPanel from '../components/MallPanel'
-import ContactCardsPanel from '../components/ContactCardsPanel'
 import AIActivityPanel from '../components/AIActivityPanel'
 import TokenPanel from '../components/TokenPanel'
+import AnalyticsPanel from '../components/AnalyticsPanel'
+import { getTokenTypeMeta } from '../constants/tokenUsageTypes.js'
 import AIModelsPanel from '../components/AIModelsPanel'
 import MonitorPanel from '../components/MonitorPanel'
 import BackupPanel from '../components/BackupPanel'
+import SchedulePanel from '../components/SchedulePanel'
+import UsersPanel from '../components/UsersPanel'
+import MallPanel from '../components/MallPanel'
+import EvolutionPanel from '../components/EvolutionPanel'
+import SessionChatboardPanel from '../components/SessionChatboardPanel'
+import PaymentSettingsGuide, { getPaymentFieldHint } from '../components/PaymentSettingsGuide'
+import OpsCenterPanel from '../components/OpsCenterPanel'
+import AdminAiTabLayout from '../components/AdminAiTabLayout'
+import XianyuPanel from '../components/XianyuPanel'
+import XianyuDashboard from '../components/XianyuDashboard'
+import AuditLogPanel from '../components/AuditLogPanel'
+import FloatingAdminAi from '../components/FloatingAdminAi.jsx'
 
-const TABS = [
-  { key: 'dashboard', label: '仪表盘', icon: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5' },
-  { key: 'sessions', label: '聊天记录', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-  { key: 'users', label: '用户管理', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
-  { key: 'knowledge', label: '知识库', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
-  { key: 'analytics', label: '数据分析', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
-  { key: 'settings', label: '设置', icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-  { key: 'recharge', label: '充值管理', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { key: 'ai-models', label: 'AI模型', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z' },
-  { key: 'evolution', label: 'AI进化', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V5.846a3 3 0 00-.879-2.121l-.22-.22a3 3 0 00-2.121-.879H8.22a3 3 0 00-2.121.879l-.22.22A3 3 0 005 5.846V14.5' },
-  { key: 'mall', label: '智能商城', icon: 'M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z' },
-  { key: 'contact-cards', label: '名片管理', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z' },
-  { key: 'ai-activity', label: 'AI日志', icon: 'M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z' },
-  { key: 'tokens', label: 'Token明细', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { key: 'deepseek-balance', label: 'DS余额', icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z' },
-  { key: 'monitor', label: '监控告警', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
-  { key: 'backup', label: '数据备份', icon: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125' },
+/** 标签页分组配置：定义管理后台的导航结构 */
+const TAB_GROUPS = [
+  {
+    label: '核心功能',
+    items: [
+      { key: 'dashboard', label: '仪表盘', icon: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5' },
+      { key: 'sessions', label: '用户对话', icon: 'M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z' },
+      { key: 'session-chatboard', label: '会话看板', icon: 'M4 6h16M4 10h16M4 14h10M4 18h8' },
+      { key: 'ops-center', label: '运营中心', badge: '新', icon: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5' },
+      { key: 'knowledge', label: '知识库', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
+      { key: 'analytics', label: '数据分析', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
+      { key: 'users', label: '用户管理', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
+      { key: 'orders', label: '订单管理', icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z' },
+      { key: 'recharge', label: '充值管理', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+    ]
+  },
+  {
+    label: '闲鱼运营',
+    items: [
+      { key: 'xianyu', label: '闲鱼运营', badge: '闲', icon: 'M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3a3 3 0 013-3h6a3 3 0 013 3m-12.75 0V7.5A2.25 2.25 0 019 5.25h6a2.25 2.25 0 012.25 2.25v6.75' },
+    ]
+  },
+  {
+    label: 'AI 智能',
+    items: [
+      { key: 'ai-models', label: 'AI模型', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5' },
+      { key: 'tokens', label: 'Token明细', icon: 'M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75zM5.625 10.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75zM5.625 16.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z' },
+      { key: 'deepseek-balance', label: 'DS余额', icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z' },
+      { key: 'ai-activity', label: 'AI日志', icon: 'M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z' },
+      { key: 'evolution', label: 'AI进化', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
+    ]
+  },
+  {
+    label: '商城运营',
+    items: [
+      { key: 'mall', label: '商品管理', icon: 'M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3a3 3 0 013-3h6a3 3 0 013 3m-12.75 0V7.5A2.25 2.25 0 019 5.25h6a2.25 2.25 0 012.25 2.25v6.75' },
+    ]
+  },
+  {
+    label: '系统运维',
+    items: [
+      { key: 'schedule', label: '日程安排', icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5' },
+      { key: 'monitor', label: '监控告警', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
+      { key: 'backup', label: '数据备份', icon: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125' },
+      { key: 'audit-log', label: '资金流水', icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z' },
+      { key: 'settings', label: '系统设置', icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l1.004-.828a1.125 1.125 0 01.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+    ]
+  },
 ]
+
+const TABS = TAB_GROUPS.flatMap(g => g.items)
 
 const SETTINGS_SUB_TABS = [
   { key: 'general', label: '基本设置', icon: '🏠' },
@@ -37,8 +121,8 @@ const SETTINGS_SUB_TABS = [
   { key: 'rechargeConfig', label: '充值设置', icon: '💰' },
   { key: 'wechat', label: '微信支付', icon: '💚' },
   { key: 'alipay', label: '支付宝', icon: '🔵' },
-  { key: 'contact', label: '技术名片', icon: '📇' },
   { key: 'security', label: '安全设置', icon: '🔒' },
+  { key: 'xianyu', label: '闲管家配置', icon: '🐟' },
 ]
 
 const SENSITIVE_KEYS = ['api_key', 'api_v3_key', 'private_key', 'password', 'serial_no', 'public_key']
@@ -48,6 +132,21 @@ const ACTION_LABELS = {
   login: { label: '登录', color: 'bg-blue-100 text-blue-700' },
   chat: { label: '聊天', color: 'bg-purple-100 text-purple-700' },
   balance: { label: '余额', color: 'bg-orange-100 text-orange-700' },
+}
+
+const COLLECTED_DATA_LABELS = {
+  industry: '行业类型',
+  violation_type: '违规类型',
+  merchant_id: '商户号',
+  platform: '平台',
+  reason: '违规原因',
+  contact: '联系方式',
+  company_name: '公司名称',
+  appeal_content: '申诉内容',
+  supplementary: '补充说明',
+  phone: '手机号',
+  email: '邮箱',
+  name: '姓名',
 }
 
 // Mini bar chart component
@@ -81,7 +180,13 @@ function HourlyChart({ data }) {
 function ConfigField({ cfg, idx, configs, setConfigs }) {
   const k = cfg.config_key
   const v = cfg.config_value || ''
-  const update = val => { const u = [...configs]; u[idx] = { ...u[idx], config_value: val }; setConfigs(u) }
+  const update = val => {
+    const u = [...configs]
+    const i = idx >= 0 ? idx : u.findIndex(c => c.config_key === k)
+    if (i >= 0) u[i] = { ...u[i], config_value: val }
+    else u.push({ config_key: k, config_value: val, config_label: cfg.config_label || k, config_group: cfg.config_group || 'general' })
+    setConfigs(u)
+  }
   const isSensitive = SENSITIVE_KEYS.some(s => k.includes(s))
   const [showPwd, setShowPwd] = useState(false)
 
@@ -110,6 +215,7 @@ function ConfigField({ cfg, idx, configs, setConfigs }) {
         )}
       </div>
       <p className="text-[11px] text-gray-400 mb-2">{k}</p>
+      {getPaymentFieldHint(k) ? <p className="text-[11px] text-blue-600/90 mb-2 leading-relaxed">{getPaymentFieldHint(k)}</p> : null}
 
       {isToggle ? (
         <span className={`text-xs font-medium ${v === '1' ? 'text-green-600' : 'text-gray-400'}`}>{v === '1' ? '已开启' : '已关闭'}</span>
@@ -194,7 +300,8 @@ function SessionItem({ s, selectedSession, selectSession, handleDeleteSession, t
   )
 }
 
-function UserCard({ u, balanceInputs, setBalanceInputs, handleAdjustBalance, handleDeleteUser, fmtTime, timeAgo }) {
+function __DEAD_START_UserCard() {
+  return null
   const bal = parseFloat(u.balance || 0)
   const spent = parseFloat(u.total_spent || 0)
   const msgs = u.total_messages || 0
@@ -279,26 +386,53 @@ export default function AdminPage() {
   const [stats, setStats] = useState(null)
   const [systemConfigs, setSystemConfigs] = useState([])
   const [paymentConfigs, setPaymentConfigs] = useState([])
+  const [paymentChannels, setPaymentChannels] = useState({})
   const [saving, setSaving] = useState(false)
+  const [xianyuRawText, setXianyuRawText] = useState('')
+  const [parsingXianyu, setParsingXianyu] = useState(false)
   const [toast, setToast] = useState('')
   const [mobileShowChat, setMobileShowChat] = useState(false)
-  const [users, setUsers] = useState([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [balanceInputs, setBalanceInputs] = useState({})
   const [newPassword, setNewPassword] = useState('')
   const [changingPwd, setChangingPwd] = useState(false)
   const [settingsSubTab, setSettingsSubTab] = useState('general')
   const [adminReply, setAdminReply] = useState('')
   const [sendingReply, setSendingReply] = useState(false)
+  const [sessionSearchQ, setSessionSearchQ] = useState('')
+  const [quickReplies, setQuickReplies] = useState([])
   const [rechargeOrders, setRechargeOrders] = useState([])
   const [loadingRecharge, setLoadingRecharge] = useState(false)
   const [rechargeFilter, setRechargeFilter] = useState('')
+  const [orders, setOrders] = useState([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [orderFilter, setOrderFilter] = useState('')
+  const [orderStatusDropdown, setOrderStatusDropdown] = useState(null)
+  const [xianyuOrders, setXianyuOrders] = useState([])
+  const [xianyuLoading, setXianyuLoading] = useState(false)
+  const [xianyuPage, setXianyuPage] = useState(1)
+  const [xianyuTotal, setXianyuTotal] = useState(0)
+  const [xianyuPageSize] = useState(20)
+  const [xianyuOrderStatus, setXianyuOrderStatus] = useState('')
+  const [xianyuRefundStatus, setXianyuRefundStatus] = useState('')
+  const [xianyuKeyword, setXianyuKeyword] = useState('')
+  const [xianyuSubTab, setXianyuSubTab] = useState('xianyu-dashboard')
+  const [xyModal, setXyModal] = useState(null)
+  const [xyOrder, setXyOrder] = useState(null)
+  const [xyShip, setXyShip] = useState({ expressNo: '', expressCompany: '' })
+  const [xyPrice, setXyPrice] = useState('')
+  const [xyLogistics, setXyLogistics] = useState([])
+  const [xyCards, setXyCards] = useState(null)
+  const [xyBusy, setXyBusy] = useState(false)
   const [appealStats, setAppealStats] = useState(null)
   // 知识库
   const [knowledgeCases, setKnowledgeCases] = useState([])
   const [loadingCases, setLoadingCases] = useState(false)
   const [caseForm, setCaseForm] = useState(null) // null=关闭, {}=新建/编辑
   const [savingCase, setSavingCase] = useState(false)
+  const [caseAiLoading, setCaseAiLoading] = useState(false)
+  const [caseMaterialPrefilled, setCaseMaterialPrefilled] = useState(false)
+  const [caseAnalysisPickerOpen, setCaseAnalysisPickerOpen] = useState(false)
+  const [caseAnalysisOptions, setCaseAnalysisOptions] = useState([])
+  const [caseAnalysisPickerLoading, setCaseAnalysisPickerLoading] = useState(false)
   // 会话详情：收集数据 + AI分析
   const [sessionCollectedData, setSessionCollectedData] = useState({})
   const [sessionAnalysis, setSessionAnalysis] = useState(null)
@@ -325,20 +459,108 @@ export default function AdminPage() {
     const headers = { ...options.headers, 'Authorization': `Bearer ${token}` }
     if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
     return fetch(url, { ...options, headers }).then(async res => {
-      if (res.status === 401) { localStorage.removeItem('admin_token'); navigate('/admin'); throw new Error('unauthorized') }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
+        if (res.status === 401) {
+          // 只有在确认是认证失败时才删除token
+          const errorMsg = errData.error || ''
+          if (errorMsg.includes('过期') || errorMsg.includes('重新登录') || errorMsg.includes('无效')) {
+            localStorage.removeItem('admin_token')
+            navigate('/admin')
+          }
+          throw new Error(errData.error || `请求失败 (${res.status})`)
+        }
         throw new Error(errData.error || `请求失败 (${res.status})`)
       }
       return res
     })
   }, [navigate])
 
+  /** 会话无材料时，自动取最近一条有正文的进化对话分析 */
+  const fetchBestEvolutionMaterial = useCallback(async () => {
+    const listRes = await adminFetch('/api/admin/evolution/analyses?limit=20')
+    const listJ = await listRes.json()
+    if (!listRes.ok) return null
+    const pick = (listJ.analyses || []).find((a) => a.raw_analysis && String(a.raw_analysis).trim().length > 80)
+    if (!pick?.id) return null
+    const cmRes = await adminFetch(`/api/admin/evolution/analyses/${pick.id}/case-material`)
+    const cmJ = await cmRes.json()
+    if (!cmRes.ok || !(cmJ.reportContent || '').trim()) return null
+    return { analysisId: pick.id, ...cmJ }
+  }, [adminFetch])
+
+  // 打开案例弹窗时自动预填：先会话材料，无则回退进化分析
+  useEffect(() => {
+    if (!caseForm) {
+      setCaseMaterialPrefilled(false)
+      return
+    }
+    if ((caseForm.reportContent || '').trim().length >= 40 || caseForm.analysisId) return
+    if (caseMaterialPrefilled) return
+    const sid = caseForm.sessionId || selectedSession
+    let cancelled = false
+    ;(async () => {
+      try {
+        let bundle = null
+        if (sid) {
+          const res = await adminFetch(`/api/admin/sessions/${encodeURIComponent(sid)}/case-material`)
+          const j = await res.json()
+          if (!cancelled && res.ok && (j.reportContent || '').length >= 40) bundle = j
+        }
+        if (!bundle && !cancelled) bundle = await fetchBestEvolutionMaterial()
+        if (cancelled || !bundle?.reportContent || bundle.reportContent.length < 40) return
+        setCaseForm((f) => {
+          if ((f.title || '').trim() && (f.successSummary || '').trim()) return f
+          return {
+            ...f,
+            sessionId: sid || bundle.sessionId || f.sessionId || '',
+            analysisId: bundle.analysisId || f.analysisId,
+            reportContent: bundle.reportContent.slice(0, 8000),
+            title: f.title || bundle.title || '',
+            industry: f.industry || bundle.industry || '',
+            problemType: f.problemType || bundle.problemType || '',
+          }
+        })
+        setCaseMaterialPrefilled(true)
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [caseForm, selectedSession, caseMaterialPrefilled, adminFetch, fetchBestEvolutionMaterial])
+
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
     if (!token) { navigate('/admin'); return }
-    fetchStats()
-    fetchSessions()
+    
+    // 不立即删除token，先尝试验证
+    let cancelled = false
+    async function loadData() {
+      try {
+        const [statsRes, sessionsRes] = await Promise.all([
+          adminFetch('/api/admin/stats'),
+          adminFetch('/api/admin/sessions')
+        ])
+        if (cancelled) return
+        const statsData = await statsRes.json()
+        setStats(statsData)
+        const appealStatsRes = await adminFetch('/api/admin/appeal-stats')
+        if (cancelled) return
+        const appealStatsData = await appealStatsRes.json()
+        setAppealStats(appealStatsData)
+        if (cancelled) return
+        const sessionsData = await sessionsRes.json()
+        setSessions(sessionsData.sessions || [])
+      } catch (e) {
+        // 只有在明确的认证失败时才删除token
+        if (e.message && (e.message.includes('过期') || e.message.includes('重新登录'))) {
+          localStorage.removeItem('admin_token')
+          navigate('/admin')
+        } else {
+          console.error('Load data error:', e)
+        }
+      }
+    }
+    loadData()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -348,41 +570,81 @@ export default function AdminPage() {
     }
   }, [activeTab, dsFetched])
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
+  useEffect(() => {
+    if (!orderStatusDropdown) return
+    const handleClick = () => setOrderStatusDropdown(null)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [orderStatusDropdown])
+
+  const toastHideTimerRef = useRef(null)
+  const showToast = useCallback((msg) => {
+    setToast(msg)
+    if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current)
+    toastHideTimerRef.current = setTimeout(() => setToast(''), 2500)
+  }, [])
 
   async function fetchStats() {
     try { setStats(await (await adminFetch('/api/admin/stats')).json()) } catch (e) { console.error(e) }
     try { setAppealStats(await (await adminFetch('/api/admin/appeal-stats')).json()) } catch {}
   }
   async function fetchSessions(force = false) {
-    if (sessions.length === 0 || force) setLoadingSessions(true)
-    try { setSessions((await (await adminFetch('/api/admin/sessions')).json()).sessions || []) }
+    if (sessions.length === 0 || force || sessionSearchQ.trim()) setLoadingSessions(true)
+    try {
+      const q = sessionSearchQ.trim()
+      const url = q ? `/api/admin/sessions?q=${encodeURIComponent(q)}` : '/api/admin/sessions'
+      const j = await (await adminFetch(url)).json()
+      setSessions(j.sessions || [])
+    }
     catch (e) { console.error(e) } finally { setLoadingSessions(false) }
   }
+  async function fetchQuickReplies() {
+    try {
+      const j = await (await adminFetch('/api/admin/ops/quick-replies')).json()
+      setQuickReplies(j.items || [])
+    } catch (e) { console.error(e) }
+  }
+  function applyCollectedDataFromSession(sessionObj) {
+    if (!sessionObj?.collected_data || typeof sessionObj.collected_data !== 'object') {
+      setSessionCollectedData({})
+      return
+    }
+    const clean = {}
+    for (const [k, v] of Object.entries(sessionObj.collected_data)) {
+      if (k.startsWith('_')) continue
+      clean[k] = typeof v === 'string' ? v : (v != null ? String(v) : '')
+    }
+    setSessionCollectedData(clean)
+  }
+
   async function selectSession(id) {
     setSelectedSession(id); setLoadingMessages(true); setMobileShowChat(true); setAdminDetailTab('chat')
     setSessionCollectedData({}); setSessionAnalysis(null); setSessionInfoFields([]); setDeepAnalysisResult(null)
     try {
-      const [msgRes, infoRes, analysisRes, deepRes] = await Promise.all([
-        adminFetch(`/api/admin/sessions/${id}/messages`).then(r => r.json()),
-        adminFetch(`/api/sessions/${id}/info`).then(r => r.ok ? r.json() : null).catch(() => null),
-        adminFetch(`/api/sessions/${id}/analysis`).then(r => r.ok ? r.json() : null).catch(() => null),
-        adminFetch(`/api/sessions/${id}/deep-analysis-result`).then(r => r.ok ? r.json() : null).catch(() => null),
+      const [msgHttp, analysisRes] = await Promise.all([
+        adminFetch(`/api/admin/sessions/${id}/messages`),
+        adminFetch(`/api/admin/sessions/${id}/analysis`).then(r => r.ok ? r.json() : null).catch(() => null),
       ])
-      setMessages(msgRes.messages || []); setSessionDetail(msgRes.session || null)
-      if (infoRes) {
-        const raw = infoRes.collectedData || {}
-        const clean = {}
-        for (const [k, v] of Object.entries(raw)) {
-          if (k.startsWith('_')) continue
-          clean[k] = typeof v === 'string' ? v : (v != null ? String(v) : '')
+      const msgRes = await msgHttp.json()
+      if (!msgHttp.ok || !msgRes.session) {
+        showToast(msgRes.error || '会话已删除或不存在')
+        setSelectedSession(null)
+        setMessages([])
+        setSessionDetail(null)
+        if (msgHttp.status === 404) {
+          setSessions((p) => p.filter((s) => s.id !== id))
         }
-        setSessionCollectedData(clean)
-        setSessionInfoFields(infoRes.fields || [])
+        return
       }
-      if (analysisRes) setSessionAnalysis(analysisRes)
-      if (deepRes?.result) setDeepAnalysisResult(deepRes.result)
-    } catch (e) { console.error(e) } finally { setLoadingMessages(false) }
+      setMessages(msgRes.messages || [])
+      setSessionDetail(msgRes.session || null)
+      const sessionObj = msgRes.session
+      applyCollectedDataFromSession(sessionObj)
+      if (sessionObj?.deep_analysis_result) {
+        setDeepAnalysisResult(sessionObj.deep_analysis_result)
+      }
+      if (analysisRes && !analysisRes.error) setSessionAnalysis(analysisRes)
+    } catch (e) { console.error(e); showToast('加载会话失败') } finally { setLoadingMessages(false) }
   }
   async function handleDeleteSession(id) {
     if (!confirm('确定删除该会话及所有聊天记录？')) return
@@ -397,27 +659,55 @@ export default function AdminPage() {
     try { setSystemConfigs((await (await adminFetch('/api/admin/system-config')).json()).configs || []) } catch (e) { console.error(e) }
   }
   async function fetchPaymentConfigs() {
-    try { setPaymentConfigs((await (await adminFetch('/api/admin/payment-config')).json()).configs || []) } catch (e) { console.error(e) }
+    try {
+      const data = await (await adminFetch('/api/admin/payment-config')).json()
+      setPaymentConfigs(data.configs || [])
+      if (data.channels) setPaymentChannels(data.channels)
+    } catch (e) { console.error(e) }
   }
   async function saveConfigs(url, configs, label) {
     setSaving(true)
     try {
+      const validConfigs = configs.filter(c => c.config_key)
+      if (validConfigs.length === 0) { showToast('无有效配置项可保存'); return }
       const res = await adminFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configs: configs.map(c => ({ config_key: c.config_key, config_value: c.config_value ?? '' })) }) })
+        body: JSON.stringify({ configs: validConfigs.map(c => ({ config_key: c.config_key, config_value: c.config_value ?? '' })) }) })
       const data = await res.json()
       if (data.success) {
         showToast(`${label}已保存`)
+        if (url.includes('payment')) {
+          if (data.channels) setPaymentChannels(data.channels)
+          fetchPaymentConfigs()
+        } else fetchSystemConfigs()
       } else {
         showToast(data.error || '保存失败')
       }
     } catch (err) { console.error('Save config error:', err); showToast(`保存失败: ${err.message}`) } finally { setSaving(false) }
   }
-
-  async function fetchUsers() {
-    if (users.length === 0) setLoadingUsers(true)
-    try { setUsers((await (await adminFetch('/api/admin/users')).json()).users || []) }
-    catch (e) { console.error(e) } finally { setLoadingUsers(false) }
+  async function parseXianyuConfig() {
+    if (!xianyuRawText.trim()) { showToast('请粘贴闲管家应用配置信息'); return }
+    setParsingXianyu(true)
+    try {
+      const res = await adminFetch('/api/admin/parse-xianyu-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawText: xianyuRawText }),
+      })
+      const data = await res.json()
+      if (data.success && data.config) {
+        setSystemConfigs(prev => prev.map(c => {
+          const val = data.config[c.config_key]
+          if (val !== undefined) return { ...c, config_value: val }
+          return c
+        }))
+        showToast('AI 解析成功，请检查并保存配置')
+      } else {
+        showToast(data.error || 'AI 解析失败')
+      }
+    } catch (err) { console.error('Parse xianyu config error:', err); showToast(`解析失败: ${err.message}`) }
+    finally { setParsingXianyu(false) }
   }
+
   async function fetchRechargeOrders(filterOverride) {
     setLoadingRecharge(true)
     try {
@@ -437,6 +727,130 @@ export default function AdminPage() {
       fetchRechargeOrders()
     } catch { showToast('操作失败') }
   }
+  async function fetchOrders(filterOverride) {
+    setLoadingOrders(true)
+    try {
+      const f = filterOverride !== undefined ? filterOverride : orderFilter
+      const url = f ? `/api/admin/orders?status=${f}` : '/api/admin/orders'
+      const data = await (await adminFetch(url)).json()
+      setOrders(data.orders || [])
+    } catch (e) { console.error(e) } finally { setLoadingOrders(false) }
+  }
+  async function fetchXianyuOrders(p, os, rs, kw) {
+    setXianyuLoading(true)
+    const page = p || xianyuPage
+    const orderStatus = os !== undefined ? os : xianyuOrderStatus
+    const refundStatus = rs !== undefined ? rs : xianyuRefundStatus
+    const keyword = kw !== undefined ? kw : xianyuKeyword
+    try {
+      const params = new URLSearchParams({ page, pageSize: xianyuPageSize, refresh: '1' })
+      if (orderStatus) params.append('order_status', orderStatus)
+      if (refundStatus) params.append('refund_status', refundStatus)
+      if (keyword) params.append('keyword', keyword)
+      const res = await adminFetch(`/api/admin/xianyu-orders?${params}`)
+      const data = await res.json()
+      if (data.success && data.data) {
+        setXianyuOrders(data.data.list || [])
+        setXianyuTotal(data.data.total || 0)
+        setXianyuPage(data.data.page || page)
+      } else {
+        showToast(data.error || '加载闲鱼订单失败')
+        setXianyuOrders([])
+        setXianyuTotal(0)
+      }
+    } catch (e) {
+      showToast(e.message || '加载闲鱼订单失败')
+      setXianyuOrders([])
+      setXianyuTotal(0)
+    }
+    setXianyuLoading(false)
+  }
+  async function loadXyLogistics() {
+    if (xyLogistics.length) return
+    try {
+      const res = await (await adminFetch('/api/xianyu/logistics/companies')).json()
+      if (res.success) setXyLogistics(Array.isArray(res.data) ? res.data : (res.data?.list || []))
+    } catch { /* ignore */ }
+  }
+  function openXyShip(o) {
+    setXyOrder(o)
+    setXyShip({ expressNo: '', expressCompany: '' })
+    setXyModal('ship')
+    loadXyLogistics()
+  }
+  async function submitXyShip() {
+    if (!xyOrder || !xyShip.expressNo || !xyShip.expressCompany) {
+      showToast('请填写物流公司与单号')
+      return
+    }
+    setXyBusy(true)
+    try {
+      const res = await (await adminFetch('/api/xianyu/orders/ship', {
+        method: 'POST',
+        body: JSON.stringify({
+          shopId: xyOrder.shop_id,
+          orderId: xyOrder.order_no,
+          expressNo: xyShip.expressNo,
+          expressCompany: xyShip.expressCompany,
+        }),
+      })).json()
+      if (res.success) {
+        showToast('发货成功')
+        setXyModal(null)
+        fetchXianyuOrders()
+      } else showToast(res.error || '发货失败')
+    } catch (e) { showToast(e.message) }
+    setXyBusy(false)
+  }
+  function openXyPrice(o) {
+    setXyOrder(o)
+    setXyPrice(String(formatOrderAmount(o) || ''))
+    setXyModal('price')
+  }
+  async function submitXyPrice() {
+    const price = parseFloat(xyPrice)
+    if (!xyOrder || isNaN(price)) { showToast('请输入有效价格'); return }
+    setXyBusy(true)
+    try {
+      const res = await (await adminFetch('/api/xianyu/orders/update-price', {
+        method: 'POST',
+        body: JSON.stringify({ shopId: xyOrder.shop_id, orderId: xyOrder.order_no, price }),
+      })).json()
+      if (res.success) {
+        showToast('改价成功')
+        setXyModal(null)
+        fetchXianyuOrders()
+      } else showToast(res.error || '改价失败')
+    } catch (e) { showToast(e.message) }
+    setXyBusy(false)
+  }
+  async function openXyCards(o) {
+    setXyOrder(o)
+    setXyCards(null)
+    setXyModal('cards')
+    setXyBusy(true)
+    try {
+      const q = o.shop_id ? `?shopId=${encodeURIComponent(o.shop_id)}` : ''
+      const res = await (await adminFetch(`/api/xianyu/orders/${encodeURIComponent(o.order_no)}/cards${q}`)).json()
+      if (res.success) setXyCards(res.data)
+      else showToast(res.error || '获取卡密失败')
+    } catch (e) { showToast(e.message) }
+    setXyBusy(false)
+  }
+  async function handleUpdateOrderStatus(orderId, newStatus) {
+    try {
+      const res = await adminFetch(`/api/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (data.error) { showToast(data.error); return }
+      showToast('状态已更新')
+      setOrderStatusDropdown(null)
+      fetchOrders()
+    } catch { showToast('操作失败') }
+  }
   async function handleRejectRecharge(orderId) {
     const note = prompt('请输入拒绝原因（可留空）：')
     if (note === null) return
@@ -448,28 +862,13 @@ export default function AdminPage() {
       fetchRechargeOrders()
     } catch { showToast('操作失败') }
   }
-  async function handleAdjustBalance(userId, amount) {
-    const val = parseFloat(amount)
-    if (!amount || isNaN(val) || val === 0) { showToast('请输入有效金额'); return }
-    const action = val > 0 ? '充值' : '扣款'
-    if (!confirm(`确认${action} ¥${Math.abs(val).toFixed(2)} ？`)) return
-    try {
-      const res = await adminFetch(`/api/admin/users/${userId}/balance`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: val }),
-      })
-      const data = await res.json()
-      if (data.error) { showToast(data.error); return }
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, balance: data.user.balance } : u))
-      setBalanceInputs(prev => ({ ...prev, [userId]: '' }))
-      showToast(`${action}成功，当前余额: ¥${parseFloat(data.user.balance).toFixed(2)}`)
-    } catch { showToast('操作失败') }
-  }
-
   async function fetchCases() {
     if (knowledgeCases.length === 0) setLoadingCases(true)
     try { setKnowledgeCases((await (await adminFetch('/api/admin/cases')).json()).cases || []) }
     catch (e) { console.error(e) } finally { setLoadingCases(false) }
+  }
+  async function fetchSchedules() {
+    // SchedulePanel handles its own fetching
   }
   async function handleMarkSuccess(sessionId) {
     const title = prompt('请输入案例标题（可留空，自动从商户名生成）：')
@@ -486,6 +885,210 @@ export default function AdminPage() {
       showToast('已标记为成功案例并加入知识库')
     } catch { showToast('操作失败') }
   }
+  function applyCaseSuggestion(form, suggestion) {
+    const s = suggestion || {}
+    const next = { ...form }
+    const filled = []
+    const apply = (key, label) => {
+      const v = typeof s[key] === 'string' ? s[key].trim() : ''
+      if (v) {
+        next[key] = v
+        filled.push(label)
+      }
+    }
+    apply('title', '标题')
+    apply('industry', '行业')
+    apply('problemType', '处罚类型')
+    apply('successSummary', '成功要点')
+    apply('adminNotes', '管理员备注')
+    return { next, filled }
+  }
+
+  async function loadCaseFromSession() {
+    const sid = caseForm?.sessionId || selectedSession
+    if (!sid) {
+      showToast('请先在「聊天记录」中打开一个会话，或填写下方「案例材料」')
+      return
+    }
+    setCaseAiLoading(true)
+    try {
+      const res = await adminFetch(`/api/admin/sessions/${encodeURIComponent(sid)}/case-material`)
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error || '加载材料失败')
+      const report = (j.reportContent || '').slice(0, 8000)
+      const src = (j.sources || []).join('、') || '无'
+      setCaseForm((f) => ({
+        ...f,
+        sessionId: sid,
+        title: f.title || j.title || f.title,
+        industry: f.industry || j.industry || '',
+        problemType: f.problemType || j.problemType || '',
+        reportContent: report,
+      }))
+      if (report.length > 40) {
+        showToast(`已加载案例材料（来源：${src}），可点击「AI 根据材料填写」`)
+        return
+      }
+      const evo = await fetchBestEvolutionMaterial()
+      if (evo?.reportContent?.length >= 40) {
+        setCaseForm((f) => ({
+          ...f,
+          analysisId: evo.analysisId,
+          reportContent: evo.reportContent.slice(0, 8000),
+          industry: f.industry || evo.industry || '',
+          problemType: f.problemType || evo.problemType || '',
+        }))
+        showToast('当前会话无材料，已自动改用最近一条进化对话分析')
+        return
+      }
+      showToast(j.sessionExists === false
+        ? '当前会话已删除且无可用进化分析，请手动粘贴材料'
+        : '会话与进化分析均无可用材料，请手动粘贴')
+    } catch (e) {
+      showToast(e.message || '加载会话失败')
+    }
+    setCaseAiLoading(false)
+  }
+
+  async function openCaseAnalysisPicker() {
+    setCaseAnalysisPickerOpen(true)
+    setCaseAnalysisPickerLoading(true)
+    try {
+      const res = await adminFetch('/api/admin/evolution/analyses?limit=30')
+      const j = await res.json()
+      const list = (j.analyses || []).filter((a) => a.raw_analysis && String(a.raw_analysis).trim().length > 80)
+      setCaseAnalysisOptions(list)
+      if (!list.length) showToast('暂无可用对话分析记录')
+    } catch (e) {
+      showToast(e.message || '加载分析列表失败')
+    }
+    setCaseAnalysisPickerLoading(false)
+  }
+
+  async function loadCaseFromEvolutionAnalysis(analysisId) {
+    setCaseAiLoading(true)
+    try {
+      const res = await adminFetch(`/api/admin/evolution/analyses/${analysisId}/case-material`)
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error || '加载失败')
+      const report = (j.reportContent || '').slice(0, 8000)
+      const src = (j.sources || []).join('、') || '对话分析'
+      setCaseForm((f) => ({
+        ...f,
+        sessionId: j.sessionId || f.sessionId || '',
+        analysisId,
+        reportContent: report,
+        industry: f.industry || j.industry || '',
+        problemType: f.problemType || j.problemType || '',
+        title: f.title || j.title || '',
+      }))
+      setCaseAnalysisPickerOpen(false)
+      showToast(report.length > 40 ? `已从进化分析加载（${src}）` : '分析正文过短，请换一条记录')
+    } catch (e) {
+      showToast(e.message || '加载失败')
+    }
+    setCaseAiLoading(false)
+  }
+
+  async function handleCaseAiEnhance() {
+    if (!caseForm) return
+    const sid = caseForm.sessionId || selectedSession
+    let formPayload = { ...caseForm }
+    let reportLen = (formPayload.reportContent || '').trim().length
+    let hasMaterial = reportLen >= 40 || (formPayload.successSummary || '').trim().length >= 20
+    if (!hasMaterial && formPayload.analysisId) {
+      try {
+        const mRes = await adminFetch(`/api/admin/evolution/analyses/${formPayload.analysisId}/case-material`)
+        const mj = await mRes.json()
+        if (mRes.ok && (mj.reportContent || '').length >= 40) {
+          formPayload = { ...formPayload, reportContent: mj.reportContent, industry: formPayload.industry || mj.industry || '', problemType: formPayload.problemType || mj.problemType || '' }
+          setCaseForm(formPayload)
+          hasMaterial = true
+        }
+      } catch { /* ignore */ }
+    }
+    if (!hasMaterial && sid) {
+      try {
+        const mRes = await adminFetch(`/api/admin/sessions/${encodeURIComponent(sid)}/case-material`)
+        const mj = await mRes.json()
+        if (mRes.ok && (mj.reportContent || '').length >= 40) {
+          formPayload = {
+            ...formPayload,
+            reportContent: mj.reportContent,
+            industry: formPayload.industry || mj.industry || '',
+            problemType: formPayload.problemType || mj.problemType || '',
+            title: formPayload.title || mj.title || '',
+          }
+          setCaseForm(formPayload)
+          reportLen = mj.reportContent.length
+          hasMaterial = true
+        }
+      } catch { /* ignore */ }
+    }
+    if (!hasMaterial) {
+      setCaseAiLoading(true)
+      try {
+        const evo = await fetchBestEvolutionMaterial()
+        if (evo?.reportContent?.length >= 40) {
+          formPayload = {
+            ...formPayload,
+            analysisId: evo.analysisId,
+            reportContent: evo.reportContent,
+            industry: formPayload.industry || evo.industry || '',
+            problemType: formPayload.problemType || evo.problemType || '',
+          }
+          setCaseForm(formPayload)
+          hasMaterial = true
+          showToast('已自动选用最近一条进化对话分析作为材料')
+        }
+      } catch { /* ignore */ }
+      setCaseAiLoading(false)
+    }
+    if (!hasMaterial) {
+      showToast('暂无可用材料：请粘贴案例正文，或点「从进化分析加载」手动选择')
+      return
+    }
+    setCaseAiLoading(true)
+    try {
+      const res = await adminFetch('/api/admin/cases/ai-enhance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sid || undefined,
+          analysisId: formPayload.analysisId || undefined,
+          title: formPayload.title,
+          industry: formPayload.industry,
+          problemType: formPayload.problemType,
+          reportContent: formPayload.reportContent,
+          successSummary: formPayload.successSummary,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) {
+        if (j.code === 'EMPTY_SUGGESTION' && j.suggestion) {
+          const { next, filled } = applyCaseSuggestion(formPayload, j.suggestion)
+          if (filled.length) {
+            setCaseForm(next)
+            showToast(`部分填写：${filled.join('、')}，请补充材料后重试`)
+            return
+          }
+        }
+        throw new Error(j.error || 'AI 失败')
+      }
+      const merged = { ...caseForm, ...formPayload }
+      const { next, filled } = applyCaseSuggestion(merged, j.suggestion)
+      if (!filled.length) {
+        showToast('AI 未生成有效内容，请补充案例材料后重试')
+        return
+      }
+      setCaseForm(next)
+      showToast(`已填写：${(j.filledFields || filled).join('、')}（请核对后保存）`)
+    } catch (e) {
+      showToast(e.message || 'AI 辅助失败')
+    }
+    setCaseAiLoading(false)
+  }
+
   async function handleSaveCase() {
     if (!caseForm) return
     setSavingCase(true)
@@ -514,11 +1117,15 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'settings') { fetchSystemConfigs(); fetchPaymentConfigs() }
-    if (activeTab === 'sessions') fetchSessions()
     if (activeTab === 'dashboard' || activeTab === 'analytics') fetchStats()
-    if (activeTab === 'users') fetchUsers()
     if (activeTab === 'recharge') fetchRechargeOrders()
+    if (activeTab === 'orders') fetchOrders()
+    if (activeTab === 'xianyu' && xianyuSubTab === 'xianyu-orders' && !xianyuOrders.length) {
+      fetchXianyuOrders(1, '', '', '')
+    }
     if (activeTab === 'knowledge') fetchCases()
+    if (activeTab === 'schedule') fetchSchedules()
+    if (activeTab === 'sessions') { fetchSessions(true); fetchQuickReplies() }
   }, [activeTab])
 
   async function handleAdminReply() {
@@ -527,7 +1134,7 @@ export default function AdminPage() {
     try {
       const res = await adminFetch(`/api/admin/sessions/${selectedSession}/reply`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: adminReply.trim() }),
+        body: JSON.stringify({ role: 'admin', content: adminReply.trim() }),
       })
       const data = await res.json()
       if (data.error) { showToast(data.error); return }
@@ -558,7 +1165,23 @@ export default function AdminPage() {
 
   function fmtTime(d) {
     if (!d) return '-'
-    try { const t = new Date(d); return isNaN(t.getTime()) ? String(d).slice(0,19) : t.toLocaleString('zh-CN') } catch { return String(d) }
+    const ts = typeof d === 'number' ? (d < 1e12 ? d * 1000 : d) : d
+    try { const t = new Date(ts); return isNaN(t.getTime()) ? String(d).slice(0, 19) : t.toLocaleString('zh-CN') } catch { return String(d) }
+  }
+
+  function xyImageSrc(url) {
+    if (!url) return ''
+    let u = url
+    if (/\.heic(\?|$)/i.test(u)) {
+      u = `${u}${u.includes('?') ? '&' : '?'}x-oss-process=image/format,jpg/quality,Q_85`
+    }
+    if (/alicdn\.com|goofish\.(com|pro)/i.test(u)) {
+      const params = new URLSearchParams({ url: u })
+      const token = localStorage.getItem('admin_token')
+      if (token) params.set('token', token)
+      return `/api/xianyu/image-proxy?${params}`
+    }
+    return u
   }
   function fmtDay(d) {
     if (!d) return ''
@@ -576,17 +1199,6 @@ export default function AdminPage() {
   }
 
   // ========== Dashboard ==========
-  const TOKEN_TYPE_LABELS = {
-    chat: { label: '用户对话', icon: '💬', color: 'bg-blue-50 text-blue-700' },
-    chat_collection: { label: '信息收集', icon: '📋', color: 'bg-cyan-50 text-cyan-700' },
-    deep_analysis: { label: '深度分析', icon: '🔍', color: 'bg-purple-50 text-purple-700' },
-    appeal_text: { label: '申诉文案', icon: '📝', color: 'bg-orange-50 text-orange-700' },
-    report_retry: { label: '报告重试', icon: '🔄', color: 'bg-yellow-50 text-yellow-700' },
-    field_extraction: { label: '字段提取', icon: '🏷️', color: 'bg-teal-50 text-teal-700' },
-    evolution_analysis: { label: '进化分析', icon: '🧬', color: 'bg-indigo-50 text-indigo-700' },
-    auto_review: { label: 'AI审批', icon: '✅', color: 'bg-emerald-50 text-emerald-700' },
-  }
-
   function renderDashboard() {
     const profit = stats?.profitAnalysis || {}
     const ts = stats?.tokenSummary || {}
@@ -634,6 +1246,30 @@ export default function AdminPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('session-chatboard')}
+            className="text-left bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-4 hover:shadow-md hover:border-indigo-200 transition-all group"
+          >
+            <p className="text-sm font-semibold text-indigo-900">会话看板</p>
+            <p className="text-xs text-indigo-700/80 mt-1">消息量、时段、首句样本、AI 简报</p>
+            <span className="text-xs font-medium text-indigo-600 mt-2 inline-block group-hover:translate-x-0.5 transition-transform">打开 →</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('ops-center')}
+            className="text-left bg-gradient-to-r from-slate-900 to-indigo-950 border border-slate-700 rounded-2xl p-4 hover:shadow-lg transition-all group text-white"
+          >
+            <p className="text-sm font-semibold flex items-center gap-2">
+              运营中心
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-cyan-500 text-slate-900">新</span>
+            </p>
+            <p className="text-xs text-slate-300 mt-1">数据大屏 · 全文搜索 · 快照 · 质检 · Prompt</p>
+            <span className="text-xs font-medium text-cyan-300 mt-2 inline-block">打开 →</span>
+          </button>
+        </div>
+
         {/* === Row 2: Quick Stats Pills === */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
@@ -665,7 +1301,7 @@ export default function AdminPage() {
                 {stats.tokenByType.map((t, i) => {
                   const total = stats.tokenByType.reduce((s, x) => s + parseInt(x.tokens), 0)
                   const pct = total > 0 ? (parseInt(t.tokens) / total * 100).toFixed(0) : 0
-                  const meta = TOKEN_TYPE_LABELS[t.type] || { label: t.type, icon: '📦', color: 'bg-gray-50 text-gray-600' }
+                  const meta = getTokenTypeMeta(t.type)
                   return (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-sm flex-shrink-0">{meta.icon}</span>
@@ -912,7 +1548,7 @@ export default function AdminPage() {
                 const meta = ACTION_LABELS[a.action] || { label: a.action, color: 'bg-gray-100 text-gray-600' }
                 return (
                   <div key={i} className="flex items-center gap-2.5 py-1.5 border-b border-gray-50 last:border-0">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${meta.color}`}>{meta.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${meta.badge || 'bg-gray-50 text-gray-600'}`}>{meta.icon} {meta.label}</span>
                     <span className="text-xs text-gray-700 flex-1 truncate">{a.nickname || a.phone || '匿名'} {a.detail && <span className="text-gray-400">· {a.detail}</span>}</span>
                     <span className="text-[10px] text-gray-400 flex-shrink-0">{timeAgo(a.created_at)}</span>
                   </div>
@@ -927,90 +1563,14 @@ export default function AdminPage() {
 
   // ========== Analytics ==========
   function renderAnalytics() {
-    const topUsers = stats?.topUsers || []
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">数据分析</h2>
-          <button onClick={fetchStats} className="text-xs text-gray-400 hover:text-wechat-green px-3 py-1.5 rounded-lg hover:bg-green-50">刷新</button>
-        </div>
-        {/* Top users */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Top 活跃用户</h3>
-          </div>
-          {topUsers.length === 0 ? (
-            <p className="text-center py-10 text-sm text-gray-300">暂无数据</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-50/50">
-                  <th className="text-left px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400">#</th>
-                  <th className="text-left px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400">用户</th>
-                  <th className="text-right px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400">消息数</th>
-                  <th className="text-right px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400 hidden sm:table-cell">会话</th>
-                  <th className="text-right px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400">消费</th>
-                  <th className="text-right px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400 hidden sm:table-cell">余额</th>
-                  <th className="text-right px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400 hidden md:table-cell">登录</th>
-                  <th className="text-left px-3 sm:px-4 py-2.5 text-[11px] font-semibold text-gray-400 hidden md:table-cell">最后活跃</th>
-                </tr></thead>
-                <tbody className="divide-y divide-gray-50">
-                  {topUsers.map((u, i) => (
-                    <tr key={u.id} className="hover:bg-gray-50/50">
-                      <td className="px-3 sm:px-4 py-2.5 text-xs">{i < 3 ? ['🥇','🥈','🥉'][i] : `${i+1}`}</td>
-                      <td className="px-3 sm:px-4 py-2.5">
-                        <div className="font-medium text-sm text-gray-800">{u.nickname || '-'}</div>
-                        <div className="text-[11px] text-gray-400">{u.phone}</div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2.5 text-right font-semibold text-gray-700">{u.total_messages}</td>
-                      <td className="px-3 sm:px-4 py-2.5 text-right text-gray-500 hidden sm:table-cell">{u.sessions}</td>
-                      <td className="px-3 sm:px-4 py-2.5 text-right text-orange-600 font-medium">¥{parseFloat(u.total_spent || 0).toFixed(2)}</td>
-                      <td className="px-3 sm:px-4 py-2.5 text-right text-green-600 hidden sm:table-cell">¥{parseFloat(u.balance || 0).toFixed(2)}</td>
-                      <td className="px-3 sm:px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">{u.login_count}次</td>
-                      <td className="px-3 sm:px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{timeAgo(u.last_active_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-        {/* Full activity log */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">用户行为追踪</h3>
-          </div>
-          <div className="max-h-96 overflow-y-auto">
-            {(stats?.recentActions || []).length === 0 ? (
-              <p className="text-center py-10 text-sm text-gray-300">暂无活动记录</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-50/50 sticky top-0">
-                  <th className="text-left px-3 sm:px-4 py-2 text-[11px] font-semibold text-gray-400">时间</th>
-                  <th className="text-left px-3 sm:px-4 py-2 text-[11px] font-semibold text-gray-400">用户</th>
-                  <th className="text-left px-3 sm:px-4 py-2 text-[11px] font-semibold text-gray-400">行为</th>
-                  <th className="text-left px-3 sm:px-4 py-2 text-[11px] font-semibold text-gray-400 hidden sm:table-cell">详情</th>
-                  <th className="text-left px-3 sm:px-4 py-2 text-[11px] font-semibold text-gray-400 hidden md:table-cell">IP</th>
-                </tr></thead>
-                <tbody className="divide-y divide-gray-50">
-                  {stats.recentActions.map((a, i) => {
-                    const meta = ACTION_LABELS[a.action] || { label: a.action, color: 'bg-gray-100 text-gray-600' }
-                    return (
-                      <tr key={i} className="hover:bg-gray-50/50">
-                        <td className="px-3 sm:px-4 py-2 text-[11px] text-gray-400 whitespace-nowrap">{timeAgo(a.created_at)}</td>
-                        <td className="px-3 sm:px-4 py-2 text-xs font-medium text-gray-700">{a.nickname || a.phone || '-'}</td>
-                        <td className="px-3 sm:px-4 py-2"><span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta.color}`}>{meta.label}</span></td>
-                        <td className="px-3 sm:px-4 py-2 text-xs text-gray-500 truncate max-w-48 hidden sm:table-cell">{a.detail || '-'}</td>
-                        <td className="px-3 sm:px-4 py-2 text-[11px] text-gray-400 font-mono hidden md:table-cell">{a.ip || '-'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
+      <AnalyticsPanel
+        adminFetch={adminFetch}
+        showToast={showToast}
+        stats={stats}
+        fetchStats={fetchStats}
+        onOpenTokens={() => setActiveTab('tokens')}
+      />
     )
   }
 
@@ -1031,7 +1591,22 @@ export default function AdminPage() {
       <div className="flex flex-1 overflow-hidden">
         <aside className={`${mobileShowChat ? 'hidden' : 'block'} lg:block w-full lg:w-80 bg-white lg:border-r border-gray-100 overflow-y-auto flex-shrink-0`}>
           <div className="p-3">
-            <p className="text-[11px] text-gray-400 mb-2 px-1">共 {sessions.length} 个对话</p>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <p className="text-[11px] text-gray-400">共 {sessions.length} 个对话</p>
+              <button type="button" onClick={() => fetchSessions(true)} disabled={loadingSessions}
+                className="text-[11px] text-purple-600 hover:text-purple-800 disabled:opacity-50 font-medium">
+                {loadingSessions ? '刷新中…' : '刷新'}
+              </button>
+            </div>
+            <form className="mb-2 flex gap-1" onSubmit={(e) => { e.preventDefault(); fetchSessions(true) }}>
+              <input
+                value={sessionSearchQ}
+                onChange={(e) => setSessionSearchQ(e.target.value)}
+                placeholder="搜索会话/消息…"
+                className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1.5"
+              />
+              <button type="submit" className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-gray-600">搜</button>
+            </form>
             {renderSessionList()}
           </div>
         </aside>
@@ -1088,19 +1663,21 @@ export default function AdminPage() {
               {adminDetailTab === 'chat' && (
                 <>
                   {loadingMessages ? <div className="text-center py-20 text-gray-400 text-sm">加载中...</div> : (
-                    <div className="space-y-3">{messages.map((m, i) => {
+                    <div className="space-y-3">
+                      {messages.length === 0 && <div className="text-center py-20 text-gray-400 text-sm">暂无聊天记录</div>}
+                      {messages.map((m, i) => {
                       const isAdmin = m.role === 'admin'
                       if (isAdmin) {
                         return (
-                          <div key={i} className="flex justify-end my-2.5">
-                            <div className="max-w-[80%] lg:max-w-[70%] bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-[18px] rounded-tr-[4px] px-4 py-2.5" style={{ boxShadow: '0 1px 3px rgba(249,115,22,0.2)' }}>
+                          <div key={i} className="flex justify-start my-2.5">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mr-2.5 mt-0.5">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                            </div>
+                            <div className="max-w-[80%] lg:max-w-[70%] bg-gradient-to-br from-green-50 to-emerald-50 text-gray-800 rounded-[18px] rounded-tl-[4px] px-4 py-2.5 border border-green-100/80" style={{ boxShadow: '0 1px 3px rgba(16,185,129,0.1)' }}>
                               <div className="flex items-center gap-1.5 mb-1">
-                                <span className="text-[10px] text-white/70 font-medium">人工客服</span>
+                                <span className="text-[10px] text-green-600 font-medium">人工客服</span>
                               </div>
                               <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{m.content}</p>
-                            </div>
-                            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center ml-2.5 mt-0.5">
-                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                             </div>
                           </div>
                         )
@@ -1111,17 +1688,32 @@ export default function AdminPage() {
                   {selectedSession && !loadingMessages && (
                     <div className="mt-4 bg-white rounded-2xl p-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-500 font-medium">人工客服</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-green-50 text-green-500 font-medium">人工客服</span>
                         <span className="text-[10px] text-gray-300">客户端显示为助手消息</span>
                       </div>
+                      {quickReplies.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {quickReplies.map((qr) => (
+                            <button
+                              key={qr.id}
+                              type="button"
+                              title={qr.content}
+                              onClick={() => setAdminReply((prev) => (prev ? prev + '\n' : '') + qr.content)}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+                            >
+                              {qr.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex items-end gap-2">
                         <textarea value={adminReply} onChange={e => setAdminReply(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdminReply() } }}
                           placeholder="输入回复内容..."
                           rows={2}
-                          className="flex-1 px-3 py-2 rounded-xl border border-gray-200/80 bg-white text-[13px] resize-none focus:ring-2 focus:ring-orange-300/30 focus:border-orange-400 max-h-32 overflow-y-auto placeholder:text-gray-300" />
+                          className="flex-1 px-3 py-2 rounded-xl border border-gray-200/80 bg-white text-[13px] resize-none focus:ring-2 focus:ring-green-300/30 focus:border-green-400 max-h-32 overflow-y-auto placeholder:text-gray-300" />
                         <button onClick={handleAdminReply} disabled={sendingReply || !adminReply.trim()}
-                          className="px-4 py-2 bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-xl text-[12px] font-medium disabled:opacity-50 shadow-sm flex-shrink-0 h-9">
+                          className="px-4 py-2 bg-gradient-to-br from-green-400 to-emerald-500 text-white rounded-xl text-[12px] font-medium disabled:opacity-50 shadow-sm flex-shrink-0 h-9">
                           {sendingReply ? '发送中...' : '发送'}
                         </button>
                       </div>
@@ -1134,7 +1726,7 @@ export default function AdminPage() {
               {adminDetailTab === 'data' && (
                 <div className="space-y-3">
                   {Object.keys(sessionCollectedData).length === 0 ? (
-                    <div className="text-center py-16 text-gray-400 text-sm">该会话暂无收集数据</div>
+                    <div className="text-center py-16 text-gray-400 text-sm">暂无收集信息</div>
                   ) : (
                     <>
                       <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -1142,14 +1734,15 @@ export default function AdminPage() {
                           <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center"><span className="text-[12px]">📋</span></span>
                           客户填写信息（{Object.keys(sessionCollectedData).filter(k => { const v = sessionCollectedData[k]; return v && String(v).trim() }).length} 项）
                         </h3>
-                        <div className="space-y-1">
-                          {sessionInfoFields.map(f => {
-                            const val = sessionCollectedData[f.key]
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {Object.keys(sessionCollectedData).map(key => {
+                            const val = sessionCollectedData[key]
                             if (!val || !String(val).trim()) return null
+                            const label = COLLECTED_DATA_LABELS[key] || key
                             return (
-                              <div key={f.key} className="flex gap-3 py-2 border-b border-gray-50 last:border-0">
-                                <span className="text-[11px] text-gray-400 w-24 flex-shrink-0 pt-0.5">{f.label}</span>
-                                <span className="text-[12px] text-gray-800 font-medium flex-1 break-all">{val}</span>
+                              <div key={key} className="bg-gray-50/80 rounded-xl p-3 border border-gray-100/60 hover:border-emerald-200/60 hover:bg-emerald-50/30 transition-all">
+                                <span className="block text-[10px] text-gray-400 mb-1 font-medium">{label}</span>
+                                <span className="block text-[13px] text-gray-800 font-medium break-all">{val}</span>
                               </div>
                             )
                           })}
@@ -1203,7 +1796,7 @@ export default function AdminPage() {
                       {/* 全文模式 */}
                       {analysisViewMode === 'text' && (
                         <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                          <div className="px-4 py-4 text-[12px] text-gray-700 leading-relaxed break-words admin-analysis-md" dangerouslySetInnerHTML={{ __html: (() => {
+                          <div className="px-4 py-4 text-[12px] text-gray-700 leading-relaxed break-words admin-analysis-md" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((() => {
                             return deepAnalysisResult
                               .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                               .replace(/^## (.*$)/gm, '<div style="margin:20px 0 8px;display:flex;align-items:center;gap:8px;"><span style="width:3px;height:16px;border-radius:2px;background:#6366f1;flex-shrink:0;"></span><h2 style="font-size:15px;font-weight:700;color:#1e293b;margin:0;">$1</h2></div>')
@@ -1216,7 +1809,7 @@ export default function AdminPage() {
                               .replace(/\n{3,}/g, '\n\n')
                               .replace(/\n\n/g, '<div style="margin:6px 0;"></div>')
                               .replace(/\n/g, '<br/>')
-                          })() }} />
+                          })()) }} />
                         </div>
                       )}
 
@@ -1288,13 +1881,23 @@ export default function AdminPage() {
   // ========== 知识库 ==========
   function renderKnowledge() {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
+      <AdminAiTabLayout
+        tabKey="knowledge"
+        adminFetch={adminFetch}
+        showToast={showToast}
+        onRefresh={() => fetchCases()}
+        loading={loadingCases}
+        className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full"
+      >
         <div className="flex items-start sm:items-center justify-between mb-4 gap-3 flex-col sm:flex-row">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-gray-800">成功案例知识库</h2>
             <p className="text-xs text-gray-400 mt-0.5">管理员标记的成功申诉案例，AI 生成报告时会自动参考相似案例</p>
           </div>
-          <button onClick={() => setCaseForm({ title: '', industry: '', problemType: '', successSummary: '', adminNotes: '', reportContent: '' })}
+          <button onClick={() => setCaseForm({
+            title: '', industry: '', problemType: '', successSummary: '', adminNotes: '', reportContent: '',
+            sessionId: selectedSession || '',
+          })}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center gap-1.5 flex-shrink-0">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
             添加案例
@@ -1329,7 +1932,7 @@ export default function AdminPage() {
                       <p className="text-[10px] text-gray-300 mt-1.5">{fmtTime(c.created_at)}{c.session_id ? ` · 来自会话 ${c.session_id.slice(0, 8)}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => setCaseForm({ id: c.id, title: c.title, industry: c.industry, problemType: c.problem_type, successSummary: c.success_summary || '', adminNotes: c.admin_notes || '', reportContent: c.report_content || '', status: c.status })}
+                      <button onClick={() => setCaseForm({ id: c.id, sessionId: c.session_id || '', title: c.title, industry: c.industry, problemType: c.problem_type, successSummary: c.success_summary || '', adminNotes: c.admin_notes || '', reportContent: c.report_content || '', status: c.status })}
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="编辑">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
                       </button>
@@ -1374,6 +1977,27 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">案例材料（AI 主要依据）</label>
+                  <p className="text-[10px] text-gray-400 mb-1">粘贴申诉报告或对话要点；材料不足时 AI 无法填写标题与摘要。</p>
+                  <textarea value={caseForm.reportContent || ''} onChange={e => setCaseForm({ ...caseForm, reportContent: e.target.value })} rows={4}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none font-mono text-[12px]" placeholder="申诉报告全文、深度分析摘要…" />
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {(caseForm.sessionId || selectedSession) ? (
+                      <button type="button" onClick={loadCaseFromSession} disabled={caseAiLoading}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50">
+                        {caseAiLoading ? '加载中…' : '从当前会话加载'}
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={openCaseAnalysisPicker} disabled={caseAiLoading}
+                      className="text-xs text-violet-600 hover:text-violet-800 font-medium disabled:opacity-50">
+                      从进化分析加载
+                    </button>
+                  </div>
+                  {!caseForm.sessionId && !selectedSession && (
+                    <p className="text-[10px] text-amber-600 mt-1">当前列表会话多无聊天/分析数据，建议用「从进化分析加载」。</p>
+                  )}
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">成功要点</label>
                   <textarea value={caseForm.successSummary || ''} onChange={e => setCaseForm({...caseForm, successSummary: e.target.value})} rows={3}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" placeholder="描述申诉成功的关键因素，AI会参考这些要点" />
@@ -1393,6 +2017,10 @@ export default function AdminPage() {
                     </select>
                   </div>
                 )}
+                <button type="button" onClick={handleCaseAiEnhance} disabled={caseAiLoading}
+                  className="w-full py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-medium text-sm hover:bg-indigo-100 disabled:opacity-50">
+                  {caseAiLoading ? 'AI 生成中…' : 'AI 根据材料填写'}
+                </button>
                 <button onClick={handleSaveCase} disabled={savingCase || !caseForm.title?.trim()}
                   className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 disabled:opacity-50 shadow-sm">
                   {savingCase ? '保存中...' : '保存案例'}
@@ -1401,7 +2029,32 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-      </div>
+        {caseAnalysisPickerOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setCaseAnalysisPickerOpen(false)}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800 text-sm">选择对话分析记录</h3>
+                <button type="button" onClick={() => setCaseAnalysisPickerOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                {caseAnalysisPickerLoading ? (
+                  <p className="text-center text-gray-400 text-sm py-8">加载中…</p>
+                ) : caseAnalysisOptions.length === 0 ? (
+                  <p className="text-center text-gray-400 text-sm py-8">暂无可用分析</p>
+                ) : caseAnalysisOptions.map((a) => (
+                  <button key={a.id} type="button" disabled={caseAiLoading}
+                    onClick={() => loadCaseFromEvolutionAnalysis(a.id)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50/50 disabled:opacity-50">
+                    <div className="text-xs font-medium text-gray-800">{a.industry || '未分类'} · {a.problem_type || '—'}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{a.analyzed_at ? new Date(a.analyzed_at).toLocaleString('zh-CN') : ''} · 完成率 {Math.round((a.completion_rate || 0) * 100)}%</div>
+                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{String(a.raw_analysis || '').slice(0, 120)}…</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </AdminAiTabLayout>
     )
   }
 
@@ -1676,6 +2329,7 @@ export default function AdminPage() {
     const rechargeConf = systemConfigs.filter(c => c.config_group === 'recharge')
     const wx = paymentConfigs.filter(c => c.config_group === 'wechat')
     const ali = paymentConfigs.filter(c => c.config_group === 'alipay')
+    const xianyu = systemConfigs.filter(c => c.config_group === 'xianyu')
 
     const renderSubContent = () => {
       switch (settingsSubTab) {
@@ -1723,6 +2377,8 @@ export default function AdminPage() {
           ) : <div className="text-center py-16 text-gray-300 text-sm">暂无充值配置项</div>
         case 'wechat':
           return wx.length > 0 ? (
+            <div className="space-y-4">
+              <PaymentSettingsGuide channel="wechat" channels={paymentChannels} adminFetch={adminFetch} showToast={showToast} onChannelsUpdate={setPaymentChannels} />
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-4 py-3 bg-green-50 border-b border-green-100 flex items-center space-x-2">
                 <span className="w-5 h-5 bg-wechat-green rounded-full flex items-center justify-center"><svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.295.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348z"/></svg></span>
@@ -1730,9 +2386,12 @@ export default function AdminPage() {
               </div>
               <div className="divide-y divide-gray-50">{wx.map(c => <ConfigField key={c.config_key} cfg={c} idx={paymentConfigs.indexOf(c)} configs={paymentConfigs} setConfigs={setPaymentConfigs} />)}</div>
             </div>
+            </div>
           ) : <div className="text-center py-16 text-gray-300 text-sm">暂无微信支付配置项</div>
         case 'alipay':
           return ali.length > 0 ? (
+            <div className="space-y-4">
+              <PaymentSettingsGuide channel="alipay" channels={paymentChannels} adminFetch={adminFetch} showToast={showToast} onChannelsUpdate={setPaymentChannels} />
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center space-x-2">
                 <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center"><svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M21.422 15.358c-.612-1.008-2.139-2.091-4.16-3.009.263-.674.467-1.397.6-2.158h-3.204V8.717h3.93V7.91h-3.93V5.535h-1.86s-.037.17-.205.495c-.33.65-.79 1.134-1.242 1.134V7.91H7.927v.807h3.424v1.474H8.23v.808h6.3c-.1.535-.24 1.043-.416 1.513-1.842-.632-3.974-1.082-5.835-1.082-3.156 0-5.053 1.392-5.053 3.09 0 1.7 1.897 3.092 5.053 3.092 2.09 0 4.423-.684 6.395-1.903.82.506 1.48.946 1.884 1.282.86.714 1.016 1.167.858 1.694H24c.182-.826-.31-1.85-2.578-3.33z"/></svg></span>
@@ -1740,19 +2399,8 @@ export default function AdminPage() {
               </div>
               <div className="divide-y divide-gray-50">{ali.map(c => <ConfigField key={c.config_key} cfg={c} idx={paymentConfigs.indexOf(c)} configs={paymentConfigs} setConfigs={setPaymentConfigs} />)}</div>
             </div>
-          ) : <div className="text-center py-16 text-gray-300 text-sm">暂无支付宝配置项</div>
-        case 'contact': {
-          const contactCfg = systemConfigs.filter(c => c.config_group === 'contact')
-          return contactCfg.length > 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-                <h3 className="text-sm font-semibold text-indigo-700">技术人员名片</h3>
-                <p className="text-[10px] text-indigo-400 mt-0.5">配置后用户在聊天页可查看您的联系方式，方便获客转化</p>
-              </div>
-              <div className="divide-y divide-gray-50">{contactCfg.map(c => <ConfigField key={c.config_key} cfg={c} idx={systemConfigs.indexOf(c)} configs={systemConfigs} setConfigs={setSystemConfigs} />)}</div>
             </div>
-          ) : <div className="text-center py-16 text-gray-300 text-sm">暂无名片配置项（重启服务后自动生成）</div>
-        }
+          ) : <div className="text-center py-16 text-gray-300 text-sm">暂无支付宝配置项</div>
         case 'security':
           return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1773,6 +2421,62 @@ export default function AdminPage() {
               </div>
             </div>
           )
+        case 'xianyu':
+          const safeVal = (key) => xianyu.find(c => c.config_key === key)?.config_value || ''
+          return (
+            <div className="space-y-4">
+              {/* 智能解析 */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-100">
+                  <h3 className="text-sm font-semibold text-purple-700">🤖 智能解析</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">粘贴闲管家应用配置原始文本，AI 自动提取</p>
+                </div>
+                <div className="px-4 py-3 space-y-3">
+                  <textarea
+                    value={xianyuRawText}
+                    onChange={e => setXianyuRawText(e.target.value)}
+                    placeholder={'粘贴应用配置原始文本，例如：\n应用类型进销存\n应用模式自研系统\n应用名称艾阳的店铺\n应用状态已上线\nAppKey1500256339739973\nAppSecretggEj73NV7fJfpwPQxDtFiyGIPkyHuxFH\n创建时间2026-03-17 19:39:40'}
+                    rows={5}
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-gray-50/80 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none font-mono"
+                  />
+                  <div className="flex justify-end">
+                    <button type="button" onClick={parseXianyuConfig} disabled={parsingXianyu || !xianyuRawText.trim()}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 disabled:opacity-50 shadow-sm transition-all">
+                      {parsingXianyu ? (
+                        <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>解析中...</>
+                      ) : (
+                        <><span>🤖</span> AI 一键解析</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* API 配置 */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
+                  <h3 className="text-sm font-semibold text-orange-700">闲管家 API 配置</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {xianyu.filter(c => c.config_key === 'xianyu_app_key' || c.config_key === 'xianyu_app_secret').map(c => <ConfigField key={c.config_key} cfg={c} idx={systemConfigs.indexOf(c)} configs={systemConfigs} setConfigs={setSystemConfigs} />)}
+                </div>
+              </div>
+
+              {/* 应用信息 */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                  <h3 className="text-sm font-semibold text-blue-700">应用概况</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  <ConfigField cfg={{ config_key: 'xianyu_app_type', config_value: safeVal('xianyu_app_type'), config_label: '应用类型' }} idx={systemConfigs.findIndex(c => c.config_key === 'xianyu_app_type')} configs={systemConfigs} setConfigs={setSystemConfigs} />
+                  <ConfigField cfg={{ config_key: 'xianyu_app_mode', config_value: safeVal('xianyu_app_mode'), config_label: '应用模式' }} idx={systemConfigs.findIndex(c => c.config_key === 'xianyu_app_mode')} configs={systemConfigs} setConfigs={setSystemConfigs} />
+                  <ConfigField cfg={{ config_key: 'xianyu_app_name', config_value: safeVal('xianyu_app_name'), config_label: '应用名称' }} idx={systemConfigs.findIndex(c => c.config_key === 'xianyu_app_name')} configs={systemConfigs} setConfigs={setSystemConfigs} />
+                  <ConfigField cfg={{ config_key: 'xianyu_app_status', config_value: safeVal('xianyu_app_status'), config_label: '应用状态' }} idx={systemConfigs.findIndex(c => c.config_key === 'xianyu_app_status')} configs={systemConfigs} setConfigs={setSystemConfigs} />
+                  <ConfigField cfg={{ config_key: 'xianyu_created_at', config_value: safeVal('xianyu_created_at'), config_label: '创建时间' }} idx={systemConfigs.findIndex(c => c.config_key === 'xianyu_created_at')} configs={systemConfigs} setConfigs={setSystemConfigs} />
+                </div>
+              </div>
+            </div>
+          )
         default: return null
       }
     }
@@ -1780,7 +2484,14 @@ export default function AdminPage() {
     const isPaymentTab = settingsSubTab === 'wechat' || settingsSubTab === 'alipay'
 
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto w-full space-y-4">
+      <AdminAiTabLayout
+        tabKey="settings"
+        adminFetch={adminFetch}
+        showToast={showToast}
+        onRefresh={() => { fetchSystemConfigs(); fetchPaymentConfigs() }}
+        className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto w-full"
+      >
+      <div className="space-y-4">
         {/* 子Tab导航 */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-gray-100/80 rounded-xl p-1">
           {SETTINGS_SUB_TABS.map(tab => (
@@ -1813,19 +2524,12 @@ export default function AdminPage() {
           )}
         </form>
       </div>
+      </AdminAiTabLayout>
     )
   }
 
-  async function handleDeleteUser(userId, nickname) {
-    if (!confirm(`确定删除用户「${nickname || userId}」及其所有聊天记录？此操作不可恢复！`)) return
-    try {
-      await adminFetch(`/api/admin/users/${userId}`, { method: 'DELETE' })
-      setUsers(prev => prev.filter(u => u.id !== userId))
-      showToast('用户已删除')
-    } catch { showToast('删除失败') }
-  }
-
-  function renderUsers() {
+  function __DEAD_START_renderUsers() {
+    return null
     const totalBalance = users.reduce((s, u) => s + parseFloat(u.balance || 0), 0)
     const totalSpent = users.reduce((s, u) => s + parseFloat(u.total_spent || 0), 0)
     const totalMsgs = users.reduce((s, u) => s + (u.total_messages || 0), 0)
@@ -1860,7 +2564,7 @@ export default function AdminPage() {
           <div className="text-center py-16 text-gray-400 text-sm">暂无用户<br/><span className="text-xs">用户在前台注册后会显示在这里</span></div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {users.map(u => <UserCard key={u.id} u={u} balanceInputs={balanceInputs} setBalanceInputs={setBalanceInputs} handleAdjustBalance={handleAdjustBalance} handleDeleteUser={handleDeleteUser} fmtTime={fmtTime} timeAgo={timeAgo} />)}
+            {null}
           </div>
         )}
       </div>
@@ -1871,7 +2575,15 @@ export default function AdminPage() {
     const STATUS_MAP = { pending: { label: '待确认', color: 'bg-yellow-100 text-yellow-700' }, confirmed: { label: '已确认', color: 'bg-green-100 text-green-700' }, rejected: { label: '已拒绝', color: 'bg-red-100 text-red-700' } }
     const METHOD_MAP = { wechat: '微信支付', alipay: '支付宝' }
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-5">
+      <AdminAiTabLayout
+        tabKey="recharge"
+        adminFetch={adminFetch}
+        showToast={showToast}
+        onRefresh={() => fetchRechargeOrders()}
+        loading={loadingRecharge}
+        className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full"
+      >
+      <div className="space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h2 className="text-lg font-bold text-gray-800">充值订单管理</h2>
@@ -1941,81 +2653,442 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+      </AdminAiTabLayout>
     )
   }
 
+  function renderOrders() {
+    const STATUS_MAP = {
+      pending: { label: '待支付', color: 'bg-gray-100 text-gray-600' },
+      paid: { label: '已支付', color: 'bg-blue-100 text-blue-600' },
+      serving: { label: '服务中', color: 'bg-orange-100 text-orange-600' },
+      completed: { label: '已完成', color: 'bg-green-100 text-green-600' },
+      cancelled: { label: '已取消', color: 'bg-red-100 text-red-600' },
+    }
+    const STATUS_BADGE = {
+      pending: { bg: '#6b7280', color: '#fff' },
+      paid: { bg: '#3b82f6', color: '#fff' },
+      serving: { bg: '#f97316', color: '#fff' },
+      completed: { bg: '#22c55e', color: '#fff' },
+      cancelled: { bg: '#ef4444', color: '#fff' },
+    }
+    const STATUS_OPTIONS = Object.keys(STATUS_MAP).filter(k => k !== 'cancelled')
+    const FILTER_OPTIONS = ['', 'pending', 'paid', 'serving', 'completed', 'cancelled']
+    const isXianyuTab = activeTab === 'xianyu'
+    const pageClass = 'p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full'
+
+    const ordersBody = (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">{isXianyuTab ? '闲鱼运营' : '订单管理'}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isXianyuTab
+                ? (xianyuSubTab === 'xianyu-dashboard' ? '多维度数据分析：订单状态、销售趋势、热销 TOP10、AI 运营日报'
+                  : xianyuSubTab === 'xianyu-products' ? '闲鱼商品、店铺与余额管理'
+                  : '查看闲管家平台订单，支持发货、改价与卡密')
+                : '管理用户 AI 申诉服务订单；闲鱼数据请进入侧栏「闲鱼运营」'}
+            </p>
+          </div>
+          {isXianyuTab ? (
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+              <button type="button" onClick={() => setXianyuSubTab('xianyu-dashboard')} className={`px-2.5 sm:px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${xianyuSubTab === 'xianyu-dashboard' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>数据看板</button>
+              <button type="button" onClick={() => { setXianyuSubTab('xianyu-orders'); if (!xianyuOrders.length) fetchXianyuOrders(1, '', '', '') }} className={`px-2.5 sm:px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${xianyuSubTab === 'xianyu-orders' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>闲鱼订单</button>
+              <button type="button" onClick={() => setXianyuSubTab('xianyu-products')} className={`px-2.5 sm:px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${xianyuSubTab === 'xianyu-products' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>闲鱼商品</button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => { setActiveTab('xianyu'); setXianyuSubTab('xianyu-dashboard') }} className="px-3 py-1.5 text-xs rounded-lg font-medium bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">
+              前往闲鱼运营 →
+            </button>
+          )}
+        </div>
+
+        {isXianyuTab && xianyuSubTab === 'xianyu-dashboard' ? (
+          <XianyuDashboard adminFetch={adminFetch} showToast={showToast} onSwitchTab={setXianyuSubTab} />
+        ) : !isXianyuTab ? (
+          <>
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+              {FILTER_OPTIONS.map(f => (
+                <button key={f} onClick={() => { setOrderFilter(f); fetchOrders(f) }}
+                  className={`px-2.5 sm:px-3 py-1.5 text-xs rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${orderFilter === f ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  {f === '' ? '全部' : STATUS_MAP[f]?.label}
+                </button>
+              ))}
+            </div>
+            {loadingOrders ? (
+              <div className="text-center py-20 text-gray-400 text-sm">加载中...</div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-20 text-gray-300 text-sm">暂无订单</div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-100">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">订单号</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">产品名称</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">用户</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">金额</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">状态</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">创建时间</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {orders.map(o => {
+                        const s = STATUS_MAP[o.status] || {}
+                        const sb = STATUS_BADGE[o.status] || { bg: '#6b7280', color: '#fff' }
+                        const isOpen = orderStatusDropdown === o.id
+                        return (
+                          <tr key={o.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3 text-gray-600 font-mono text-xs whitespace-nowrap">{o.order_no || '-'}</td>
+                            <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{o.product_name || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{o.phone || '-'}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap">¥{parseFloat(o.amount || 0).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <div className="relative inline-block">
+                                <button
+                                  onClick={() => setOrderStatusDropdown(isOpen ? null : o.id)}
+                                  className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors hover:opacity-80"
+                                  style={{ backgroundColor: sb.bg, color: sb.color }}
+                                >
+                                  {s.label}
+                                </button>
+                                {isOpen && (
+                                  <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-30 bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[120px]">
+                                    {STATUS_OPTIONS.map(opt => {
+                                      const optBadge = STATUS_BADGE[opt]
+                                      return (
+                                        <button
+                                          key={opt}
+                                          onClick={() => handleUpdateOrderStatus(o.id, opt)}
+                                          className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 transition-colors flex items-center gap-2"
+                                        >
+                                          <span
+                                            className="w-2 h-2 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: optBadge.bg }}
+                                          />
+                                          <span className="text-gray-700">{STATUS_MAP[opt]?.label}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{fmtTime(o.created_at)}</td>
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <div className="relative inline-block">
+                                <button
+                                  onClick={() => setOrderStatusDropdown(isOpen ? null : o.id)}
+                                  className="px-3 py-1.5 text-xs text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium"
+                                >
+                                  变更状态
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        ) : xianyuSubTab === 'xianyu-products' ? (
+          <div className="mt-2"><XianyuPanel adminFetch={adminFetch} showToast={showToast} /></div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <select value={xianyuOrderStatus} onChange={e => { setXianyuOrderStatus(e.target.value); setXianyuPage(1); fetchXianyuOrders(1, e.target.value, xianyuRefundStatus, xianyuKeyword) }} className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                <option value="">全部状态</option>
+                {Object.entries(ORDER_STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select value={xianyuRefundStatus} onChange={e => { setXianyuRefundStatus(e.target.value); setXianyuPage(1); fetchXianyuOrders(1, xianyuOrderStatus, e.target.value, xianyuKeyword) }} className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                <option value="">全部退款</option>
+                {Object.entries(REFUND_STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <input type="text" placeholder="搜索订单号/买家" value={xianyuKeyword} onChange={e => setXianyuKeyword(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { setXianyuPage(1); fetchXianyuOrders(1, xianyuOrderStatus, xianyuRefundStatus, xianyuKeyword) } }} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg w-40" />
+              <button onClick={() => { setXianyuPage(1); fetchXianyuOrders(1, xianyuOrderStatus, xianyuRefundStatus, xianyuKeyword) }} className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-medium">搜索</button>
+            </div>
+
+            {xianyuLoading ? (
+              <div className="text-center py-20 text-gray-400 text-sm">加载中...</div>
+            ) : xianyuOrders.length === 0 ? (
+              <div className="text-center py-20 text-gray-300 text-sm">暂无闲鱼订单</div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mt-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-100">
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">订单号</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">商品</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">买家</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">收货地址</th>
+                        <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">金额</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">下单时间</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">状态</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">物流</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {xianyuOrders.map(o => {
+                        const orderStatusInfo = formatOrderStatusLabel(o.order_status)
+                        const refundStatusInfo = o.refund_status && o.refund_status !== 0 ? formatRefundStatusLabel(o.refund_status) : null
+                        const consignInfo = o.consign_type ? formatConsignLabel(o.consign_type) : null
+                        const img = o.goods?.images?.[0] || ''
+                        const fullAddr = formatFullAddress(o) || o.receiver_full_address || ''
+                        return (
+                          <tr key={o.order_no} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-3 py-2.5 text-gray-600 font-mono text-xs whitespace-nowrap">{o.order_no || '-'}</td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-2 min-w-[180px]">
+                                {img ? <img src={xyImageSrc(img)} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-lg object-cover bg-gray-100 flex-shrink-0" onError={e => { e.target.style.display = 'none' }} /> : <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />}
+                                <div className="min-w-0">
+                                  <p className="text-xs text-gray-800 font-medium truncate max-w-[160px]">{o.goods?.title || o.product_title || '-'}</p>
+                                  {o.goods?.sku_text && <p className="text-[10px] text-gray-400 truncate">{o.goods.sku_text}</p>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap">
+                              <div>{o.buyer_nick || '-'}</div>
+                              {o.receiver_mobile && <p className="text-[10px] text-gray-400">{o.receiver_mobile}</p>}
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[200px]">
+                              <div className="truncate" title={fullAddr}>
+                                {o.receiver_name ? <span className="text-gray-700">{o.receiver_name} </span> : ''}
+                                {fullAddr || '-'}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-semibold text-gray-800 text-xs whitespace-nowrap">¥{formatOrderAmount(o)}</td>
+                            <td className="px-3 py-2.5 text-center text-gray-400 text-xs whitespace-nowrap">{fmtTime(o.order_time)}</td>
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${orderStatusInfo.bg} ${orderStatusInfo.text}`}>{orderStatusInfo.label}</span>
+                              {refundStatusInfo && <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ml-1 ${refundStatusInfo.bg} ${refundStatusInfo.text}`}>{refundStatusInfo.label}</span>}
+                            </td>
+                            <td className="px-3 py-2.5 text-center text-xs whitespace-nowrap">
+                              {consignInfo ? (
+                                <div>
+                                  <span className="text-gray-600">{consignInfo.label}</span>
+                                  {(o.waybill_no || o.express_no) && (
+                                    <p className="text-[10px] text-gray-400">{o.express_company || o.express_name || ''} {o.waybill_no || o.express_no}</p>
+                                  )}
+                                </div>
+                              ) : <span className="text-gray-300">-</span>}
+                            </td>
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                              <div className="flex flex-wrap items-center justify-center gap-1">
+                                <button type="button" onClick={() => openXyShip(o)} className="px-2 py-1 text-[10px] rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium">发货</button>
+                                <button type="button" onClick={() => openXyPrice(o)} className="px-2 py-1 text-[10px] rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium">改价</button>
+                                <button type="button" onClick={() => openXyCards(o)} className="px-2 py-1 text-[10px] rounded-md bg-purple-50 text-purple-600 hover:bg-purple-100 font-medium">卡密</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {xianyuTotal > xianyuPageSize && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+                    <span className="text-xs text-gray-500">共 {xianyuTotal} 条，第 {xianyuPage}/{Math.ceil(xianyuTotal / xianyuPageSize)} 页</span>
+                    <div className="flex items-center gap-1">
+                      <button disabled={xianyuPage <= 1} onClick={() => { const np = xianyuPage - 1; setXianyuPage(np); fetchXianyuOrders(np) }} className="px-3 py-1 text-xs border border-gray-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors">上一页</button>
+                      <button disabled={xianyuPage >= Math.ceil(xianyuTotal / xianyuPageSize)} onClick={() => { const np = xianyuPage + 1; setXianyuPage(np); fetchXianyuOrders(np) }} className="px-3 py-1 text-xs border border-gray-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors">下一页</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {xyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !xyBusy && setXyModal(null)}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-800">
+                  {xyModal === 'ship' ? '订单发货' : xyModal === 'price' ? '订单改价' : '查看卡密'}
+                </h3>
+                <button type="button" onClick={() => setXyModal(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
+              {xyOrder && <p className="text-xs text-gray-500 font-mono">订单号：{xyOrder.order_no}</p>}
+              {xyModal === 'ship' && (
+                <div className="space-y-3">
+                  <label className="block text-xs text-gray-600">
+                    物流公司
+                    <select value={xyShip.expressCompany} onChange={e => setXyShip(s => ({ ...s, expressCompany: e.target.value }))} className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg">
+                      <option value="">请选择</option>
+                      {xyLogistics.map((c, i) => {
+                        const code = typeof c === 'string' ? c : (c.code || c.express_code || '')
+                        const name = typeof c === 'string' ? c : (c.name || c.express_name || c.company_name || code)
+                        const val = code && name && code !== name ? `${code}::${name}` : (code || name)
+                        return <option key={i} value={val}>{name}</option>
+                      })}
+                    </select>
+                  </label>
+                  <label className="block text-xs text-gray-600">
+                    物流单号
+                    <input value={xyShip.expressNo} onChange={e => setXyShip(s => ({ ...s, expressNo: e.target.value }))} className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" placeholder="快递单号" />
+                  </label>
+                  <button type="button" disabled={xyBusy} onClick={submitXyShip} className="w-full py-2.5 bg-purple-600 text-white text-sm rounded-lg font-medium disabled:opacity-50">{xyBusy ? '提交中...' : '确认发货'}</button>
+                </div>
+              )}
+              {xyModal === 'price' && (
+                <div className="space-y-3">
+                  <label className="block text-xs text-gray-600">
+                    新价格（元）
+                    <input type="number" step="0.01" value={xyPrice} onChange={e => setXyPrice(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
+                  </label>
+                  <button type="button" disabled={xyBusy} onClick={submitXyPrice} className="w-full py-2.5 bg-purple-600 text-white text-sm rounded-lg font-medium disabled:opacity-50">{xyBusy ? '提交中...' : '确认改价'}</button>
+                </div>
+              )}
+              {xyModal === 'cards' && (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {xyBusy && !xyCards ? <p className="text-sm text-gray-400 text-center py-4">加载中...</p> : null}
+                  {xyCards && (
+                    <pre className="text-xs bg-gray-50 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{typeof xyCards === 'string' ? xyCards : JSON.stringify(xyCards, null, 2)}</pre>
+                  )}
+                  {!xyBusy && xyCards == null && <p className="text-sm text-gray-400 text-center py-4">暂无卡密数据</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+
+    if (isXianyuTab) {
+      return <div className={pageClass}>{ordersBody}</div>
+    }
+
+    return (
+      <AdminAiTabLayout
+        tabKey="orders"
+        adminFetch={adminFetch}
+        showToast={showToast}
+        onRefresh={() => fetchOrders()}
+        loading={loadingOrders}
+        className={pageClass}
+      >
+        {ordersBody}
+      </AdminAiTabLayout>
+    )
+  }
 
   return (
     <div className="h-screen h-dvh bg-[#f5f5f5] flex flex-col overflow-hidden">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900/90 backdrop-blur-lg text-white text-sm px-5 py-2.5 rounded-2xl shadow-xl animate-fade-in font-medium">{toast}</div>
       )}
-      <header className="bg-white flex-shrink-0 z-20" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <div className="px-4 py-2.5 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+      <header className="bg-white flex-shrink-0 z-20" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="px-4 py-2.5 flex items-center justify-between bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white tracking-tight">商户申诉 · 管理后台</h1>
+              <h1 className="text-sm font-bold text-white tracking-tight">商户申诉助手 · 管理后台</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />系统运行中</span>
-                <span className="text-[10px] text-slate-500">v2.0</span>
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />运行中</span>
+                <span className="text-[10px] text-slate-500">v2.1</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <a href="/" className="h-8 px-3 flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg text-[11px] font-medium transition-all" title="前台">
+          <div className="flex items-center gap-1">
+            <a href="/" className="h-8 px-3 flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg text-[11px] font-medium transition-all" title="访问前台">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
-              <span className="hidden sm:inline">访问前台</span>
+              <span className="hidden sm:inline">前台</span>
             </a>
-            <button onClick={handleLogout} className="h-8 px-3 flex items-center gap-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg text-[11px] font-medium transition-all" title="退出">
+            <button onClick={handleLogout} className="h-8 px-3 flex items-center gap-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg text-[11px] font-medium transition-all" title="退出登录">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
               <span className="hidden sm:inline">退出</span>
             </button>
           </div>
         </div>
-        <div className="px-2 sm:px-4 py-1.5 flex overflow-x-auto no-scrollbar bg-gray-50/80 border-b border-gray-100">
-          {TABS.map(tab => (
-            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setMobileShowChat(false) }}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap rounded-xl mx-0.5 transition-all ${
-                activeTab === tab.key
-                  ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
-              }`}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
-              </svg>
-              <span>{tab.label}</span>
-            </button>
+        <div className="px-2 sm:px-4 py-1.5 flex overflow-x-auto no-scrollbar bg-gray-50/80 border-b border-gray-100 items-center gap-1">
+          {TABS.map((tab, i) => (
+            <React.Fragment key={tab.key}>
+              {i > 0 && i % 6 === 0 && <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />}
+              <button onClick={() => { setActiveTab(tab.key); setMobileShowChat(false) }}
+                className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium whitespace-nowrap rounded-lg transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
+                }`}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
+                </svg>
+                <span>{tab.label}</span>
+                {tab.badge ? (
+                  <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-indigo-600 text-white leading-none">{tab.badge}</span>
+                ) : null}
+              </button>
+            </React.Fragment>
           ))}
         </div>
       </header>
-      <div className="flex-1 flex flex-col overflow-auto gpu-scroll">
-        <div key={activeTab} className="panel-animate flex-1">
+      <div className={`flex-1 flex flex-col gpu-scroll ${activeTab === 'sessions' ? 'min-h-0 overflow-hidden' : 'overflow-auto'}`}>
+        <div key={activeTab} className={`panel-animate flex-1 ${activeTab === 'sessions' ? 'flex flex-col min-h-0 overflow-hidden' : ''}`}>
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'sessions' && renderSessions()}
-        {activeTab === 'users' && renderUsers()}
+        {activeTab === 'session-chatboard' && (
+          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            <SessionChatboardPanel
+              adminFetch={adminFetch}
+              showToast={showToast}
+              onOpenSession={(id) => { setActiveTab('sessions'); selectSession(id) }}
+            />
+          </div>
+        )}
+        {activeTab === 'ops-center' && (
+          <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
+            <OpsCenterPanel
+              adminFetch={adminFetch}
+              showToast={showToast}
+              onOpenSession={(id) => { setActiveTab('sessions'); selectSession(id) }}
+            />
+          </div>
+        )}
         {activeTab === 'analytics' && renderAnalytics()}
         {activeTab === 'settings' && renderSettings()}
         {activeTab === 'recharge' && renderRechargeOrders()}
+        {(activeTab === 'orders' || activeTab === 'xianyu') && renderOrders()}
         {activeTab === 'knowledge' && renderKnowledge()}
         {activeTab === 'ai-models' && <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"><AIModelsPanel adminFetch={adminFetch} showToast={showToast} /></div>}
-        {activeTab === 'evolution' && <EvolutionPanel adminFetch={adminFetch} showToast={showToast} />}
-        {activeTab === 'mall' && <MallPanel adminFetch={adminFetch} />}
-        {activeTab === 'contact-cards' && <ContactCardsPanel adminFetch={adminFetch} />}
         {activeTab === 'ai-activity' && <AIActivityPanel adminFetch={adminFetch} />}
-        {activeTab === 'tokens' && <TokenPanel adminFetch={adminFetch} />}
+        {activeTab === 'schedule' && <SchedulePanel adminFetch={adminFetch} showToast={showToast} />}
+        {activeTab === 'tokens' && <TokenPanel adminFetch={adminFetch} showToast={showToast} />}
         {activeTab === 'deepseek-balance' && renderDeepseekBalance()}
-        {activeTab === 'monitor' && <MonitorPanel adminFetch={adminFetch} />}
-        {activeTab === 'backup' && <BackupPanel adminFetch={adminFetch} />}
+        {activeTab === 'monitor' && <MonitorPanel adminFetch={adminFetch} showToast={showToast} />}
+        {activeTab === 'backup' && <BackupPanel adminFetch={adminFetch} showToast={showToast} />}
+        {activeTab === 'users' && <UsersPanel adminFetch={adminFetch} showToast={showToast} />}
+        {activeTab === 'mall' && <MallPanel adminFetch={adminFetch} />}
+        {activeTab === 'evolution' && <EvolutionPanel adminFetch={adminFetch} showToast={showToast} />}
+        {activeTab === 'audit-log' && <AuditLogPanel adminFetch={adminFetch} showToast={showToast} />}
         </div>
       </div>
       {showAdminReport && deepAnalysisResult && (
         <ReportCard collectedData={sessionCollectedData} analysisText={deepAnalysisResult} onClose={() => setShowAdminReport(false)} />
       )}
+      <FloatingAdminAi
+        adminFetch={adminFetch}
+        showToast={showToast}
+        onNavigateTab={setActiveTab}
+        onGlobalRefresh={() => {
+          fetchStats()
+          fetchRechargeOrders()
+          fetchOrders()
+          fetchCases()
+          fetchSchedules()
+          fetchQuickReplies()
+        }}
+      />
     </div>
   )
 }

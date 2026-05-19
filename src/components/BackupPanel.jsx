@@ -1,11 +1,64 @@
-﻿import React, { useState, useEffect, useCallback } from 'react'
+/**
+ * @fileoverview 数据库备份管理面板（管理员专用）
+ * 提供数据库备份的创建、查看、删除和历史记录管理功能
+ *
+ * 核心功能：
+ *   - 状态概览：自动备份调度器状态、备份文件数、总占用空间、最后备份信息
+ *   - 立即备份：手动触发全量备份，显示备份详情（文件名/大小/表数/行数/耗时）
+ *   - 备份列表：按时间倒序显示所有备份文件，支持单独删除
+ *   - 历史记录：备份执行历史，包含状态（成功/失败/运行中）、类型（自动/手动）、性能数据
+ *
+ * 备份策略：
+ *   - 自动备份：每日固定时间执行（由 status.autoBackupHour 决定）
+ *   - 文件上限：最多保留 maxFiles 个备份文件，超出后自动清理
+ *   - 备份内容：全量数据库（所有表的完整数据）
+ *
+ * 关键依赖：
+ *   - adminFetch: 带管理员认证的 fetch 函数
+ *   - 后端接口: /api/admin/backup/status, /api/admin/backup/run,
+ *               /api/admin/backup/:filename
+ *
+ * 注意事项：
+ *   - 删除备份不可恢复，有二次确认弹窗
+ *   - 备份进行中时（isRunning），"立即备份"按钮禁用
+ *   - 备份成功使用 alert() 弹窗显示详情，失败也使用 alert()
+ *   - 历史记录按 max-h-60 限制高度，超出可滚动
+ */
+import React, { useState, useEffect, useCallback } from 'react'
+import AdminAiTabLayout from './AdminAiTabLayout.jsx'
 
-export default function BackupPanel({ adminFetch }) {
+/**
+ * 数据库备份管理面板（管理员专用）
+ *
+ * 提供备份的完整生命周期管理：
+ *   1. 状态卡片：自动备份状态/文件数/总空间/最后备份
+ *   2. 备份文件列表：文件名/创建时间/大小 + 删除操作
+ *   3. 备份历史记录：执行状态/类型/表数/行数/耗时的详细流水
+ *
+ * @param {Object} props
+ * @param {Function} props.adminFetch - 带管理员认证的 fetch 函数
+ * @returns {JSX.Element} 数据库备份管理面板 UI
+ *
+ * 注意事项：
+ *   - 备份操作使用 confirm() 二次确认，成功后 alert() 显示详情
+ *   - 删除操作不可恢复，需二次确认
+ *   - 历史记录按时间倒序排列，最新的在前
+ */
+export default function BackupPanel({ adminFetch, showToast }) {
+  /** 备份状态数据对象 */
   const [status, setStatus] = useState(null)
+  /** 是否正在首次加载 */
   const [loading, setLoading] = useState(true)
+  /** 立即备份是否进行中 */
   const [backupLoading, setBackupLoading] = useState(false)
+  /** 正在删除的备份文件名，null 表示无删除操作 */
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [backupDoneMsg, setBackupDoneMsg] = useState('')
 
+  /**
+   * 获取备份状态
+   * 调用 /api/admin/backup/status 获取调度器状态/文件列表/历史记录
+   */
   const fetchStatus = useCallback(async () => {
     try {
       const res = await adminFetch('/api/admin/backup/status')
@@ -15,26 +68,44 @@ export default function BackupPanel({ adminFetch }) {
     setLoading(false)
   }, [adminFetch])
 
+  /** 组件挂载时获取备份状态 */
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
+  /** 备份进行中轮询状态 */
+  useEffect(() => {
+    if (!status?.isRunning && !backupLoading) return
+    const t = setInterval(fetchStatus, 2000)
+    return () => clearInterval(t)
+  }, [status?.isRunning, backupLoading, fetchStatus])
+
+  /**
+   * 立即执行数据库备份
+   * 调用 POST /api/admin/backup/run，成功后 alert() 显示备份详情
+   * 备份进行中时禁用按钮（backupLoading 和 status.isRunning 双重判断）
+   */
   const handleBackup = async () => {
     if (!confirm('确定要立即执行数据库备份吗？')) return
     setBackupLoading(true)
+    setBackupDoneMsg('')
     try {
       const res = await adminFetch('/api/admin/backup/run', { method: 'POST' })
       const data = await res.json()
-      if (data.success) {
-        alert(`备份成功！\n文件: ${data.filename}\n大小: ${data.sizeHuman}\n表: ${data.tables} 个\n行: ${data.rows} 行\n耗时: ${data.durationMs}ms`)
+      if (!data.success) {
+        setBackupDoneMsg('备份失败: ' + (data.error || '未知错误'))
       } else {
-        alert('备份失败: ' + (data.error || '未知错误'))
+        setBackupDoneMsg(`备份成功：${data.filename}（${data.sizeHuman}，${data.tables} 表，${data.rows} 行，${data.durationMs}ms）`)
       }
       await fetchStatus()
     } catch (err) {
-      alert('备份请求失败: ' + err.message)
+      setBackupDoneMsg('备份请求失败: ' + err.message)
     }
     setBackupLoading(false)
   }
 
+  /**
+   * 删除指定备份文件
+   * @param {string} filename - 要删除的备份文件名
+   */
   const handleDelete = async (filename) => {
     if (!confirm(`确定删除备份文件 ${filename} 吗？此操作不可恢复。`)) return
     setDeleteTarget(filename)
@@ -47,11 +118,31 @@ export default function BackupPanel({ adminFetch }) {
     setDeleteTarget(null)
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-400">加载备份数据...</div>
-  if (!status) return <div className="p-8 text-center text-red-400">无法获取备份状态</div>
+  if (loading) {
+    return (
+      <AdminAiTabLayout tabKey="backup" adminFetch={adminFetch} showToast={showToast} onRefresh={fetchStatus} loading className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <div className="p-8 text-center text-gray-400">加载备份数据...</div>
+      </AdminAiTabLayout>
+    )
+  }
+  if (!status) {
+    return (
+      <AdminAiTabLayout tabKey="backup" adminFetch={adminFetch} showToast={showToast} onRefresh={fetchStatus} className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <div className="p-8 text-center text-red-400">无法获取备份状态</div>
+      </AdminAiTabLayout>
+    )
+  }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <AdminAiTabLayout
+      tabKey="backup"
+      adminFetch={adminFetch}
+      showToast={showToast}
+      onRefresh={fetchStatus}
+      loading={backupLoading}
+      className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"
+    >
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">数据备份</h2>
@@ -67,6 +158,22 @@ export default function BackupPanel({ adminFetch }) {
           </button>
         </div>
       </div>
+
+      {(backupLoading || status.isRunning) && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <p className="text-sm text-blue-800 font-medium mb-2">备份进行中…</p>
+          <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 animate-[progress_2s_ease-in-out_infinite]" style={{ width: '55%' }} />
+          </div>
+          <p className="text-[10px] text-blue-600/80 mt-2">每 2 秒自动刷新状态，请勿关闭页面</p>
+        </div>
+      )}
+
+      {backupDoneMsg && !status.isRunning && !backupLoading && (
+        <div className={`rounded-xl p-3 text-xs ${backupDoneMsg.startsWith('备份成功') ? 'bg-green-50 text-green-800 border border-green-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
+          {backupDoneMsg}
+        </div>
+      )}
 
       {/* Status Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -147,6 +254,7 @@ export default function BackupPanel({ adminFetch }) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminAiTabLayout>
   )
 }

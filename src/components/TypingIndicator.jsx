@@ -1,5 +1,23 @@
+/**
+ * AI 正在输入指示器
+ * @description 显示 AI 助手正在生成回复的动画指示器
+ * 
+ * 视觉效果：
+ * - 左侧显示 AI 头像（普通模式绿色 / 专业模式金色）
+ * - 右侧白色气泡内三个圆点依次闪烁（typingDot 动画）
+ * - 入场动画 message-animate 滑入效果
+ * 
+ * @param {Object} props
+ * @param {boolean} [props.proMode=false] - 是否为专业模式（金色主题）
+ */
 import React from 'react'
 
+/**
+ * 正在输入指示器组件
+ * @description 显示三个跳动圆点的动画，表示 AI 正在生成回复
+ * @param {Object} props
+ * @param {boolean} [props.proMode=false] - 是否为专业模式（影响颜色和主题）
+ */
 export default function TypingIndicator({ proMode = false }) {
   return (
     <div className="flex justify-start my-2.5 message-animate">

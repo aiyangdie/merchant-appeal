@@ -317,6 +317,13 @@ async function seedDefaults(pool) {
     ['ai_temperature',      '0.7',                     'AI 回复温度（0-1）',             'ai',      14],
     ['cost_multiplier',     '2',                       'Token计费倍率（默认2倍）',        'ai',      15],
     ['new_user_balance',    '1.00',                    '新用户注册赠送余额（元，0=不赠送）', 'ai',      16],
+    ['xianyu_app_key',     '',                        '闲管家 AppKey',               'xianyu',  1],
+    ['xianyu_app_secret',  '',                        '闲管家 AppSecret',             'xianyu',  2],
+    ['xianyu_app_type',    '进销存',                   '应用类型',                      'xianyu',  3],
+    ['xianyu_app_mode',    '自研系统',                  '应用模式',                      'xianyu',  4],
+    ['xianyu_app_name',    '艾阳的店铺',                '应用名称',                      'xianyu',  5],
+    ['xianyu_app_status',  '已上线',                    '应用状态',                      'xianyu',  6],
+    ['xianyu_created_at',  '2026-03-17 19:39:40',     '创建时间',                      'xianyu',  7],
   ];
   for (const [key, value, label, group, order] of sysDefaults) {
     await pool.execute(

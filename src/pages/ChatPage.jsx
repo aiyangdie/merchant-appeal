@@ -1,4 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react'
+/**
+ * @fileoverview 用户聊天主页面
+ * 商户申诉系统的核心交互界面，提供完整的对话式申诉体验
+ *
+ * 核心功能：
+ *   - 用户认证：登录/注册（手机号 + 中文名），JWT Token 管理，过期自动登出
+ *   - AI 对话：流式消息输出（SSE 协议），实时 AI 申诉顾问
+ *   - 信息收集：AI 自动收集商户信息（行业、违规类型、商户号、处罚原因等）
+ *   - API 模式选择：官方 API / 自定义 Key 两种模式
+ *   - 会话管理：创建新会话、查看历史会话、会话持久化
+ *   - 订单绑定：关联申诉案件与具体订单
+ *   - 侧边面板：申诉文案、投诉材料、申诉指导、AI 智能分析、用户中心
+ *   - 充值系统：余额充值、消费记录、购买确认
+ *
+ * 视图模式：
+ *   - auth: 登录/注册页面
+ *   - apiSelect: API 模式选择（官方/自定义Key）
+ *   - chat: 正常聊天界面
+ *   - myHistory: 历史会话列表
+ *   - history: 只读查看某条历史会话
+ *
+ * 关键依赖：
+ *   - ChatMessage: 消息气泡组件（支持 Markdown 渲染）
+ *   - AIAnalysisPanel: AI 智能分析面板
+ *   - ComplaintDocPanel: 投诉材料整理面板
+ *   - AppealTextPanel: 申诉文案生成面板
+ *   - AppealGuidePanel: 申诉指导面板
+ *   - UserCenter: 用户中心（余额/消费记录）
+ *   - RechargeModal: 充值弹窗
+ *   - OrderBindModal: 订单绑定弹窗
+ *   - PurchaseConfirmModal: 购买确认弹窗
+ *   - sessionUtils: 会话管理工具
+ *   - auth service: 认证服务
+ *
+ * 注意事项：
+ *   - Token 过期检测使用 JWT payload.exp 提前判断
+ *   - 流式消息使用 EventSource 或 fetch + ReadableStream
+ *   - sessionIdRef 保持最新会话 ID，避免闭包陷阱
+ *   - WELCOME 为首次访问欢迎消息（Markdown 格式）
+ *   - 所有 API 请求携带 Authorization Bearer Token
+ */
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
 import TypingIndicator from '../components/TypingIndicator'
@@ -9,22 +50,29 @@ import ComplaintDocPanel from '../components/ComplaintDocPanel'
 import AppealGuidePanel from '../components/AppealGuidePanel'
 import UserCenter from '../components/UserCenter'
 import UserAvatar from '../components/UserAvatar'
+import ToastContainer from '../components/ToastContainer'
+import OrderBindModal from '../components/OrderBindModal'
+import RechargeModal from '../components/RechargeModal'
+import PurchaseConfirmModal from '../components/PurchaseConfirmModal'
+import MoreMenu from '../components/MoreMenu'
+import useToast from '../hooks/useToast'
+import storage from '../utils/storage'
+import { isChinese, sanitizeCollected, fmtTime, formatOrderAmount, getOrderStatusStyle, sortOrdersByStatus, FIELD_LABELS, BREAKPOINTS, formatOrderStatusLabel, formatRefundStatusLabel, formatFullAddress, formatConsignLabel, ORDER_STATUS_MAP, REFUND_STATUS_MAP } from '../utils/orderUtils'
+import { ensureSession, bindOrder, fetchSessionInfo } from '../utils/sessionUtils'
+import { saveToken as saveAuthToken, getToken, clearAuth, saveUser, getUser, saveSessionId, removeSessionId, getSessionId } from '../services/auth'
 
-const WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
+const WELCOME_FALLBACK = '您好！我是您的商户号申诉顾问。请简单说说您的行业和遇到的问题，我会帮您分析并生成申诉材料。'
 
-不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
-
-💼 **先说说您的情况吧：**
-
-比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
-
-🛠️ **平台功能一览（顶部工具栏）：**
-📄 **申诉文案** — 一键生成可直接复制到微信后台的申诉材料
-📋 **投诉材料** — 生成完整申诉文书（可复制到Word）
-🗺️ **申诉指导** — 完整流程 + 投诉回复话术 + 95017电话话术 + 材料清单 + 进度追踪
-
-💡 有问题随时问我，比如"为什么要这个信息"。
-🔒 您的信息只用于本次咨询，不会泄露。`
+async function fetchWelcomeMessage() {
+  try {
+    const res = await fetch('/api/public/welcome')
+    if (!res.ok) return WELCOME_FALLBACK
+    const data = await res.json()
+    return data?.message?.trim() || WELCOME_FALLBACK
+  } catch {
+    return WELCOME_FALLBACK
+  }
+}
 
 // ========== 视图模式 ==========
 // 'auth'      — 登录/注册（手机号 + 中文名）
@@ -33,11 +81,6 @@ const WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解
 // 'myHistory' — 我的历史对话列表
 // 'history'   — 只读查看某条历史会话
 
-function isChinese(str) {
-  if (!str) return false
-  return /^[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\u{2ceb0}-\u{2ebef}\u{30000}-\u{3134f}]+$/u.test(str.trim())
-}
-
 export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -45,6 +88,17 @@ export default function ChatPage() {
   const sessionIdRef = useRef(null)  // 添加 ref 来存储最新的 sessionId
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
+
+  // 检测 localStorage 中的 token 是否已过期（提前判断避免无用请求）
+  function isLocalTokenExpired() {
+    try {
+      const token = getToken()
+      if (!token) return true
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (!payload.exp) return false
+      return Date.now() >= payload.exp * 1000
+    } catch { return true }
+  }
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -55,24 +109,26 @@ export default function ChatPage() {
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [authMode, setAuthMode] = useState('login') // 'login' | 'register'
-  const tokenRef = useRef(localStorage.getItem('appeal_token') || '')
+  const tokenRef = useRef(getToken() || '')
+  const toast = useToast()
 
-  function getAuthHeaders() {
+  const getAuthHeaders = useCallback(() => {
     const h = { 'Content-Type': 'application/json' }
-    if (tokenRef.current) h['Authorization'] = `Bearer ${tokenRef.current}`
+    const token = getToken()
+    if (token) h['Authorization'] = `Bearer ${token}`
     return h
-  }
+  }, [])
+
   function saveToken(token) {
     tokenRef.current = token || ''
-    if (token) localStorage.setItem('appeal_token', token)
-    else localStorage.removeItem('appeal_token')
+    saveAuthToken(token)
   }
   function handleAuthExpired() {
     saveToken('')
-    localStorage.removeItem('appeal_user')
-    localStorage.removeItem('appeal_session_id')
+    clearAuth()
     setUser(null); setSessionId(null); setMessages([]); setLoading(false)
-    setView('auth'); setAuthPhone(''); setAuthNickname(''); setAuthError('登录已过期，请重新登录')
+    setView('auth'); setReady(true)
+    setAuthPhone(''); setAuthNickname(''); setAuthError('登录已过期，请重新登录')
   }
 
   // API 模式选择
@@ -91,9 +147,7 @@ export default function ChatPage() {
 
   // 历史侧边栏（右滑打开）
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [deletedSessions, setDeletedSessions] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('appeal_deleted_sessions') || '[]') } catch { return [] }
-  })
+  const [deletedSessions, setDeletedSessions] = useState(() => storage.get('deleted_sessions') || [])
   const touchRef = useRef({ startX: 0, startY: 0, dragging: false })
 
   // 充值
@@ -107,46 +161,7 @@ export default function ChatPage() {
   const [paymentPending, setPaymentPending] = useState(null) // { outTradeNo, method, codeUrl, amount }
   const [paymentStatus, setPaymentStatus] = useState('') // pending | paid | failed
   const paymentPollRef = useRef(null)
-
-  // 清理 collectedData：去掉内部 _ 前缀字段，确保所有值都是字符串
-  function sanitizeCollected(raw) {
-    if (!raw || typeof raw !== 'object') return {}
-    const clean = {}
-    for (const [k, v] of Object.entries(raw)) {
-      if (k.startsWith('_')) continue
-      clean[k] = typeof v === 'string' ? v : (v != null ? String(v) : '')
-    }
-    return clean
-  }
-
-  // 智能格式化金额（订单数据金额单位不一致，有的已是元，有的需要转换）
-  function formatOrderAmount(order) {
-    // 优先使用 _fen 字段（最准确）
-    if (order.pay_amount_fen) {
-      return parseFloat(order.pay_amount_fen / 100).toFixed(2)
-    }
-    if (order.total_amount_fen) {
-      return parseFloat(order.total_amount_fen / 100).toFixed(2)
-    }
-    // 如果金额大于10000，说明是分单位
-    let amount = order.pay_amount || order.total_amount || 0
-    if (amount > 10000) {
-      amount = amount / 100
-    }
-    return parseFloat(amount).toFixed(2)
-  }
-
-  // 获取订单状态颜色
-  function getOrderStatusStyle(status, orderStatus) {
-    // orderStatus: 12=待发货, 23=已退款, 其他=未知
-    if (orderStatus === 12) {
-      return { bg: 'bg-green-100', text: 'text-green-700', label: status || '待发货' }
-    }
-    if (orderStatus === 23 || status?.includes('退款') || status?.includes('关闭')) {
-      return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '已关闭' }
-    }
-    return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '未知' }
-  }
+  const MAX_PAYMENT_POLL_COUNT = 24 // 24次 × 5秒 = 2分钟最大轮询时长
 
   // 信息收集面板
   const [collectedInfo, setCollectedInfo] = useState({})
@@ -162,11 +177,12 @@ export default function ChatPage() {
   const [analysisKey, setAnalysisKey] = useState(0) // force re-fetch analysis
   const [newChatAnim, setNewChatAnim] = useState(false) // new chat transition
   const [chatFading, setChatFading] = useState(false) // fade-out before reset
-  const [contactCard, setContactCard] = useState(null)
-  const [contactCards, setContactCards] = useState([])
-  const [showContact, setShowContact] = useState(false)
-  const [selectedCardIdx, setSelectedCardIdx] = useState(0)
+  const [showMoreMenu, setShowMoreMenu] = useState(false) // 三点菜单显示状态
+  const [moreMenuPos, setMoreMenuPos] = useState({ right: 0, top: 0 }) // 三点菜单位置（fixed定位）
+  const moreMenuBtnRef = useRef(null) // 三点按钮ref，用于计算位置
   const [riskLevel, setRiskLevel] = useState(null) // { level, label, description, factors, suggestion }
+  const [completenessHint, setCompletenessHint] = useState(null) // { missing, nextQuestion, score }
+  const [guideDataVersion, setGuideDataVersion] = useState(0) // 收集数据变更时刷新申诉指导
   const [riskTransition, setRiskTransition] = useState(false)
   const prevRiskRef = useRef(null)
   // AI砍价
@@ -178,9 +194,14 @@ export default function ChatPage() {
   // 虚拟人设
   const [virtualPersona, setVirtualPersona] = useState(null)
   const [showPersonaCard, setShowPersonaCard] = useState(false)
+  const [pendingOrderNo, setPendingOrderNo] = useState(null)
+  const [serviceCountdown, setServiceCountdown] = useState(null)
   // 商品详情购买弹窗
   const [detailProduct, setDetailProduct] = useState(null)
   const [purchasing, setPurchasing] = useState(false)
+  const [showPurchaseConfirm, setShowPurchaseConfirm] = useState(false)
+  const [pendingPurchaseProduct, setPendingPurchaseProduct] = useState(null)
+  const [pendingPurchasePrice, setPendingPurchasePrice] = useState(null)
   // 订单绑定
   const [showOrderPanel, setShowOrderPanel] = useState(false)
   const [boundOrder, setBoundOrder] = useState(null)
@@ -189,6 +210,7 @@ export default function ChatPage() {
   const [orderNoInput, setOrderNoInput] = useState('')
   const [orderNoLoading, setOrderNoLoading] = useState(false)
   const [orderSearchResults, setOrderSearchResults] = useState([])
+  const [analyzing, setAnalyzing] = useState(false)
 
   const searchOrder = async (keyword) => {
     // 如果没有session，先创建一个
@@ -197,13 +219,13 @@ export default function ChatPage() {
         const res = await fetch('/api/sessions', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ userId: user?.id })
+          body: JSON.stringify({})
         })
         const data = await res.json()
         if (data.sessionId) {
           setSessionId(data.sessionId)
           sessionIdRef.current = data.sessionId
-          localStorage.setItem('appeal_session_id', data.sessionId)
+          saveSessionId(data.sessionId)
         }
       } catch (e) {
         console.error('创建session失败:', e)
@@ -215,13 +237,7 @@ export default function ChatPage() {
       const res = await fetch(`/api/orders/from-system?keyword=${encodeURIComponent(keyword)}&page_size=20`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success && data.data) {
-        // 显示所有订单，按状态排序（待发货优先）
-        const sorted = data.data.sort((a, b) => {
-          if (a.order_status === 12 && b.order_status !== 12) return -1
-          if (b.order_status === 12 && a.order_status !== 12) return 1
-          return 0
-        })
-        setOrderSearchResults(sorted)
+        setOrderSearchResults(sortOrdersByStatus(data.data.list))
       } else {
         setOrderSearchResults([])
       }
@@ -240,10 +256,9 @@ export default function ChatPage() {
         const res = await fetch('/api/sessions', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ 
-            userId: user?.id,
+          body: JSON.stringify({
             orderNo: order.order_no,
-            orderData: order
+            orderData: order,
           })
         })
         const data = await res.json()
@@ -251,7 +266,7 @@ export default function ChatPage() {
           currentSessionId = data.sessionId
           setSessionId(data.sessionId)
           sessionIdRef.current = data.sessionId
-          localStorage.setItem('appeal_session_id', data.sessionId)
+          saveSessionId(data.sessionId)
           setBoundOrder(order)
           return // 创建时已绑定订单，直接返回
         }
@@ -278,6 +293,29 @@ export default function ChatPage() {
   const [proModeAnim, setProModeAnim] = useState(false) // 专业模式切换动画
   const prevProModeRef = useRef(false)
 
+  // 深度分析：调用后端AI分析接口
+  const handleDeepAnalysis = async () => {
+    if (!sessionId || analyzing) return
+    setAnalyzing(true)
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/deep-analysis`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAnalysisKey(prev => prev + 1)
+        if (data.analysisResult) {
+          addMessage('assistant', data.analysisResult.summary || '深度分析完成，请查看右侧面板', { analysisData: data.analysisResult })
+        }
+      }
+    } catch (e) {
+      console.error('[深度分析] 失败:', e)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   // 专业模式：当系统开始收集核心信息时自动激活
   const isProfessionalMode = infoFields.length > 0 || Object.keys(collectedInfo).length > 0
 
@@ -291,14 +329,6 @@ export default function ChatPage() {
   }, [isProfessionalMode])
 
   useEffect(() => {
-    fetch('/api/contact-card').then(r => r.json()).then(d => {
-      if (d.enabled) setContactCard(d)
-      if (d.cards?.length > 0) setContactCards(d.cards)
-    }).catch(() => {})
-  }, [])
-
-  // 加载会话绑定的订单
-  useEffect(() => {
     if (!sessionId) return
     fetch(`/api/sessions/${sessionId}/order`, { headers: getAuthHeaders() })
       .then(r => r.json())
@@ -307,10 +337,9 @@ export default function ChatPage() {
           setBoundOrder(d.data)
         }
       })
-      .catch(() => {})
+      .catch((e) => console.warn('[订单绑定] 获取失败:', e))
   }, [sessionId])
 
-  // 打开订单面板时自动加载订单列表
   useEffect(() => {
     if (showOrderPanel && orderList.length === 0) {
       setOrderListLoading(true)
@@ -318,18 +347,12 @@ export default function ChatPage() {
         .then(r => r.json())
         .then(d => {
           if (d.success && d.data) {
-            // 显示所有订单，按状态排序（待发货优先）
-            const sorted = d.data.sort((a, b) => {
-              if (a.order_status === 12 && b.order_status !== 12) return -1
-              if (b.order_status === 12 && a.order_status !== 12) return 1
-              return 0
-            })
-            setOrderList(sorted)
+            setOrderList(sortOrdersByStatus(d.data.list))
           } else {
             setOrderList([])
           }
         })
-        .catch(() => setOrderList([]))
+        .catch((e) => { console.warn('[订单] 加载失败:', e); setOrderList([]) })
         .finally(() => setOrderListLoading(false))
     }
   }, [showOrderPanel])
@@ -350,31 +373,8 @@ export default function ChatPage() {
         setRiskTransition(true)
         setTimeout(() => setRiskTransition(false), 600)
       }
-    }).catch(() => {})
+    }).catch((e) => console.warn('[风险评估] 请求失败:', e))
   }, [collectedInfo])
-
-  // 智能名片展示：检测AI回复中的关键转化节点
-  const contactShownRef = useRef(false)
-  useEffect(() => {
-    if (contactShownRef.current || (!contactCard && contactCards.length === 0)) return
-    if (messages.length < 4) return // 至少2轮对话后才触发
-    const lastMsg = messages[messages.length - 1]
-    if (lastMsg?.role !== 'assistant') return
-    const text = lastMsg.content || ''
-    // 关键转化触发词：案件复杂/需要专业帮助/建议咨询/代办/难度高
-    const triggerPatterns = [
-      /案件.*复杂|难度.*高|极难|成功率.*低于|成功率.*[<＜].*50/,
-      /建议.*咨询.*专业|建议.*寻求.*专业|需要.*法律.*支持/,
-      /专业团队.*协助|一对一.*指导|代办/,
-      /如果.*觉得.*困难|如果.*需要.*帮助/,
-      /材料已.*生成|文案已.*生成|申诉材料.*准备/,
-      /所有信息.*收集完毕|信息.*收集.*完成/,
-    ]
-    if (triggerPatterns.some(p => p.test(text))) {
-      contactShownRef.current = true
-      setTimeout(() => setShowContact(true), 2000)
-    }
-  }, [messages, contactCard, contactCards])
 
   // 组件卸载时清理支付轮询定时器
   useEffect(() => {
@@ -382,6 +382,17 @@ export default function ChatPage() {
       if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null }
     }
   }, [])
+
+  useEffect(() => {
+    if (serviceCountdown === null) return
+    if (serviceCountdown <= 0) {
+      setShowPersonaCard(false)
+      if (pendingOrderNo) chatNavigate(`/service/${pendingOrderNo}`)
+      return
+    }
+    const timer = setTimeout(() => setServiceCountdown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [serviceCountdown, pendingOrderNo])
 
   const scrollTimerRef = useRef(null)
   useEffect(() => {
@@ -403,72 +414,108 @@ export default function ChatPage() {
 
   // 恢复用户登录状态
   useEffect(() => {
-    const savedUser = localStorage.getItem('appeal_user')
-    if (savedUser) {
-      try {
-        const u = JSON.parse(savedUser)
-        fetch(`/api/user/${u.id}`, { headers: getAuthHeaders() })
-          .then(r => {
-            if (r.status === 401) { handleAuthExpired(); setReady(true); return null }
-            if (!r.ok) {
-              // 用户已被删除或不存在 → 清除本地状态，跳转登录
-              localStorage.removeItem('appeal_user')
-              localStorage.removeItem('appeal_session_id')
-              localStorage.removeItem('appeal_token')
-              setUser(null); setView('auth'); setReady(true)
-              return null
-            }
-            return r.json()
-          })
-          .then(data => {
-            if (!data) return
-            if (data?.user) {
-              setUser(data.user)
-              localStorage.setItem('appeal_user', JSON.stringify(data.user))
-              restoreSession(data.user)
-            } else {
-              localStorage.removeItem('appeal_user')
-              localStorage.removeItem('appeal_session_id')
-              localStorage.removeItem('appeal_token')
-              setView('auth'); setReady(true)
-            }
-          })
-          .catch(() => { setUser(u); restoreSession(u) })
-      } catch {
-        localStorage.removeItem('appeal_user')
+    const savedUser = getUser()
+    if (!savedUser) {
+      setView('auth'); setReady(true)
+      return
+    }
+
+    try {
+      const u = savedUser
+      if (!u?.id) {
+        storage.remove('user')
         setView('auth'); setReady(true)
+        return
       }
-    } else {
+
+      if (isLocalTokenExpired()) {
+        handleAuthExpired()
+        return
+      }
+
+      fetch(`/api/user/${u.id}`, { headers: getAuthHeaders() })
+        .then(r => {
+          if (r.status === 401) { handleAuthExpired(); return null }
+          if (!r.ok) {
+            storage.remove('user')
+            removeSessionId()
+            saveAuthToken('')
+            setUser(null); setView('auth'); setReady(true)
+            return null
+          }
+          return r.json()
+        })
+        .then(data => {
+          if (!data) return
+          if (data?.user) {
+            setUser(data.user)
+            saveUser(data.user)
+            restoreSession(data.user)
+          } else {
+            storage.remove('user')
+            removeSessionId()
+            saveAuthToken('')
+            setView('auth'); setReady(true)
+          }
+        })
+        .catch(() => { setUser(u); restoreSession(u) })
+    } catch {
+      storage.remove('user')
       setView('auth'); setReady(true)
     }
   }, [])
 
   function restoreSession(u) {
-    const saved = localStorage.getItem('appeal_session_id')
+    const saved = getSessionId()
+    const showWelcome = (welcomeText) => {
+      setMessages([{ role: 'assistant', content: welcomeText }])
+      setView('chat')
+      setReady(true)
+    }
+
     if (saved) {
+      let timeoutWelcome = WELCOME_FALLBACK
+      fetchWelcomeMessage().then(t => { timeoutWelcome = t })
+      const timeout = setTimeout(() => showWelcome(timeoutWelcome), 8000)
+
       Promise.all([
         fetch(`/api/sessions/${saved}/messages`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
         fetch(`/api/sessions/${saved}/info`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
       ]).then(([msgData, infoData]) => {
+        clearTimeout(timeout)
         if (msgData?.messages?.length > 0) {
           setSessionId(saved)
-          sessionIdRef.current = saved  // 同步更新 ref
+          sessionIdRef.current = saved
           setMessages(msgData.messages)
           if (infoData) {
-            setCollectedInfo(sanitizeCollected(infoData.collectedData))
+            const cd = sanitizeCollected(infoData.collectedData)
+            setCollectedInfo(cd)
             setInfoFields(infoData.fields || [])
             setInfoStep(infoData.step || 0)
             setInfoTotal(infoData.totalSteps || 14)
+            const hint = cd?._completeness_hint
+            if (hint && (hint.missing?.length || hint.missingCritical?.length || hint.nextQuestion)) {
+              const missing = [...new Set([...(hint.missing || []), ...(hint.missingCritical || [])])].filter(Boolean)
+              setCompletenessHint({
+                missing,
+                nextQuestion: hint.nextQuestion || '',
+                score: hint.score,
+              })
+            }
           }
         } else {
-          localStorage.removeItem('appeal_session_id')
-          setMessages([{ role: 'assistant', content: WELCOME }])
+          removeSessionId()
+          fetchWelcomeMessage().then(showWelcome)
+          return
         }
-        setView('chat'); setReady(true)
-      }).catch(() => { setMessages([{ role: 'assistant', content: WELCOME }]); setView('chat'); setReady(true) })
+        setView('chat')
+        setReady(true)
+      }).catch(() => {
+        clearTimeout(timeout)
+        fetchWelcomeMessage().then(showWelcome)
+      })
     } else {
-      setMessages([{ role: 'assistant', content: WELCOME }])
-      setView('chat'); setReady(true)
+      fetchWelcomeMessage().then(showWelcome)
     }
   }
 
@@ -497,7 +544,7 @@ export default function ChatPage() {
       if (data.user) {
         if (data.token) saveToken(data.token)
         setUser(data.user)
-        localStorage.setItem('appeal_user', JSON.stringify(data.user))
+        saveUser(data.user)
         restoreSession(data.user)
       }
     } catch { setAuthError('网络错误，请重试') }
@@ -521,7 +568,7 @@ export default function ChatPage() {
       if (data.error) { setApiModeError(data.error); return }
       if (data.user) {
         setUser(data.user)
-        localStorage.setItem('appeal_user', JSON.stringify(data.user))
+        saveUser(data.user)
       }
       setView('chat')
     } catch { setApiModeError('保存失败，请重试') }
@@ -536,7 +583,7 @@ export default function ChatPage() {
     const MAX_RETRIES = 2
     const res = await fetch('/api/chat/stream', {
       method: 'POST', headers: getAuthHeaders(),
-      body: JSON.stringify({ sessionId: sessionIdRef.current, content: text, userId: user?.id }),  // 使用 ref
+      body: JSON.stringify({ sessionId: sessionIdRef.current, content: text }),
     })
 
     if (!res.ok) {
@@ -574,10 +621,10 @@ export default function ChatPage() {
             const parsed = JSON.parse(data)
 
             if (parsed.type === 'start') {
-              if (parsed.sessionId && parsed.sessionId !== sessionId) {
+              if (parsed.sessionId && (parsed.sessionReplaced || parsed.sessionId !== sessionIdRef.current)) {
                 setSessionId(parsed.sessionId)
-                sessionIdRef.current = parsed.sessionId  // 同步更新 ref
-                localStorage.setItem('appeal_session_id', parsed.sessionId)
+                sessionIdRef.current = parsed.sessionId
+                saveSessionId(parsed.sessionId)
               }
               if (parsed.totalSteps) setInfoTotal(parsed.totalSteps)
               if (parsed.step !== undefined) setInfoStep(parsed.step)
@@ -590,6 +637,8 @@ export default function ChatPage() {
               // 仅桌面端自动展开信息面板，手机端静默收集不打断
               if (window.innerWidth >= 1024) setShowInfoPanel(true)
               setAnalysisKey(prev => prev + 1)
+              const refreshGuideKeys = ['industry', 'problem_type', 'violation_reason', 'complaint_status', 'merchant_id', 'legal_name', 'business_model', 'business_scenario', 'refund_policy', '_industry_tip', '_dynamic_fields']
+              if (refreshGuideKeys.includes(parsed.key) || parsed.dynamic) setGuideDataVersion(v => v + 1)
             } else if (parsed.type === 'chunk') {
               streamingContent += parsed.content
               const currentContent = streamingContent
@@ -608,7 +657,7 @@ export default function ChatPage() {
               if (parsed.balance !== null && parsed.balance !== undefined && user) {
                 const u = { ...user, balance: parsed.balance }
                 setUser(u)
-                localStorage.setItem('appeal_user', JSON.stringify(u))
+                saveUser(u)
               }
               // 附加 token 用量到最后一条 assistant 消息
               if (parsed.tokenUsage && msgAdded) {
@@ -637,16 +686,26 @@ export default function ChatPage() {
                 })
               }
             } else if (parsed.type === 'completeness') {
-              // 信息收集完成度通知
-              if (parsed.triggerReport) {
-                setAnalysisKey(prev => prev + 1)
-                // 收集完成后自动显示AI分析面板
-                if (window.innerWidth >= 1280) setShowAIPanel(true)
-                // 收集完成后延迟展示名片（关键转化节点）
-                if (contactCard || contactCards.length > 0) {
-                  setTimeout(() => setShowContact(true), 3000)
-                }
+              if (parsed.missing?.length) {
+                setCompletenessHint({ missing: parsed.missing, nextQuestion: parsed.nextQuestion || '', score: parsed.score })
               }
+              setGuideDataVersion(v => v + 1)
+              if (parsed.triggerReport) {
+                setCompletenessHint(null)
+                setAnalysisKey(prev => prev + 1)
+                if (window.innerWidth >= 1280) setShowAIPanel(true)
+                setMessages(prev => [...prev, {
+                  role: 'assistant',
+                  content: '信息已收集完整。请点击顶部【申诉文案】或【深度分析】生成申诉材料；也可在右侧查看已收集字段。',
+                }])
+              }
+            } else if (parsed.type === 'completeness_hint') {
+              setCompletenessHint({
+                missing: parsed.missing || [],
+                nextQuestion: parsed.nextQuestion || '',
+                score: parsed.score,
+              })
+              setGuideDataVersion(v => v + 1)
             } else if (parsed.type === 'error') {
               const role = parsed.needRecharge ? 'system' : 'assistant'
               if (!msgAdded) {
@@ -661,7 +720,7 @@ export default function ChatPage() {
               }
               if (parsed.sessionId && parsed.sessionId !== sessionId) {
                 setSessionId(parsed.sessionId)
-                localStorage.setItem('appeal_session_id', parsed.sessionId)
+                saveSessionId(parsed.sessionId)
               }
             }
           } catch {}
@@ -687,6 +746,7 @@ export default function ChatPage() {
     const text = input.trim()
     if (!text || loading) return
     setInput('')
+    setCompletenessHint(null)
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setLoading(true)
     try {
@@ -731,8 +791,14 @@ export default function ChatPage() {
     setBargainDeal(null)
     setBargainLoading(true)
     // AI先打招呼
+    if (!user?.id) {
+      toast.error('请先登录后再使用砍价')
+      setBargainLoading(false)
+      return
+    }
     fetch(`/api/mall/products/${product.id}/bargain`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: getAuthHeaders(),
       body: JSON.stringify({ history: [], message: '你好，我想了解一下这个服务，价格能优惠吗？' }),
     }).then(r => r.json()).then(d => {
       setBargainHistory([
@@ -753,11 +819,12 @@ export default function ChatPage() {
     setBargainLoading(true)
     try {
       const res = await fetch(`/api/mall/products/${bargainProduct.id}/bargain`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: getAuthHeaders(),
         body: JSON.stringify({ history: newHistory.slice(-8), message: text }),
       })
       const d = await res.json()
-      setBargainHistory(prev => [...prev, { role: 'assistant', content: d.reply }])
+      setBargainHistory(prev => [...prev, { role: 'assistant', content: d.reply || '(无回复内容)' }])
       if (d.accepted && d.finalPrice) {
         setBargainDeal({ finalPrice: d.finalPrice })
       }
@@ -766,27 +833,49 @@ export default function ChatPage() {
     } finally { setBargainLoading(false) }
   }
 
-  async function handlePurchase(product) {
+  function handlePurchase(product, overridePrice = null) {
     if (purchasing) return
+    setPendingPurchaseProduct(product)
+    setPendingPurchasePrice(overridePrice)
+    setShowPurchaseConfirm(true)
+  }
+
+  async function executePurchase() {
+    const product = pendingPurchaseProduct
+    const overridePrice = pendingPurchasePrice
+    if (!product) return
+    setShowPurchaseConfirm(false)
     setPurchasing(true)
     try {
       const res = await fetch('/api/orders/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ productId: product.id, collectedData: collectedInfo }),
+        body: JSON.stringify({ productId: product.id, collectedData: collectedInfo, ...(overridePrice ? { price: overridePrice } : {}) }),
       })
       const d = await res.json()
       if (d.success) {
         setDetailProduct(null)
         setBargainProduct(null)
-        chatNavigate(`/service/${d.orderNo}`)
+        setPendingPurchaseProduct(null)
+        setPendingPurchasePrice(null)
+        if (d.persona) {
+          setVirtualPersona(d.persona)
+          setShowPersonaCard(true)
+          setPendingOrderNo(d.orderNo)
+          setServiceCountdown(3)
+        } else {
+          chatNavigate(`/service/${d.orderNo}`)
+        }
       } else if (d.needRecharge) {
-        alert(`余额不足（当前 ¥${d.balance}，需要 ¥${d.price}），请先充值`)
+        const deficit = parseFloat((d.price || 0) - (d.balance || 0)).toFixed(2)
+        setRechargeAmount(Math.ceil(deficit))
+        setShowRecharge(true)
+        toast.warning(`余额不足，还需充值 ¥${deficit}`)
       } else {
-        alert(d.error || '购买失败')
+        toast.error(d.error || '购买失败')
       }
     } catch (err) {
-      alert('购买失败，请稍后重试')
+      toast.error('购买失败，请稍后重试')
     }
     setPurchasing(false)
   }
@@ -795,12 +884,12 @@ export default function ChatPage() {
     // Smooth transition: fade out → reset → animate in
     setChatFading(true)
     setTimeout(() => {
-      localStorage.removeItem('appeal_session_id')
+      removeSessionId()
       setSessionId(null)
       sessionIdRef.current = null  // 清除 ref
       setBoundOrder(null)  // 清除绑定的订单
-      setMessages([{ role: 'assistant', content: WELCOME }])
-      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setAnalysisKey(0); contactShownRef.current = false
+      fetchWelcomeMessage().then(welcome => setMessages([{ role: 'assistant', content: welcome }]))
+      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setCompletenessHint(null); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setAnalysisKey(0)
       setRiskLevel(null); prevRiskRef.current = null
       setView('chat')
       setChatFading(false)
@@ -868,8 +957,8 @@ export default function ChatPage() {
 
   function handleLogout() {
     saveToken('')
-    localStorage.removeItem('appeal_user')
-    localStorage.removeItem('appeal_session_id')
+    storage.remove('user')
+    removeSessionId()
     setUser(null); setSessionId(null); setMessages([])
     setView('auth'); setAuthPhone(''); setAuthNickname(''); setAuthError('')
   }
@@ -901,13 +990,12 @@ export default function ChatPage() {
   function startPaymentPolling(outTradeNo) {
     if (paymentPollRef.current) clearInterval(paymentPollRef.current)
     let pollCount = 0
-    const maxPolls = 120 // 最多轮询120次（约10分钟）
     paymentPollRef.current = setInterval(async () => {
-      pollCount++
-      if (pollCount > maxPolls) {
+      if (++pollCount > MAX_PAYMENT_POLL_COUNT) {
         clearInterval(paymentPollRef.current)
         paymentPollRef.current = null
         setPaymentStatus('timeout')
+        toast.warning('支付查询超时，请刷新页面查看结果')
         return
       }
       try {
@@ -924,9 +1012,9 @@ export default function ChatPage() {
               const uData = await uRes.json()
               if (uData.user) {
                 setUser(uData.user)
-                localStorage.setItem('appeal_user', JSON.stringify(uData.user))
+                saveUser(uData.user)
               }
-            } catch {}
+            } catch (e) { console.warn('[支付] 更新用户信息失败:', e) }
           }
         } else if (data.status === 'failed') {
           clearInterval(paymentPollRef.current)
@@ -946,7 +1034,7 @@ export default function ChatPage() {
         body: JSON.stringify({ amount: rechargeAmount, paymentMethod: rechargeMethod, remark: rechargeRemark }),
       })
       const data = await res.json()
-      if (data.error) { alert(data.error); return }
+      if (data.error) { toast.error(data.error); return }
 
       if (data.realPayment && data.outTradeNo) {
         // 真实支付模式
@@ -975,10 +1063,10 @@ export default function ChatPage() {
       } else {
         // 手动充值模式（兜底）
         const msg = data.message || '充值申请已提交！管理员确认后余额将自动到账。'
-        alert(msg)
+        toast.success(msg)
         closeRecharge()
       }
-    } catch { alert('提交失败，请稍后重试') }
+    } catch { toast.error('提交失败，请稍后重试') }
     finally { setRechargeSubmitting(false) }
   }
 
@@ -1037,7 +1125,7 @@ export default function ChatPage() {
   function softDeleteSession(sid) {
     const updated = [...deletedSessions, sid]
     setDeletedSessions(updated)
-    localStorage.setItem('appeal_deleted_sessions', JSON.stringify(updated))
+    storage.set('deleted_sessions', updated)
     setMySessions(prev => prev.filter(s => s.id !== sid))
   }
 
@@ -1059,7 +1147,7 @@ export default function ChatPage() {
 
   function continueSession(sid) {
     setSessionId(sid)
-    localStorage.setItem('appeal_session_id', sid)
+    saveSessionId(sid)
     Promise.all([
       fetch(`/api/sessions/${sid}/messages`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
       fetch(`/api/sessions/${sid}/info`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
@@ -1076,12 +1164,6 @@ export default function ChatPage() {
     }).catch(() => setView('chat'))
   }
 
-  function fmtTime(d) {
-    if (!d) return ''
-    try { const t = new Date(d); return isNaN(t.getTime()) ? String(d).slice(0,16) : t.toLocaleString('zh-CN') } catch { return String(d) }
-  }
-
-  // ========== 加载页 ==========
   if (!ready) {
     return (
       <div className="min-h-screen min-h-dvh bg-[#f5f5f5] flex items-center justify-center">
@@ -1097,83 +1179,97 @@ export default function ChatPage() {
     )
   }
 
-  // ========== 登录/注册视图 ==========
   if (view === 'auth') {
     return (
-      <div className="min-h-screen min-h-dvh auth-bg flex items-center justify-center px-4 relative overflow-hidden">
+      <div className="min-h-screen min-h-dvh bg-gradient-to-br from-gray-50 via-white to-green-50/30 flex items-center justify-center px-4 py-8 relative overflow-hidden">
         {/* 装饰性背景元素 */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-[#07C160]/[0.06] rounded-full blur-2xl" />
-        <div className="absolute bottom-20 right-10 w-40 h-40 bg-blue-400/[0.06] rounded-full blur-2xl" />
-        <div className="absolute top-1/3 right-1/4 w-24 h-24 bg-purple-400/[0.05] rounded-full blur-2xl" />
+        <div className="absolute top-10 left-5 w-40 h-40 bg-[#07C160]/[0.08] rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-10 right-5 w-48 h-48 bg-blue-400/[0.08] rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 right-10 w-32 h-32 bg-purple-400/[0.06] rounded-full blur-2xl" />
 
-        <div className="w-full max-w-sm animate-scale-in relative z-10">
-          <div className="text-center mb-8">
-            <div className="w-[72px] h-[72px] mx-auto mb-5 rounded-[22px] bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center shadow-lg glow-green animate-float">
-              <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        <div className="w-full max-w-[380px] relative z-10">
+          {/* Logo 和标题区域 */}
+          <div className="text-center mb-10">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-[28px] bg-gradient-to-br from-[#07C160] via-[#059669] to-[#047857] flex items-center justify-center shadow-xl shadow-green-500/30 hover:shadow-2xl hover:shadow-green-500/40 transition-all duration-300 hover:scale-105 animate-float">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">商户号申诉助手</h1>
-            <p className="text-sm text-gray-400 mt-1.5">AI 智能生成专业申诉材料</p>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-2">商户号申诉助手</h1>
+            <p className="text-base text-gray-500 leading-relaxed">AI 智能生成专业申诉材料</p>
           </div>
 
-          <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 border border-white/60" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' }}>
-            <div className="flex bg-gray-100/70 rounded-xl p-0.5 mb-5">
+          {/* 登录/注册卡片 */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 border border-white/80 shadow-xl shadow-black/[0.02]">
+            {/* 切换标签 */}
+            <div className="flex bg-gray-100/60 rounded-2xl p-1 mb-8">
               <button onClick={() => { setAuthMode('login'); setAuthError('') }}
-                className={`flex-1 py-2.5 text-sm font-medium rounded-[10px] transition-all ${authMode === 'login' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}>登录</button>
+                className={`flex-1 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${authMode === 'login' ? 'bg-white text-gray-900 shadow-md shadow-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>
+                登录
+              </button>
               <button onClick={() => { setAuthMode('register'); setAuthError('') }}
-                className={`flex-1 py-2.5 text-sm font-medium rounded-[10px] transition-all ${authMode === 'register' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}>注册</button>
+                className={`flex-1 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${authMode === 'register' ? 'bg-white text-gray-900 shadow-md shadow-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>
+                注册
+              </button>
             </div>
 
-            <div className="space-y-3.5">
+            {/* 表单区域 - 增加间距 */}
+            <div className="space-y-5">
+              {/* 手机号输入框 */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">手机号</label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                <label className="block text-sm font-medium text-gray-700 mb-2.5">手机号</label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#07C160] transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
                   </div>
                   <input type="tel" value={authPhone} onChange={e => setAuthPhone(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAuth()}
                     placeholder="请输入手机号" autoFocus
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200/80 bg-gray-50/50 text-sm focus:ring-2 focus:ring-[#07C160]/20 focus:border-[#07C160]/50 focus:bg-white transition-all placeholder:text-gray-300" />
+                    className="w-full pl-12 pr-5 py-3.5 rounded-2xl border-2 border-gray-200/60 bg-gray-50/30 text-base focus:ring-0 focus:border-[#07C160]/60 focus:bg-white focus:border-2 transition-all placeholder:text-gray-400 hover:bg-gray-50/50" />
                 </div>
               </div>
+
+              {/* 名称输入框（仅注册时显示） */}
               {authMode === 'register' && (
-                <div className="animate-slide-up">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                    名称 <span className="text-red-400">*</span>
-                    <span className="text-gray-300 font-normal ml-1">必须中文</span>
+                <div className="animate-slide-up space-y-2.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    名称 <span className="text-red-500">*</span>
+                    <span className="text-gray-400 font-normal ml-1.5 text-xs">必须为中文</span>
                   </label>
-                  <div className="relative">
-                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#07C160] transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                     </div>
                     <input type="text" value={authNickname} onChange={e => setAuthNickname(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAuth()}
                       placeholder="请输入中文名称"
-                      className={`w-full pl-10 pr-4 py-2.5 rounded-xl border bg-gray-50/50 text-sm focus:ring-2 focus:ring-[#07C160]/20 focus:border-[#07C160]/50 focus:bg-white transition-all placeholder:text-gray-300 ${
-                        authNickname && !isChinese(authNickname.trim()) ? 'border-red-300 bg-red-50/30' : 'border-gray-200/80'
+                      className={`w-full pl-12 pr-5 py-3.5 rounded-2xl border-2 bg-gray-50/30 text-base focus:ring-0 focus:border-[#07C160]/60 focus:bg-white focus:border-2 transition-all placeholder:text-gray-400 hover:bg-gray-50/50 ${
+                        authNickname && !isChinese(authNickname.trim()) ? 'border-red-300 bg-red-50/20' : 'border-gray-200/60'
                       }`} />
                   </div>
                   {authNickname && !isChinese(authNickname.trim()) && (
-                    <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    <p className="text-sm text-red-500 mt-2 flex items-center gap-1.5 pl-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                       请输入纯中文字符
                     </p>
                   )}
                 </div>
               )}
+
+              {/* 错误提示 */}
               {authError && (
-                <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 px-3 py-2.5 rounded-xl animate-scale-in">
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                  {authError}
+                <div className="flex items-start gap-2.5 text-sm text-red-600 bg-red-50/80 px-4 py-3.5 rounded-2xl border border-red-100/50 animate-scale-in">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  <span>{authError}</span>
                 </div>
               )}
+
+              {/* 提交按钮 */}
               <button onClick={handleAuth} disabled={authLoading}
-                className="w-full py-3 bg-gradient-to-r from-[#07C160] to-[#059669] text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-green-500/20 disabled:opacity-50 shadow-sm transition-all active:scale-[0.98]">
+                className="w-full py-4 bg-gradient-to-r from-[#07C160] via-[#059669] to-[#047857] text-white text-base font-bold rounded-2xl hover:shadow-xl hover:shadow-green-500/30 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-200 active:scale-[0.98] mt-2">
                 {authLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span className="flex items-center justify-center gap-2.5">
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                     处理中...
                   </span>
                 ) : authMode === 'register' ? '注册并进入' : '登录'}
@@ -1181,8 +1277,17 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="text-center mt-6">
-            <Link to="/admin" className="text-xs text-gray-300 hover:text-gray-500 transition-colors">管理员入口</Link>
+          {/* 底部链接 */}
+          <div className="text-center mt-8 pt-6 border-t border-gray-100/50">
+            <Link to="/admin" className="text-sm text-gray-400 hover:text-[#07C160] transition-colors inline-flex items-center gap-1.5 group">
+              <svg className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3V9" /></svg>
+              管理员入口
+            </Link>
+          </div>
+
+          {/* 版权信息 */}
+          <div className="text-center mt-6 text-xs text-gray-300">
+            © 2026 商户申诉系统 · AI驱动
           </div>
         </div>
       </div>
@@ -1387,31 +1492,34 @@ export default function ChatPage() {
     <div className={`h-screen h-dvh flex flex-col overflow-hidden ${isProfessionalMode ? 'pro-mode' : ''} ${proModeAnim ? 'mode-switch-anim' : ''} ${riskLevel?.level ? `risk-${riskLevel.level}` : ''} ${riskTransition ? 'risk-transition' : ''}`}
       style={{ background: riskLevel?.level ? `var(--risk-bg)` : (isProfessionalMode ? 'var(--pro-bg)' : '#f5f5f5') }}
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-      <header className={`flex-shrink-0 safe-top transition-all duration-500 ${riskLevel?.level ? 'risk-header' : (isProfessionalMode ? 'pro-header' : 'glass border-b border-black/[0.06]')}`}>
-        <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
+      <header className={`flex-shrink-0 safe-top transition-all duration-500 ${riskLevel?.level ? 'risk-header' : (isProfessionalMode ? 'pro-header' : 'glass border-b border-black/[0.04]')}`} style={{ position: 'relative', zIndex: 10, isolation: 'isolate' }}>
+        <div className="px-4 sm:px-6 py-3 sm:py-3.5 flex items-center justify-between">
+          {/* 左侧：Logo + 标题信息 */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* 头像：普通模式=绿色，专业模式=深色科技风 */}
             {isProfessionalMode ? (
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center flex-shrink-0 pro-avatar-glow relative overflow-hidden">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center flex-shrink-0 pro-avatar-glow relative overflow-hidden shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
-                <svg className="w-[18px] h-[18px] text-white relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <svg className="w-5 h-5 text-white relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
                 </svg>
               </div>
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center shadow-sm flex-shrink-0 glow-green">
-                <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#07C160] to-[#059669] flex items-center justify-center shadow-md flex-shrink-0 glow-green">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </div>
             )}
+            
+            {/* 标题区域 */}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className={`text-sm font-semibold truncate tracking-tight ${isProfessionalMode ? 'text-stone-800' : 'text-gray-900'}`}>
+                <h1 className={`text-base font-bold truncate tracking-tight ${isProfessionalMode ? 'text-stone-800' : 'text-gray-900'}`}>
                   {isProfessionalMode ? '申诉专业工作台' : '商户号申诉助手'}
                 </h1>
                 {isProfessionalMode && (
-                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-md font-bold border border-amber-200 tracking-wider">PRO</span>
+                  <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md font-bold border border-amber-200 tracking-wider">PRO</span>
                 )}
                 {riskLevel?.level && (
                   <span className={`risk-badge risk-icon-pulse inline-flex items-center gap-1`}>
@@ -1420,164 +1528,114 @@ export default function ChatPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              
+              {/* 副标题：状态信息 */}
+              <div className="flex items-center gap-2 mt-1">
                 {isProfessionalMode ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
                     信息收集中 · {Object.keys(collectedInfo).filter(k => collectedInfo[k] && String(collectedInfo[k]).trim()).length}/{infoFields.length || infoTotal}
                   </span>
-                ) : user?.api_mode === 'custom' ? (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-500 rounded-md font-medium">自定义API</span>
+                ) : null}
+                {collectedInfo._industry_tip && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/60 max-w-[280px] truncate" title={collectedInfo._industry_tip}>
+                    🏭 {String(collectedInfo._industry_tip).slice(0, 36)}{String(collectedInfo._industry_tip).length > 36 ? '…' : ''}
+                  </span>
+                )}
+                {completenessHint?.missing?.length > 0 && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-sky-50 text-sky-800 border border-sky-200/60 max-w-[220px] truncate" title={completenessHint.missing.join('、')}>
+                    还缺：{completenessHint.missing.slice(0, 2).join('、')}{completenessHint.missing.length > 2 ? '…' : ''}
+                  </span>
+                )}
+                {!isProfessionalMode && (user?.api_mode === 'custom' ? (
+                  <span className="text-[11px] px-2 py-0.5 bg-violet-50 text-violet-500 rounded-md font-medium">自定义API</span>
                 ) : parseFloat(user?.balance || 0) > 0 ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
                     ¥{parseFloat(user?.balance || 0).toFixed(2)}
                   </span>
                 ) : (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-600">免费模型</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-600">免费模型</span>
+                ))}
+                {boundOrder && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-orange-50 text-orange-600 border border-orange-200/60 flex items-center gap-1">
+                    📦 申诉订单
+                  </span>
                 )}
-                {user && <span className={`text-[10px] truncate max-w-[80px] ${isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>{user.nickname}</span>}
+                {pendingOrderNo && !showPersonaCard && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-blue-50 text-blue-600 border border-blue-200/60 animate-pulse">
+                    💬 服务中
+                  </span>
+                )}
+                {user && <span className={`text-[11px] truncate max-w-[100px] ${isProfessionalMode ? 'text-stone-400' : 'text-gray-400'}`}>{user.nickname}</span>}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            {/* AI分析面板切换 */}
+
+          {/* 右侧：操作按钮组 - 核心功能一目了然 */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* 1️⃣ 新对话 */}
+            <button onClick={() => { handleNewChat(); setShowMoreMenu(false) }}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 ${
+                isProfessionalMode ? 'text-stone-400 hover:text-stone-600 hover:bg-stone-50 active:scale-95' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:scale-95'
+              }`} title="新对话">
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            </button>
+
+            {/* 2️⃣ AI分析面板切换 */}
             <button onClick={() => setShowAIPanel(!showAIPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg xl:hidden ${
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 ${
                 showAIPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="AI分析">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  ? (isProfessionalMode ? 'bg-amber-100 text-amber-700 shadow-md' : 'bg-blue-100 text-blue-600 shadow-md')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50 active:scale-95' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:scale-95')
+              }`} title="AI智能分析">
+              <svg className="w-[20px] h-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
               </svg>
             </button>
-            {/* 客户信息面板切换 */}
+
+            {/* 3️⃣ 客户信息面板切换 */}
             <button onClick={() => setShowInfoPanel(!showInfoPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg lg:hidden ${
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 relative ${
                 showInfoPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-wechat-green bg-green-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
+                  ? (isProfessionalMode ? 'bg-amber-100 text-amber-700 shadow-md' : 'bg-green-100 text-green-600 shadow-md')
+                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50 active:scale-95' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:scale-95')
               }`} title="客户信息">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-[20px] h-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {hasInfoData && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${isProfessionalMode ? 'bg-amber-500' : 'bg-wechat-green'}`} />}
+              {hasInfoData && <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full ${isProfessionalMode ? 'bg-amber-500 animate-pulse' : 'bg-wechat-green animate-pulse'}`} />}
             </button>
-            {/* 申诉全流程指导 */}
-            <button onClick={() => setShowAppealGuide(!showAppealGuide)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showAppealGuide
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-indigo-500 bg-indigo-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="申诉指导·话术·95017">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
-              </svg>
-            </button>
-            {/* 投诉材料整理 */}
-            <button onClick={() => setShowComplaintDoc(!showComplaintDoc)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showComplaintDoc
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="投诉材料整理">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-            </button>
-            {/* 申诉文案面板切换 */}
-            <button onClick={() => setShowAppealPanel(!showAppealPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showAppealPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-orange-500 bg-orange-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="申诉文案">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-            </button>
-            {/* 联系技术人员 */}
-            {contactCard && (
-              <button onClick={() => setShowContact(true)}
-                className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50'}`} title="联系技术人员">
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
+
+            {/* 4️⃣ 三点菜单（更多功能） */}
+            <div className="relative" style={{ zIndex: 100 }}>
+              <button
+                ref={moreMenuBtnRef}
+                onPointerDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const newPos = { right: window.innerWidth - rect.right, top: rect.bottom + 8 }
+                  setMoreMenuPos(newPos)
+                  setShowMoreMenu(prev => !prev)
+                }}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 select-none cursor-pointer ${
+                  showMoreMenu
+                    ? (isProfessionalMode ? 'bg-stone-200 text-stone-800 shadow-md rotate-90' : 'bg-gray-200 text-gray-800 shadow-md rotate-90')
+                    : (isProfessionalMode ? 'text-stone-400 hover:text-stone-600 hover:bg-stone-50 active:scale-95' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:scale-95')
+                }`}
+                type="button"
+                style={{ position: 'relative', zIndex: 101, WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg className="w-[20px] h-[20px]" fill="currentColor" viewBox="0 0 24 24" style={{ pointerEvents: 'none' }}>
+                  <circle cx="12" cy="6" r="1.75" />
+                  <circle cx="12" cy="12" r="1.75" />
+                  <circle cx="12" cy="18" r="1.75" />
                 </svg>
               </button>
-            )}
-            {/* 用户中心（头像） */}
-            <button onClick={() => setShowUserCenter(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg overflow-hidden hover:ring-2 hover:ring-offset-1 hover:ring-green-300 transition-all" title="用户中心">
-              <UserAvatar name={user?.nickname || '用户'} size={32} style={{ borderRadius: 8 }} />
-            </button>
-            {/* 订单绑定 */}
-            <button onClick={async () => {
-              // 如果没有session，先创建一个
-              if (!sessionId) {
-                try {
-                  const res = await fetch('/api/sessions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user?.id })
-                  })
-                  const data = await res.json()
-                  if (data.sessionId) {
-                    setSessionId(data.sessionId)
-                    sessionIdRef.current = data.sessionId
-                    localStorage.setItem('appeal_session_id', data.sessionId)
-                  }
-                } catch (e) {
-                  console.error('创建session失败:', e)
-                }
-              }
-              setShowOrderPanel(true)
-            }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${boundOrder ? (isProfessionalMode ? 'text-amber-600 bg-amber-50' : 'text-wechat-green bg-green-50') : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')}`} title={boundOrder ? '已绑定订单' : '绑定订单'}>
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-              {boundOrder && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wechat-green rounded-full" />}
-            </button>
-            <button onClick={openRecharge}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="充值">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button onClick={() => { if (window.innerWidth < 640) openDrawer(); else openMyHistory() }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="历史对话">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button onClick={() => { setSelectedApiMode(user?.api_mode || 'official'); setCustomKey(''); setView('apiSelect') }}
-              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="切换API">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-            <button onClick={handleExportChat}
-              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${
-                messages.length <= 1
-                  ? (isProfessionalMode ? 'text-stone-200 cursor-not-allowed' : 'text-gray-200 cursor-not-allowed')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="导出对话" disabled={messages.length <= 1}>
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            </button>
-            <button onClick={handleNewChat}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-wechat-green hover:bg-green-50'}`} title="新对话">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-            <div className={`w-px h-4 mx-0.5 hidden sm:block ${isProfessionalMode ? 'bg-amber-200/40' : 'bg-gray-200'}`} />
-            <button onClick={handleLogout}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-300 hover:text-red-400 hover:bg-red-50' : 'text-gray-300 hover:text-red-400 hover:bg-red-50'}`} title="退出">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-              </svg>
-            </button>
+            </div>
           </div>
         </div>
       </header>
@@ -1622,9 +1680,7 @@ export default function ChatPage() {
         <div className="flex-1 flex flex-col min-w-0">
           <main onClick={e => {
             const prodCard = e.target.closest('.product-rec-card')
-            if (prodCard) { const pid = prodCard.dataset.productId; if (pid) { fetch(`/api/mall/products/${pid}`).then(r=>r.json()).then(d=>{ if(d.product) setDetailProduct(d.product) }).catch(()=>{}) }; return }
-            const contactRecCard = e.target.closest('.contact-rec-card')
-            if (contactRecCard) { setShowContact(true); return }
+            if (prodCard) { const pid = prodCard.dataset.productId; if (pid) { fetch(`/api/mall/products/${pid}`).then(r=>r.json()).then(d=>{ if(d.product) setDetailProduct({ ...d.product, price: d.product.price || '0', originalPrice: d.product.originalPrice || null, tags: Array.isArray(d.product.tags) ? d.product.tags : [] }) }).catch((e)=>console.warn('[商品] 获取详情失败:', e)) }; return }
           }} className={`flex-1 overflow-y-auto overscroll-contain gpu-scroll ${isProfessionalMode ? 'pro-chat-bg pro-grid-bg' : 'bg-[#f5f5f5]'}`}>
             <div className={`max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
               {/* 已绑定订单信息卡片 */}
@@ -1651,14 +1707,27 @@ export default function ChatPage() {
                         </div>
                         <button onClick={() => setShowOrderPanel(true)} className={`text-xs px-2 py-1 rounded-lg ${isProfessionalMode ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'}`}>更换</button>
                       </div>
-                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                         <div><span className="text-gray-400">买家: </span><span className="text-gray-700 font-medium">{boundOrder.buyer_nick || boundOrder.customer_name || '未知'}</span></div>
-                        <div><span className="text-gray-400">📞 </span><span className="text-gray-700 font-medium">{boundOrder.receiver_mobile || boundOrder.buyer_phone || boundOrder.customer_phone || '无'}</span></div>
+                        <div><span className="text-gray-400">📞 </span><span className="text-gray-700 font-medium">{(() => { const phone = boundOrder.receiver_mobile; return phone ? phone.slice(0,3) + '****' + phone.slice(7) : (boundOrder.buyer_phone || boundOrder.customer_phone || '无') })()}</span></div>
                         <div className="col-span-2"><span className="text-gray-400">商品: </span><span className="text-gray-700 font-medium truncate">{boundOrder.goods?.title || boundOrder.product_name || '未知商品'}</span></div>
+                        {boundOrder.goods?.sku_text && (
+                          <div className="col-span-2"><span className="text-gray-400">规格: </span><span className="text-gray-500 text-[11px]">{boundOrder.goods.sku_text}</span></div>
+                        )}
                         <div><span className="text-gray-400">金额: </span><span className={`font-bold ${isProfessionalMode ? 'text-amber-600' : 'text-green-600'}`}>¥{formatOrderAmount(boundOrder)}</span></div>
-                        <div><span className="text-gray-400">状态: </span><span className="text-gray-600">{boundOrder.status || '未知'}</span></div>
-                        {boundOrder.receiver_address && (
-                          <div className="col-span-2"><span className="text-gray-400">📍 </span><span className="text-gray-500 truncate">{boundOrder.receiver_address}</span></div>
+                        <div><span className="text-gray-400">下单: </span><span className="text-gray-600">{fmtTime(boundOrder.order_time) || '未知'}</span></div>
+                        <div className="col-span-2 flex items-center gap-2">
+                          <span className="text-gray-400 flex-shrink-0">状态: </span>
+                          <span className="text-gray-600">{boundOrder.status || '未知'}</span>
+                          {boundOrder.refund_status && boundOrder.refund_status !== 0 && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${formatRefundStatusLabel(boundOrder.refund_status).bg} ${formatRefundStatusLabel(boundOrder.refund_status).text}`}>{formatRefundStatusLabel(boundOrder.refund_status).label}</span>
+                          )}
+                        </div>
+                        {boundOrder.consign_type && (
+                          <div className="col-span-2"><span className="text-gray-400">发货: </span><span className="text-gray-600">{formatConsignLabel(boundOrder.consign_type).label}{boundOrder.express_name ? ` ${boundOrder.express_name}` : ''}{boundOrder.waybill_no ? ` ${boundOrder.waybill_no}` : ''}</span></div>
+                        )}
+                        {(boundOrder.receiver_full_address || boundOrder.receiver_address) && (
+                          <div className="col-span-2"><span className="text-gray-400">📍 </span><span className="text-gray-500 truncate">{formatFullAddress(boundOrder) || boundOrder.receiver_full_address || boundOrder.receiver_address}</span></div>
                         )}
                       </div>
                     </div>
@@ -1740,8 +1809,80 @@ export default function ChatPage() {
             </div>
           </main>
 
-          <footer className={`flex-shrink-0 safe-bottom ${isProfessionalMode ? 'bg-white/80 backdrop-blur-xl border-t border-amber-200/40' : 'glass border-t border-black/[0.04]'}`}>
-            <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5">
+          {/* 🛠️ 功能工具栏 — 所有核心功能一目了然 */}
+          <div className={`flex-shrink-0 border-t ${isProfessionalMode ? 'border-amber-200/40 bg-gradient-to-r from-amber-50/50 to-orange-50/30' : 'border-gray-100 bg-gradient-to-r from-green-50/30 to-emerald-50/20'}`}>
+            <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* 分组1: 核心申诉工具 */}
+                <button onClick={() => { setShowAppealPanel(true); setShowMoreMenu(false) }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    isProfessionalMode
+                      ? 'bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 shadow-sm active:scale-95'
+                      : 'bg-white border border-[#07C160]/30 text-[#07C160] hover:bg-[#07C160]/10 hover:border-[#07C160]/60 shadow-sm active:scale-95'
+                  }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <span className="hidden sm:inline">生成文案</span>
+                </button>
+                <button onClick={() => { setShowAppealGuide(true); setShowMoreMenu(false) }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    isProfessionalMode
+                      ? 'bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 hover:border-purple-400 shadow-sm active:scale-95'
+                      : 'bg-white border border-indigo-300 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400 shadow-sm active:scale-95'
+                  }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013.382 16H13a1 1 0 001-1v-5.697a1 1 0 00-.364-.777L9 5m0 0V3a1 1 0 011-1h4a1 1 0 011 1v4m0 0v6.5M9 15h.01" /></svg>
+                  <span className="hidden sm:inline">申诉指导</span>
+                </button>
+                <button onClick={() => { setShowComplaintDoc(true); setShowMoreMenu(false) }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    isProfessionalMode
+                      ? 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm active:scale-95'
+                      : 'bg-white border border-cyan-300 text-cyan-600 hover:bg-cyan-50 hover:border-cyan-400 shadow-sm active:scale-95'
+                  }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                  <span className="hidden sm:inline">投诉材料</span>
+                </button>
+
+                {/* 分隔线 */}
+                <div className={`w-px h-6 ${isProfessionalMode ? 'bg-amber-200' : 'bg-gray-200'} flex-shrink-0`} />
+
+                {/* 分组2: 分析工具 */}
+                <button onClick={() => { handleDeepAnalysis(); setShowAIPanel(true) }}
+                  disabled={analyzing}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    analyzing
+                      ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-wait'
+                      : isProfessionalMode
+                        ? 'bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-400 shadow-sm active:scale-95'
+                        : 'bg-white border border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 shadow-sm active:scale-95'
+                  }`}>
+                  {analyzing ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  )}
+                  <span className="hidden sm:inline">{analyzing ? '分析中...' : '深度分析'}</span>
+                </button>
+
+                {/* 分隔线 */}
+                <div className={`w-px h-6 ${isProfessionalMode ? 'bg-amber-200' : 'bg-gray-200'} hidden sm:block flex-shrink-0`} />
+
+                {/* 分组3: 辅助工具 */}
+                <button onClick={() => setShowOrderPanel(!showOrderPanel)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    boundOrder
+                      ? (isProfessionalMode ? 'bg-amber-100 border border-amber-300 text-amber-800' : 'bg-green-100 border border-green-300 text-green-800')
+                      : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 active:scale-95'
+                  }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                  <span className="hidden sm:inline">{boundOrder ? '订单详情' : '绑定订单'}</span>
+                  {boundOrder && <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <footer className={`flex-shrink-0 safe-bottom ${isProfessionalMode ? 'bg-white/95 backdrop-blur-xl border-t border-amber-200/40 shadow-lg' : 'bg-white/95 backdrop-blur-xl border-t border-black/[0.04] shadow-lg'}`}>
+            <div className="max-w-3xl mx-auto px-4 sm:px-5 py-4 sm:py-5">
               {/* 智能快捷回复：根据对话阶段动态切换 */}
               {!input && !loading && (() => {
                 let quickReplies = []
@@ -1775,13 +1916,13 @@ export default function ChatPage() {
                 }
 
                 return quickReplies.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 mb-2 animate-fadeIn">
+                  <div className="flex flex-wrap gap-2 mb-3 animate-fadeIn">
                     {quickReplies.map(q => (
                       <button key={q} onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50) }}
-                        className={`px-3 py-1.5 text-[11px] rounded-full transition-all whitespace-nowrap ${
+                        className={`px-4 py-2 text-[13px] font-medium rounded-full transition-all duration-200 whitespace-nowrap ${
                           isProfessionalMode
-                            ? 'bg-white border border-amber-200/60 text-stone-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50/60'
-                            : 'bg-white border border-gray-200/80 text-gray-600 hover:border-[#07C160]/40 hover:text-[#07C160] hover:bg-green-50/50'
+                            ? 'bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-stone-600 hover:border-amber-300 hover:text-amber-800 hover:from-amber-100 hover:to-orange-100 shadow-sm hover:shadow-md'
+                            : 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-gray-700 hover:border-[#07C160] hover:text-[#07C160] hover:from-green-100 hover:to-emerald-100 shadow-sm hover:shadow-md'
                         }`}>
                         {q}
                       </button>
@@ -1789,37 +1930,37 @@ export default function ChatPage() {
                   </div>
                 ) : null
               })()}
-              <div className="flex items-end gap-2">
-                <div className="flex-1 relative">
+              <div className="flex items-end gap-3">
+                <div className="flex-1 relative group">
                   <textarea ref={inputRef} value={input} autoFocus
                     onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder={isProfessionalMode ? '描述您的情况或回答问题...' : '输入消息...'} rows={1} disabled={loading}
-                    className={`w-full resize-none rounded-2xl px-4 py-2.5 text-sm transition-all max-h-28 overflow-y-auto ${
+                    className={`w-full resize-none rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed transition-all duration-200 max-h-32 overflow-y-auto ${
                       isProfessionalMode
-                        ? 'border border-amber-200/60 bg-white/90 text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-300/30 focus:border-amber-300 focus:bg-white'
-                        : 'border border-gray-200/60 bg-white/80 placeholder:text-gray-300 focus:ring-2 focus:ring-[#07C160]/15 focus:border-[#07C160]/40 focus:bg-white'
+                        ? 'border-2 border-amber-200/60 bg-white/90 text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:border-amber-400 focus:bg-white focus:shadow-lg focus:shadow-amber-500/10'
+                        : 'border-2 border-gray-200/60 bg-white/80 placeholder:text-gray-400 focus:ring-0 focus:border-[#07C160]/60 focus:bg-white focus:shadow-lg focus:shadow-green-500/10'
                     }`}
-                    style={{ minHeight: '42px' }}
-                    onInput={e => { e.target.style.height = '42px'; e.target.style.height = Math.min(e.target.scrollHeight, 112) + 'px' }}
+                    style={{ minHeight: '48px' }}
+                    onInput={e => { e.target.style.height = '48px'; e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px' }}
                   />
                   {input.length > 200 && (
-                    <span className={`absolute right-3 bottom-1.5 text-[10px] ${input.length > 4500 ? 'text-red-400' : isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>
+                    <span className={`absolute right-4 bottom-2 text-[11px] font-medium ${input.length > 4500 ? 'text-red-500' : isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>
                       {input.length}/5000
                     </span>
                   )}
                 </div>
                 <button onClick={handleSend} disabled={!input.trim() || loading}
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+                  className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                     input.trim() && !loading
                       ? (isProfessionalMode
-                          ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-500/30 active:scale-90'
-                          : 'bg-gradient-to-br from-[#07C160] to-[#059669] text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:shadow-green-500/30 active:scale-90')
+                          ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/40 active:scale-90 hover:scale-105'
+                          : 'bg-gradient-to-br from-[#07C160] via-[#059669] to-[#047857] text-white shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 active:scale-90 hover:scale-105')
                       : (isProfessionalMode ? 'bg-amber-50 text-amber-300 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed')
                   }`}>
                   {loading ? (
-                    <svg className="w-[18px] h-[18px] animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                   ) : (
-                    <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
                     </svg>
                   )}
@@ -1854,6 +1995,30 @@ export default function ChatPage() {
         </div>
       </div>
 
+      {/* 三点更多菜单 - 必须在主层级，不能在面板内部 */}
+      <MoreMenu
+        show={showMoreMenu}
+        pos={moreMenuPos}
+        onClose={() => setShowMoreMenu(false)}
+        user={user}
+        isProfessionalMode={isProfessionalMode}
+        boundOrder={boundOrder}
+        messages={messages}
+        onOpenAppealGuide={() => setShowAppealGuide(!showAppealGuide)}
+        onOpenComplaintDoc={() => setShowComplaintDoc(!showComplaintDoc)}
+        onOpenAppealPanel={() => setShowAppealPanel(!showAppealPanel)}
+        onOpenOrderPanel={async () => {
+          if (!sessionId) { try { const res = await fetch('/api/sessions', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) }); const data = await res.json(); if (data.sessionId) { setSessionId(data.sessionId); sessionIdRef.current = data.sessionId; saveSessionId(data.sessionId) } } catch (e) { console.error('创建session失败:', e) } }
+          setShowOrderPanel(true)
+        }}
+        onOpenRecharge={openRecharge}
+        onOpenHistory={() => { if (window.innerWidth < 640) openDrawer(); else openMyHistory() }}
+        onExportChat={handleExportChat}
+        onNewChat={handleNewChat}
+        onOpenUserCenter={() => setShowUserCenter(true)}
+        onLogout={handleLogout}
+      />
+
       {/* 申诉全流程指导面板（覆盖层） */}
       {showAppealGuide && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowAppealGuide(false)}>
@@ -1861,6 +2026,7 @@ export default function ChatPage() {
           <div className="relative ml-auto" onClick={e => e.stopPropagation()}>
             <AppealGuidePanel
               sessionId={sessionId}
+              dataVersion={guideDataVersion}
               onClose={() => setShowAppealGuide(false)}
               getAuthHeaders={getAuthHeaders}
             />
@@ -1943,7 +2109,7 @@ export default function ChatPage() {
                     </span>
                     <span className="text-sm font-medium text-green-700">已绑定订单</span>
                   </div>
-                  <button onClick={() => { setBoundOrder(null); fetch(`/api/sessions/${sessionId}/bind-order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: null, order_data: null }) }).catch(() => {}) }} className="text-xs text-red-500 hover:text-red-600 font-medium">解除绑定</button>
+                  <button onClick={() => { setBoundOrder(null); fetch(`/api/sessions/${sessionId}/bind-order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: null, order_data: null }) }).catch((e) => console.warn('[订单] 解除绑定失败:', e)) }} className="text-xs text-red-500 hover:text-red-600 font-medium">解除绑定</button>
                 </div>
                 <div className="mt-2 flex gap-3 bg-white rounded-lg p-2">
                   {panelImage && (
@@ -1977,7 +2143,7 @@ export default function ChatPage() {
                     <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                   </div>
                   <p className="text-sm text-gray-500 mb-3">暂无订单数据</p>
-                  <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { setOrderList([]) } } catch {} setOrderListLoading(false) }} className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md">
+                  <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { setOrderList(sortOrdersByStatus(data.data.list)) } else { setOrderList([]) } } catch {} setOrderListLoading(false) }} className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md">
                     刷新订单列表
                   </button>
                 </div>
@@ -1985,20 +2151,17 @@ export default function ChatPage() {
                 <div className="space-y-2">
                   {orderList.map((order, idx) => {
                     const orderImage = order.goods?.images?.[0] || order.product_image || ''
-                    const statusStyle = getOrderStatusStyle(order.status, order.order_status)
                     return (
                     <div key={idx} onClick={async () => {
-                      // 确保有 sessionId，如果没有则创建（同时绑定订单）
                       let sid = sessionIdRef.current
                       if (!sid) {
                         try {
                           const res = await fetch('/api/sessions', { 
                             method: 'POST', 
                             headers: getAuthHeaders(), 
-                            body: JSON.stringify({ 
-                              userId: user?.id,
+                            body: JSON.stringify({
                               orderNo: order.order_no,
-                              orderData: order
+                              orderData: order,
                             }) 
                           })
                           const data = await res.json()
@@ -2006,20 +2169,19 @@ export default function ChatPage() {
                             sid = data.sessionId
                             setSessionId(sid)
                             sessionIdRef.current = sid
-                            localStorage.setItem('appeal_session_id', sid)
+                            saveSessionId(sid)
                             setBoundOrder(order)
                             setShowOrderPanel(false)
-                            return // 创建时已绑定订单，直接返回
+                            return
                           }
                         } catch (e) { console.error('创建session失败:', e); return }
                       }
-                      // 已有会话，绑定订单
                       if (sid) {
                         try {
                           await fetch(`/api/sessions/${sid}/bind-order`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ order_no: order.order_no, order_data: order }) })
                           setBoundOrder(order)
                           setShowOrderPanel(false)
-                        } catch (e) { alert('绑定失败') }
+                        } catch (e) { toast.error('绑定失败') }
                       }
                     }}
                       className={`p-3 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${boundOrder?.order_no === order.order_no ? 'border-orange-400 bg-orange-50' : 'border-gray-100 bg-white hover:border-orange-200'}`}>
@@ -2034,9 +2196,15 @@ export default function ChatPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
                                 <span className="text-sm font-bold text-gray-900 truncate">{order.buyer_nick || order.customer_name || '未知买家'}</span>
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${statusStyle.bg} ${statusStyle.text}`}>{statusStyle.label}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${formatOrderStatusLabel(order.order_status).bg} ${formatOrderStatusLabel(order.order_status).text}`}>{formatOrderStatusLabel(order.order_status).label}</span>
+                                {order.refund_status && order.refund_status !== 0 && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${formatRefundStatusLabel(order.refund_status).bg} ${formatRefundStatusLabel(order.refund_status).text}`}>{formatRefundStatusLabel(order.refund_status).label}</span>
+                                )}
                               </div>
                               <p className="text-xs text-gray-500 truncate">{order.goods?.title || order.product_name || '商品信息'}</p>
+                              {order.goods?.sku_text && (
+                                <p className="text-[10px] text-gray-400 truncate mt-0.5">规格: {order.goods.sku_text}</p>
+                              )}
                             </div>
                             <div className="text-right ml-2">
                               <p className="text-sm font-bold text-orange-600">¥{formatOrderAmount(order)}</p>
@@ -2045,7 +2213,7 @@ export default function ChatPage() {
                           </div>
                           <div className="flex items-center gap-3 text-xs text-gray-400">
                             <span>📞 {order.receiver_mobile || order.buyer_phone || order.customer_phone || '无'}</span>
-                            <span>📅 {order.order_time ? new Date(order.order_time).toLocaleDateString() : '未知'}</span>
+                            <span>📅 {fmtTime(order.order_time) || '未知'}</span>
                           </div>
                         </div>
                       </div>
@@ -2063,7 +2231,7 @@ export default function ChatPage() {
             </div>
             {/* 底部操作 */}
             <div className="px-6 py-4 border-t border-gray-100 safe-bottom">
-              <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { alert(data.error || '获取订单失败') } } catch (e) { alert('连接失败') } setOrderListLoading(false) }} disabled={orderListLoading}
+              <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { setOrderList(sortOrdersByStatus(data.data.list)) } else { toast.error(data.error || '获取订单失败') } } catch (e) { toast.error('连接失败') } setOrderListLoading(false) }} disabled={orderListLoading}
                 className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-60">
                 {orderListLoading ? '加载中...' : '获取闲鱼订单'}
               </button>
@@ -2071,97 +2239,6 @@ export default function ChatPage() {
           </div>
         </div>
       )}
-
-      {/* 名片弹窗（支持多名片切换） */}
-      {showContact && (contactCards.length > 0 || contactCard) && (() => {
-        const cards = contactCards.length > 0 ? contactCards : (contactCard ? [contactCard] : [])
-        const card = cards[selectedCardIdx] || cards[0]
-        if (!card) return null
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[8px] p-4" onClick={() => setShowContact(false)}>
-            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-scale-in" style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-              <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 px-5 py-7 text-white text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_55%)]" />
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full" />
-                <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full" />
-                <button onClick={() => setShowContact(false)} className="absolute right-3 top-3 w-7 h-7 flex items-center justify-center text-white/60 hover:text-white rounded-lg hover:bg-white/10 z-10">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-                <div className="relative z-10">
-                  <div className="w-18 h-18 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3 shadow-lg" style={{width:72,height:72}}>
-                    <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold tracking-tight">{card.name}</h3>
-                  <p className="text-white/70 text-xs mt-1 font-medium">{card.title}</p>
-                  {card.category && card.category !== 'general' && (
-                    <span className="inline-block mt-2 px-2.5 py-0.5 bg-white/15 rounded-full text-[10px] font-medium">{card.category}</span>
-                  )}
-                  {cards.length > 1 && (
-                    <div className="flex justify-center gap-1.5 mt-3">
-                      {cards.map((c, i) => (
-                        <button key={i} onClick={() => { setSelectedCardIdx(i); if (c.id) fetch(`/api/contact-cards/${c.id}/click`, { method: 'POST' }).catch(() => {}) }}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${i === selectedCardIdx ? 'bg-white text-amber-600 shadow-sm' : 'bg-white/20 text-white/80 hover:bg-white/30'}`}>
-                          {c.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="px-5 py-4 space-y-2.5">
-                {card.description && <p className="text-[12px] text-gray-500 text-center leading-relaxed pb-1">{card.description}</p>}
-                {card.phone && (
-                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100/80 hover:shadow-sm transition-shadow">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-green-600 font-medium">电话</div>
-                      <div className="text-[14px] font-bold text-gray-800 tracking-wide">{card.phone}</div>
-                    </div>
-                    <a href={`tel:${card.phone}`} className="px-3.5 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">拨打</a>
-                  </div>
-                )}
-                {card.wechat && (
-                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100/80 hover:shadow-sm transition-shadow">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#07C160] to-[#06a050] flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.295.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348z"/></svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-emerald-600 font-medium">微信号</div>
-                      <div className="text-[14px] font-bold text-gray-800">{card.wechat}</div>
-                    </div>
-                    <button onClick={() => { navigator.clipboard?.writeText(card.wechat); }} className="px-3.5 py-1.5 bg-gradient-to-r from-[#07C160] to-[#06a050] text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">复制</button>
-                  </div>
-                )}
-                {card.email && (
-                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/80 hover:shadow-sm transition-shadow">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-blue-600 font-medium">邮箱</div>
-                      <div className="text-[14px] font-bold text-gray-800 truncate">{card.email}</div>
-                    </div>
-                    <a href={`mailto:${card.email}`} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs rounded-xl hover:shadow-md transition-all font-medium">发邮件</a>
-                  </div>
-                )}
-                {card.qrCode && (
-                  <div className="text-center pt-2 pb-1">
-                    <p className="text-[10px] text-gray-400 mb-2">扫码添加微信</p>
-                    <img src={card.qrCode} alt="微信二维码" className="w-36 h-36 mx-auto rounded-xl border border-gray-100 shadow-sm" />
-                  </div>
-                )}
-                {!card.phone && !card.wechat && !card.email && (
-                  <p className="text-xs text-gray-400 text-center py-4">暂未配置联系方式</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
 
       {/* AI砍价弹窗 */}
       {bargainProduct && (
@@ -2213,11 +2290,11 @@ export default function ChatPage() {
               {bargainDeal ? (
                 <div className="space-y-2">
                   <div className="text-center">
-                    <p className="text-xs text-green-600 font-medium">🎉 成交价: ¥{bargainDeal.finalPrice}</p>
+                    <p className="text-xs text-green-600 font-medium">🎉 成交价: ¥{bargainDeal.finalPrice ?? '0'}</p>
                   </div>
-                  <button onClick={() => handlePurchase(bargainProduct)} disabled={purchasing}
+                  <button onClick={() => handlePurchase(bargainProduct, bargainDeal?.finalPrice)} disabled={purchasing}
                     className="w-full py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl font-bold text-sm shadow-sm disabled:opacity-60">
-                    {purchasing ? '购买中...' : `立即下单 · ¥${bargainDeal.finalPrice}`}
+                    {purchasing ? '购买中...' : `立即下单 · ¥${bargainDeal.finalPrice ?? '0'}`}
                   </button>
                 </div>
               ) : (
@@ -2257,11 +2334,34 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="px-6 py-5 space-y-3">
+              {/* 来源标注 */}
+              <div className="flex items-center gap-2">
+                {virtualPersona.source === 'ai' ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 rounded-full text-[10px] font-bold border border-violet-200/60">
+                      ✨ AI智能匹配
+                    </span>
+                    <span className="text-[10px] text-violet-400">根据您的需求智能生成专属服务顾问</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-medium border border-gray-200/60">
+                      📋 默认分配
+                    </span>
+                    <span className="text-[10px] text-gray-400">使用标准服务顾问模板</span>
+                  </>
+                )}
+              </div>
               <p className="text-sm text-gray-600 leading-relaxed">{virtualPersona.greeting}</p>
               {virtualPersona.personality && (
                 <p className="text-[11px] text-gray-400">性格特征: {virtualPersona.personality}</p>
               )}
-              <button onClick={() => setShowPersonaCard(false)}
+              {serviceCountdown !== null && serviceCountdown > 0 && (
+                <p className="text-center text-sm font-medium text-indigo-500 animate-pulse">
+                  即将进入服务... {serviceCountdown}
+                </p>
+              )}
+              <button onClick={() => { setShowPersonaCard(false); if (pendingOrderNo) chatNavigate(`/service/${pendingOrderNo}`) }}
                 className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium text-sm shadow-sm hover:shadow-md transition-all">
                 开始沟通
               </button>
@@ -2292,13 +2392,20 @@ export default function ChatPage() {
             {/* 价格区域 */}
             <div className="px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100/50">
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-red-500">¥{detailProduct.price}</span>
-                {detailProduct.originalPrice && parseFloat(detailProduct.originalPrice) > parseFloat(detailProduct.price) && (
-                  <>
-                    <span className="text-sm text-gray-400 line-through">¥{detailProduct.originalPrice}</span>
-                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-md">省¥{(parseFloat(detailProduct.originalPrice) - parseFloat(detailProduct.price)).toFixed(0)}</span>
-                  </>
-                )}
+                <span className="text-3xl font-extrabold text-red-500">¥{detailProduct.price || '0'}</span>
+                {(() => {
+                  const orig = parseFloat(detailProduct.originalPrice)
+                  const price = parseFloat(detailProduct.price)
+                  if (!isNaN(orig) && !isNaN(price) && orig > price) {
+                    return (
+                      <>
+                        <span className="text-sm text-gray-400 line-through">¥{detailProduct.originalPrice}</span>
+                        <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-md">省¥{(orig - price).toFixed(0)}</span>
+                      </>
+                    )
+                  }
+                  return null
+                })()}
               </div>
             </div>
             {/* 商品详情 */}
@@ -2327,7 +2434,7 @@ export default function ChatPage() {
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                     购买中...
                   </span>
-                ) : `立即购买 · ¥${detailProduct.price}`}
+                ) : `立即购买 · ¥${detailProduct.price || '0'}`}
               </button>
               <button onClick={() => { setDetailProduct(null); setBargainProduct(detailProduct); setBargainHistory([]); setBargainDeal(null); setBargainInput('') }}
                 className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-2xl font-medium text-sm border border-amber-200/80 hover:bg-amber-100 transition-colors">
@@ -2507,6 +2614,18 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* 购买确认弹窗 */}
+      <PurchaseConfirmModal
+        show={showPurchaseConfirm}
+        product={pendingPurchaseProduct}
+        finalPrice={pendingPurchasePrice}
+        currentBalance={user?.balance}
+        isProfessionalMode={isProfessionalMode}
+        onConfirm={executePurchase}
+        onCancel={() => { setShowPurchaseConfirm(false); setPendingPurchaseProduct(null); setPendingPurchasePrice(null) }}
+        purchasing={purchasing}
+      />
+
       {/* ========== 历史侧边栏（右滑打开） ========== */}
       <div className={`history-drawer-overlay ${drawerOpen ? 'open' : ''}`} onClick={closeDrawer} />
       <div className={`history-drawer ${drawerOpen ? 'open' : ''} bg-white flex flex-col`}>
@@ -2549,7 +2668,56 @@ export default function ChatPage() {
 
       {/* 移动端左边缘滑动提示 */}
       <div className="swipe-hint sm:hidden" onClick={openDrawer} />
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
     </div>
+  )
+}
+
+function MenuItem({ icon, label, sublabel, onClick, isActive = false, disabled = false, danger = false, hasIndicator = false, indicatorColor = 'bg-green-500', isPro = false }) {
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-4 py-3 transition-all duration-150 rounded-xl text-left ${
+        disabled
+          ? (isPro ? 'text-stone-300 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed')
+          : danger
+            ? (isPro ? 'text-red-600 hover:bg-red-50 active:bg-red-100' : 'text-red-600 hover:bg-red-50 active:bg-red-100')
+            : isActive
+              ? (isPro ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700')
+              : (isPro ? 'text-stone-600 hover:text-stone-900 hover:bg-stone-50 active:bg-stone-100' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:bg-gray-100')
+      }`}
+    >
+      <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+        isActive
+          ? (isPro ? 'bg-amber-200/60' : 'bg-green-200/60')
+          : (isPro ? 'bg-stone-100' : 'bg-gray-100')
+      }`}>
+        <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {icon}
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium truncate ${isActive ? 'font-semibold' : ''}`}>
+            {label}
+          </span>
+          {hasIndicator && (
+            <span className={`w-2 h-2 rounded-full ${indicatorColor} flex-shrink-0`} />
+          )}
+        </div>
+        {sublabel && (
+          <p className={`text-xs mt-0.5 truncate ${isPro ? 'text-stone-400' : 'text-gray-400'}`}>
+            {sublabel}
+          </p>
+        )}
+      </div>
+      {!disabled && !danger && (
+        <svg className={`w-4 h-4 flex-shrink-0 ${isPro ? 'text-stone-300' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      )}
+    </button>
   )
 }
 

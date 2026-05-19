@@ -1,5 +1,36 @@
+/**
+ * @fileoverview AI 投诉材料整理面板
+ * 为案件申诉提供智能化的投诉/申诉材料生成功能
+ *
+ * 核心功能：
+ *   - AI 一键生成：基于会话数据自动生成完整的投诉/申诉材料
+ *   - 分块展示：按案件概述、商户信息、违规详情、证据清单、时间线、申诉要点分块
+ *   - 一键复制：支持分段复制和一次性复制全部内容（格式化为分段文档）
+ *   - 完整文书：提供完整格式的申诉文书，可展开/收起，直接复制到 Word 使用
+ *   - 费用透明：显示本次生成的 Token 消耗和费用信息（支持缓存识别）
+ *   - 重新生成：支持强制重新生成，使用 force 参数
+ *
+ * 文档结构（SECTIONS）：
+ *   1. complaint_summary - 案件概述（事件全貌+核心诉求）
+ *   2. merchant_info - 商户与经营信息（结构化资料，含经营场景/AppID）
+ *   3. violation_detail - 违规详情+订单信息（处罚原因+交易订单号）
+ *   4. evidence_list - 证据材料清单（身份证/营业执照/订单截图等）
+ *   5. timeline - 事件时间线（按时间顺序梳理关键节点）
+ *   6. appeal_points - 申诉要点与策略（核心论点+驳回应对预案）
+ *
+ * 关键依赖：
+ *   - getAuthHeaders: 认证请求头获取函数
+ *   - 后端接口: GET/POST /api/sessions/:id/complaint-doc, POST /api/sessions/:id/generate-complaint-doc
+ *
+ * 注意事项：
+ *   - 生成超时时间为 130 秒（AI 整理材料需要较长时间）
+ *   - 失败时自动重试 1 次（retryCount < 1）
+ *   - 复制功能优先使用 navigator.clipboard，fallback 到 execCommand
+ *   - costInfo 仅在新生成时设置，加载已有文档时不显示费用
+ */
 import React, { useState, useEffect } from 'react'
 
+/** 文档分块配置：定义申诉材料的6个标准部分 */
 const SECTIONS = [
   { key: 'complaint_summary', label: '案件概述', icon: '📋', desc: '事件全貌+核心诉求' },
   { key: 'merchant_info', label: '商户与经营信息', icon: '🏪', desc: '结构化资料（含经营场景/AppID）' },
@@ -9,18 +40,34 @@ const SECTIONS = [
   { key: 'appeal_points', label: '申诉要点与策略', icon: '💡', desc: '核心论点+驳回应对预案' },
 ]
 
+/**
+ * AI 投诉材料整理面板组件
+ * 用户提供案件信息后，一键生成结构化的投诉/申诉材料文档
+ *
+ * @param {Object} props
+ * @param {string} props.sessionId - 当前会话 ID，用于加载/保存文档
+ * @param {string|number} props.userId - 用户 ID，用于计费和权限校验
+ * @param {Function} [props.onClose] - 关闭面板回调（移动端使用）
+ * @param {Function} props.getAuthHeaders - 获取认证请求头的函数
+ * @returns {JSX.Element} 投诉材料整理面板 UI
+ */
 export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthHeaders }) {
-  const [doc, setDoc] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [copiedKey, setCopiedKey] = useState(null)
-  const [costInfo, setCostInfo] = useState(null)
-  const [expandedFull, setExpandedFull] = useState(false)
+  const [doc, setDoc] = useState(null)               // 已生成的文档对象（包含各分块内容）
+  const [loading, setLoading] = useState(false)       // 生成中的加载状态
+  const [error, setError] = useState('')              // 错误信息
+  const [copiedKey, setCopiedKey] = useState(null)    // 当前已复制的分块 key（用于显示"已复制"状态）
+  const [costInfo, setCostInfo] = useState(null)      // 本次生成的费用信息（cost/inputTokens/outputTokens/cached）
+  const [expandedFull, setExpandedFull] = useState(false) // 完整文书是否展开
 
+  /** 组件挂载或 sessionId 变化时，加载服务器上已保存的文档 */
   useEffect(() => {
     if (sessionId) loadExisting()
   }, [sessionId])
 
+  /**
+   * 加载已存在的投诉文档（从服务器恢复）
+   * 如果之前生成过文档，刷新页面后自动恢复
+   */
   async function loadExisting() {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/complaint-doc`, { headers: getAuthHeaders() })
@@ -29,8 +76,13 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
     } catch {}
   }
 
+  /**
+   * 生成投诉材料（AI 驱动）
+   * @param {boolean} force - 是否强制重新生成（忽略缓存）
+   * @param {number} retryCount - 当前重试次数（最大 1 次）
+   */
   async function generate(force = false, retryCount = 0) {
-    if (!sessionId || !userId) {
+    if (!sessionId) {
       setError('缺少会话信息，请刷新页面后重试')
       return
     }
@@ -42,7 +94,7 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
       const res = await fetch(`/api/sessions/${sessionId}/generate-complaint-doc`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ userId, force }),
+        body: JSON.stringify({ force }),
         signal: controller.signal,
       })
       clearTimeout(timeout)
@@ -82,6 +134,12 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
     }
   }
 
+  /**
+   * 复制文本到剪贴板
+   * 优先使用 navigator.clipboard API，不支持时 fallback 到 execCommand
+   * @param {string} text - 要复制的文本
+   * @param {string} key - 复制状态标识（用于显示"已复制"按钮状态）
+   */
   async function copyText(text, key) {
     try {
       await navigator.clipboard.writeText(text)
@@ -99,6 +157,10 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
     }
   }
 
+  /**
+   * 一键复制全部（格式化为分段文档格式）
+   * 将所有分块拼接成带标题的完整文档，适合直接粘贴到 Word
+   */
   function copyAll() {
     if (!doc) return
     const parts = [

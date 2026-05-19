@@ -2,6 +2,24 @@
 
 import { getAIModels, getActiveAIModel, getHealthyFreeModels, getFallbackModels, updateModelHealth, setActiveAIModel } from './db.js'
 
+async function trackHealthProbeUsage(model, usage) {
+  if (!usage) return
+  try {
+    const { trackAIUsage, isUsageTrackerReady } = await import('./ai/usageTracker.js')
+    if (!isUsageTrackerReady()) return
+    await trackAIUsage({
+      userId: 0,
+      type: 'health_probe',
+      usage,
+      provider: model.provider || 'unknown',
+      modelName: model.model_name,
+      modelId: model.id || 0,
+    })
+  } catch (e) {
+    console.error('[modelHealth] trackHealthProbeUsage:', e.message)
+  }
+}
+
 // 单个模型健康检测（发送最小请求验证可用性）
 async function checkModelHealth(model) {
   const start = Date.now()
@@ -32,6 +50,10 @@ async function checkModelHealth(model) {
     const responseMs = Date.now() - start
 
     if (res.ok) {
+      try {
+        const body = await res.json()
+        if (body?.usage) await trackHealthProbeUsage(model, body.usage)
+      } catch { /* 响应体非 JSON 时忽略 */ }
       return { status: 'healthy', error: null, responseMs }
     }
 

@@ -1,8 +1,40 @@
+/**
+ * @fileoverview AI 智能分析面板组件
+ * 为案件申诉提供两层分析能力：
+ *   1. 本地规则引擎分析（免费，自动触发）- 风险评估、策略建议
+ *   2. AI 深度分析（付费，手动触发）- 流式逐字输出完整申诉报告
+ *
+ * 核心功能：
+ *   - 自动加载已保存的深度分析报告
+ *   - 数据收集后自动触发本地规则分析
+ *   - 点击"深度分析"按钮触发 AI 流式分析（SSE 协议）
+ *   - 支持全文/清单两种查看模式
+ *   - 计费信息展示（会员免费/token扣费）
+ *   - 可生成正式申诉报告（ReportCard）
+ *
+ * 关键依赖：
+ *   - ReportCard: 申诉报告生成弹窗
+ *   - AnalysisVisualView: 可视化清单视图
+ *   - 后端 SSE 接口: /api/sessions/{id}/deep-analysis
+ *
+ * 注意事项：
+ *   - 流式解析使用 SSE data: 协议，需处理不完整行缓冲
+ *   - AbortController 用于取消进行中的 AI 分析
+ *   - 流式输出期间自动滚动到底部
+ */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 import ReportCard from './ReportCard'
 import AnalysisVisualView from './AnalysisVisualView'
 
-// 简单 Markdown 渲染器
+/**
+ * 简易 Markdown 渲染器
+ * 将 Markdown 文本转换为 HTML，支持标题、加粗、列表、分割线等基础语法
+ *
+ * @param {Object} props
+ * @param {string} props.text - 原始 Markdown 文本
+ * @returns {JSX.Element} 渲染后的 HTML 内容
+ */
 function MarkdownRenderer({ text }) {
   const html = useMemo(() => {
     if (!text) return ''
@@ -19,9 +51,34 @@ function MarkdownRenderer({ text }) {
       .replace(/\n\n/g, '<div class="h-2"></div>')
       .replace(/\n/g, '<br/>')
   }, [text])
-  return <div className="text-[11px] text-gray-700 leading-relaxed break-words analysis-markdown" dangerouslySetInnerHTML={{ __html: html }} />
+  return <div className="text-[11px] text-gray-700 leading-relaxed break-words analysis-markdown" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
 }
 
+/**
+ * AI 智能分析面板
+ * 提供案件申诉的两层分析能力：规则引擎（免费自动）+ AI 深度分析（付费手动）
+ *
+ * 工作流程：
+ *   1. 组件挂载时自动加载已保存的深度分析报告
+ *   2. 当用户填写数据后(filledCount >= 1)，自动触发本地规则分析
+ *   3. 用户点击"深度分析"按钮触发 AI 流式分析，逐字输出中文报告
+ *   4. 分析完成后可切换"全文"/"清单"视图，或生成正式报告
+ *
+ * @param {Object} props
+ * @param {string} props.sessionId - 案件会话 ID，用于 API 请求和报告持久化
+ * @param {Object} props.collectedData - 用户已填写的申诉数据对象
+ * @param {Function} [props.onClose] - 关闭面板回调（移动端）
+ * @param {number|string} [props.refreshKey] - 触发重新分析的外部信号
+ * @param {number|string} [props.userId] - 当前用户 ID，用于计费追踪
+ * @param {Function} [props.getAuthHeaders] - 获取认证请求头的函数
+ * @returns {JSX.Element} AI 分析面板 UI
+ *
+ * 注意事项：
+ *   - AI 分析使用 SSE 流式传输，需要浏览器支持 ReadableStream.getReader()
+ *   - 每次新分析会取消前一次进行中的请求（AbortController）
+ *   - 流式输出期间自动滚动到底部，完成后停止自动滚动
+ *   - 计费类型：member_free(会员免费) / token_charge(按量扣费)
+ */
 export default function AIAnalysisPanel({ sessionId, collectedData, onClose, refreshKey, userId, getAuthHeaders }) {
   const authHeaders = getAuthHeaders ? getAuthHeaders() : { 'Content-Type': 'application/json' }
   const [local, setLocal] = useState(null)
@@ -38,10 +95,11 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
   const streamEndRef = useRef(null)
   const contentRef = useRef(null)
 
+  /** 计算已填写字段数（排除以 _ 开头的内部字段） */
   const filledCount = Object.keys(collectedData || {}).filter(k => !k.startsWith('_') && collectedData[k] && String(collectedData[k]).trim()).length
   const hasData = filledCount > 0
 
-  // 加载已保存的深度分析
+  // 组件挂载时加载已保存的深度分析报告（从服务器恢复上次分析结果）
   useEffect(() => {
     if (!sessionId) return
     fetch(`/api/sessions/${sessionId}/deep-analysis-result`, { headers: authHeaders })
@@ -50,7 +108,11 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
       .catch(() => {})
   }, [sessionId])
 
-  // 本地分析（免费，自动触发）
+  /**
+   * 本地规则引擎分析（免费，自动触发）
+   * 基于预定义规则对案件进行风险评估和策略建议
+   * 当 sessionId 存在且至少有 1 个已填写字段时触发
+   */
   const fetchLocal = () => {
     if (!sessionId || filledCount < 1) { setLocal(null); return }
     setLoading(true)
@@ -61,14 +123,28 @@ export default function AIAnalysisPanel({ sessionId, collectedData, onClose, ref
       .finally(() => setLoading(false))
   }
 
-  // AI流式深度分析（逐字输出中文报告）
+  /**
+   * AI 流式深度分析（付费，手动触发）
+   * 通过 SSE 协议逐字接收 AI 生成的中文分析报告
+   *
+   * SSE 事件类型：
+   *   - local: 本地分析结果（分析过程中先推送）
+   *   - chunk: 文本片段，逐字追加到 streamingText
+   *   - done: 分析完成，携带计费信息
+   *   - error: 分析失败，携带错误原因（quota_exceeded/no_balance）
+   *
+   * 注意事项：
+   *   - 使用缓冲区处理不完整行（SSE 数据可能被 TCP 分包）
+   *   - 新分析会取消前一次请求（abortRef）
+   *   - 流式输出期间自动滚动到底部
+   */
   const fetchDeepAnalysis = async () => {
     if (!sessionId || filledCount < 1) return
     if (abortRef.current) abortRef.current.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setAiLoading(true); setIsStreaming(true); setStreamingText(''); setFinalText(''); setError(null); setBilling(null)
-    const url = `/api/sessions/${sessionId}/deep-analysis${userId ? `?userId=${userId}` : ''}`
+    const url = `/api/sessions/${sessionId}/deep-analysis`
     let accumulated = ''
     try {
       const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders })

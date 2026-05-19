@@ -1,5 +1,35 @@
-import React, { useState, useEffect } from 'react'
+/**
+ * 申诉文案面板组件
+ * @description 生成、展示和管理微信商户申诉文案
+ * 
+ * 核心功能：
+ * 1. 文案生成 — 调用 AI 生成申诉文案，流式渲染输出，支持强制重新生成
+ * 2. 分段展示 — 按微信商户后台的 5 个表单字段分别展示（业务模式、退款机制、投诉原因、处理方法、补充说明）
+ * 3. 一键复制 — 每段文案独立复制，带字符数限制提示（300字符）
+ * 4. 进度跟踪 — 申诉状态流转（已生成→已提交→审核中→通过/驳回）
+ * 5. 反馈收集 — 记录申诉结果（通过/驳回原因），帮助 AI 学习优化
+ * 6. 计费展示 — 显示 Token 消耗和费用信息
+ * 
+ * 文案分段（SECTIONS）：
+ * - business_model: 业务模式说明
+ * - refund_rules: 退款机制与退款方式
+ * - complaint_cause: 投诉产生原因及详细说明
+ * - complaint_resolution: 投诉处理方法
+ * - supplementary: 补充文字说明
+ * 
+ * @param {Object} props
+ * @param {string} props.sessionId - 会话 ID
+ * @param {string} props.userId - 用户 ID
+ * @param {Function} [props.onClose] - 关闭面板回调（移动端）
+ * @param {Function} props.getAuthHeaders - 获取认证请求头回调 () => {Authorization: 'Bearer xxx'}
+ */
+import React, { useState, useEffect, useRef } from 'react'
 
+/**
+ * 申诉文案分段定义
+ * @constant {Array<{key: string, label: string, icon: string, dbKey: string, formField: string}>}
+ * @description 对应微信商户后台申诉表单的 5 个填写栏
+ */
 const SECTIONS = [
   { key: 'business_model', label: '业务模式说明', icon: '💼', dbKey: 'business_model', formField: '对应表单「业务模式说明」' },
   { key: 'refund_rules', label: '退款机制与退款方式', icon: '💰', dbKey: 'refund_rules', formField: '对应表单「退款机制与退款方式」' },
@@ -8,16 +38,27 @@ const SECTIONS = [
   { key: 'supplementary', label: '补充文字说明', icon: '📝', dbKey: 'supplementary', formField: '对应表单「补充文字说明」' },
 ]
 
+/**
+ * 申诉文案面板主组件
+ * @description 完整的申诉文案生成、管理和提交流程面板
+ * @param {Object} props
+ * @param {string} props.sessionId - 会话 ID
+ * @param {string} props.userId - 用户 ID
+ * @param {Function} [props.onClose] - 关闭面板回调
+ * @param {Function} props.getAuthHeaders - 获取认证请求头回调
+ */
 export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHeaders }) {
   const [appealText, setAppealText] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [copiedKey, setCopiedKey] = useState(null)
   const [cost, setCost] = useState(null)
-  const [costInfo, setCostInfo] = useState(null) // { cost, isOfficialMode, cached, inputTokens, outputTokens }
+  const [costInfo, setCostInfo] = useState(null)
   const [statusLoading, setStatusLoading] = useState(false)
-  const [showFeedback, setShowFeedback] = useState(null) // 'approved' | 'rejected' | null
+  const [showFeedback, setShowFeedback] = useState(null)
   const [feedbackText, setFeedbackText] = useState('')
+  const [streamingText, setStreamingText] = useState('')
+  const abortRef = useRef(null)
 
   useEffect(() => {
     if (sessionId) loadExisting()
@@ -32,31 +73,31 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
   }
 
   async function generate(force = false, retryCount = 0) {
-    if (!sessionId || !userId) {
+    if (!sessionId) {
       setError('缺少会话信息，请刷新页面后重试')
       return
     }
     setLoading(true)
     setError('')
+    setStreamingText('')
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 90000) // 90秒前端超时
       const res = await fetch(`/api/sessions/${sessionId}/generate-appeal-text`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ userId, force }),
+        body: JSON.stringify({ force, stream: true }),
         signal: controller.signal,
       })
-      clearTimeout(timeout)
 
-      // 先检查响应状态
       if (!res.ok) {
         let errMsg = `服务器错误(${res.status})`
         try {
           const errData = await res.json()
           if (errData.error) errMsg = errData.error
         } catch {
-          // 非JSON响应（可能是代理错误页面）
           const text = await res.text().catch(() => '')
           if (res.status === 502 || res.status === 504) errMsg = '后端服务未启动或响应超时，请检查服务器状态'
           else if (text.length < 200) errMsg = text || errMsg
@@ -65,24 +106,62 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
         return
       }
 
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        return
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || !trimmed.startsWith('data: ')) continue
+          const data = trimmed.slice(6)
+
+          try {
+            const parsed = JSON.parse(data)
+
+            if (parsed.type === 'start') {
+              continue
+            }
+
+            if (parsed.choices?.[0]?.delta?.content) {
+              accumulated += parsed.choices[0].delta.content
+              setStreamingText(accumulated)
+            }
+
+            if (parsed.choices?.[0]?.delta?.reasoning_content) {
+              continue
+            }
+
+            if (parsed.type === 'done') {
+              if (parsed.appealText) {
+                setAppealText(parsed.appealText)
+                setCostInfo({
+                  cost: parsed.cost || 0,
+                  isOfficialMode: parsed.isOfficialMode,
+                  cached: parsed.cached || false,
+                  inputTokens: parsed.inputTokens || 0,
+                  outputTokens: parsed.outputTokens || 0,
+                })
+              } else if (parsed.error) {
+                setError(parsed.error)
+              }
+              setStreamingText('')
+            }
+          } catch {}
+        }
       }
-      setAppealText(data.appealText)
-      setCostInfo({
-        cost: data.cost || 0,
-        isOfficialMode: data.isOfficialMode,
-        cached: data.cached,
-        inputTokens: data.inputTokens || 0,
-        outputTokens: data.outputTokens || 0,
-      })
     } catch (err) {
       if (err.name === 'AbortError') {
-        setError('请求超时，AI生成文案需要较长时间，请稍后重试')
+        setError('请求已取消')
       } else if (retryCount < 1) {
-        // 自动重试一次
         console.warn('Appeal text generate failed, retrying...', err.message)
         return generate(force, retryCount + 1)
       } else {
@@ -90,6 +169,7 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
       }
     } finally {
       setLoading(false)
+      abortRef.current = null
     }
   }
 
@@ -155,7 +235,19 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {!appealText ? (
+        {streamingText && !appealText ? (
+          <div className="space-y-3">
+            <div className="text-center py-3">
+              <div className="flex items-center justify-center gap-2 text-sm text-orange-500 font-medium">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                AI正在生成申诉文案...
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3.5 border border-orange-100">
+              <pre className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words font-sans max-h-[60vh] overflow-y-auto">{streamingText}</pre>
+            </div>
+          </div>
+        ) : !appealText ? (
           <div className="text-center py-10">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
               <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

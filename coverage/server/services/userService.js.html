@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">28.57% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/28</span>
+                <span class='fraction'>0/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">42.1% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/19</span>
+                <span class='fraction'>0/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/4</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">29.62% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/27</span>
+                <span class='fraction'>0/27</span>
             </div>
         
             
@@ -157,35 +157,35 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -194,7 +194,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -237,20 +237,20 @@ class UserService {
    * @param {string} phone 
    * @param {string} nickname 
    */
-  async register(phone, nickname) {
+<span class="fstat-no" title="function not covered" >  as</span>ync register(phone, nickname) {
     // Input validation
-    if (!phone || phone.length &lt; 2 || phone.length &gt; 20) {
-      throw new Error('INVALID_PHONE');
+<span class="cstat-no" title="statement not covered" >    if (!phone || phone.length &lt; 2 || phone.length &gt; 20) {</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error('INVALID_PHONE');</span>
     }
     
     // Chinese character validation for nickname could be moved to utils/validation.js
     // For now keeping simple logic here
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (nickname &amp;&amp; nickname.length &gt; 20) {
+<span class="cstat-no" title="statement not covered" >    if (nickname &amp;&amp; nickname.length &gt; 20) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error('INVALID_NICKNAME');</span>
     }
 &nbsp;
-    try {
-      const { user, isNew } = await userModel.create(phone, nickname);
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const { user, isNew } = <span class="cstat-no" title="statement not covered" >await userModel.create(phone, nickname);</span>
       
       // If new user, give initial balance (if configured)
       // This logic should ideally check system config, but for MVP refactor we might hardcode or fetch config
@@ -266,8 +266,8 @@ class UserService {
       const token = <span class="cstat-no" title="statement not covered" >this._generateToken(user.id);</span>
 <span class="cstat-no" title="statement not covered" >      return { user, token, isNew };</span>
     } catch (error) {
-      logger.error('Service: Error registering user', error);
-      throw error;
+<span class="cstat-no" title="statement not covered" >      logger.error('Service: Error registering user', error);</span>
+<span class="cstat-no" title="statement not covered" >      throw error;</span>
     }
   }
 &nbsp;
@@ -275,8 +275,8 @@ class UserService {
    * Login user
    * @param {string} phone 
    */
-  async login(phone) {
-    const user = await userModel.findByPhone(phone);
+<span class="fstat-no" title="function not covered" >  as</span>ync login(phone) {
+    const user = <span class="cstat-no" title="statement not covered" >await userModel.findByPhone(phone);</span>
 <span class="cstat-no" title="statement not covered" >    if (!user) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error('USER_NOT_FOUND');</span>
     }
@@ -316,7 +316,7 @@ export default new UserService();
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-22T10:17:55.697Z
+                at 2026-05-19T05:45:38.996Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

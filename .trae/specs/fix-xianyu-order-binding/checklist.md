@@ -1,0 +1,21 @@
+# Checklist
+
+- [x] `server/config/initDb.js` 的 sysDefaults 数组中包含 `xianyu_app_key` 和 `xianyu_app_secret` 配置项
+- [x] `server/db.js` 的 `initDatabase()` 中包含 IGNORE INSERT 迁移，确保已有数据库补全闲管家配置
+- [x] `server/xianyu-api.js` 签名算法使用官方规范：`md5("appKey,bodyMd5,timestamp,appSecret")`
+- [x] `server/xianyu-api.js` 所有请求使用 POST 方法
+- [x] `server/xianyu-api.js` 基础 URL 为 `https://open.goofish.pro`
+- [x] `server/xianyu-api.js` 订单列表端点使用 `/api/open/order/list`
+- [x] `server/xianyu-api.js` 订单详情端点使用 `/api/open/order/detail`
+- [x] `server/xianyu-api.js` 的 `loadAppCredential()` 优先从数据库读取 AppKey/AppSecret
+- [x] `server/xianyu-api.js` 包含 `mapOrderFields()` 数据映射函数
+- [x] `GET /api/orders/from-system` 返回的数据经过 `mapOrderFields` 映射
+- [x] `GET /api/orders/from-system` 未配置时返回友好错误（指向管理后台）
+- [x] `GET /api/orders/from-system` 不再返回 mock 假数据
+- [x] 管理后台「系统设置」中出现「闲管家配置」子标签
+- [x] 闲管家配置页面包含 AppKey 输入框（明文）
+- [x] 闲管家配置页面包含 AppSecret 输入框（密码模式，可切换显示/隐藏）
+- [x] 闲管家配置页面包含保存按钮且可正常保存到数据库
+- [x] 闲管家配置页面包含应用信息只读标签（类型、模式、名称、状态、时间）
+- [x] `npm run build` 构建通过无错误
+- [x] 闲管家签名算法单元验证：sign=c26c8a48809141f3dd80bd9b9ddb41ea ✅ match=true

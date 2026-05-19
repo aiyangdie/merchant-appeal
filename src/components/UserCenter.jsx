@@ -1,6 +1,33 @@
 import React, { useState, useEffect } from 'react'
 import UserAvatar from './UserAvatar'
 
+/**
+ * 用户中心弹窗组件
+ * @description 展示用户账户信息，包含余额、消费明细、充值记录、申诉记录四大功能
+ * 
+ * 核心功能：
+ * 1. 账户概览 — 余额、累计消费、今日请求数/消费/Token 用量
+ * 2. 消费明细 — 按时间展示每次 AI 服务的 Token 消耗和费用，区分服务类型（对话/报告/申诉文案等）
+ * 3. 充值记录 — 展示充值订单的状态（待确认/已到账/已拒绝）和金额
+ * 4. 申诉记录 — 展示申诉文案的生成、提交、审核状态流转及驳回原因
+ * 5. 充值入口 — 一键跳转充值功能
+ * 
+ * 申诉状态：
+ * - generated: 已生成
+ * - submitted: 已提交
+ * - under_review: 审核中
+ * - approved: 通过
+ * - rejected: 驳回
+ * - resubmitted: 重新提交
+ * 
+ * @param {Object} props
+ * @param {Object} props.user - 用户信息 {id, nickname, phone}
+ * @param {Function} props.onClose - 关闭弹窗回调
+ * @param {Function} props.onRecharge - 打开充值功能回调
+ * @param {Function} props.getAuthHeaders - 获取认证请求头回调 () => {Authorization: 'Bearer xxx'}
+ */
+
+/** 服务类型标签映射 — 用于消费明细显示 */
 const TYPE_LABELS = {
   chat: '对话',
   chat_local: '信息收集',
@@ -221,7 +248,7 @@ export default function UserCenter({ user, onClose, onRecharge, getAuthHeaders }
                         {o.admin_note && <p className="text-[10px] text-gray-400 mt-0.5">{o.admin_note}</p>}
                       </div>
                       <span className={`text-xs font-semibold flex-shrink-0 ml-2 ${o.status === 'confirmed' ? 'text-green-600' : 'text-gray-400'}`}>
-                        +¥{parseFloat(o.amount).toFixed(2)}
+                        +¥{parseFloat(o.amount || 0).toFixed(2)}
                       </span>
                     </div>
                   ))}
