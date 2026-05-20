@@ -5,16 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:simple": "concurrently \"npm run dev:server:simple\" \"npm run dev:client\"",
     "dev:client": "vite",
     "dev:server": "node --watch server/index.js",
-    "dev:server:simple": "node --watch server/index-simple.js",
     "build": "vite build",
     "start": "node server/index.js",
-    "start:simple": "node server/index-simple.js",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
-    "test:ci": "NODE_OPTIONS='--experimental-vm-modules' jest --ci --coverage --reporters=default"
+    "test": "npm run test:unit",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci --coverage --reporters=default",
+    "verify:evolution": "node server/scripts/evolutionVerify.mjs",
+    "verify:agent": "node server/scripts/agentSmokeTest.mjs",
+    "verify:all": "npm run test:unit && npm run verify:evolution && npm run verify:agent"
   },
   "dependencies": {
     "axios": "^1.15.0",
@@ -41,11 +42,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "canvas": "^3.2.1",
     "concurrently": "^9.1.0",
     "jest": "^29.7.0",
     "postcss": "^8.4.49",
-    "pptxgenjs": "^4.0.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^3.4.15",
     "terser": "^5.46.1",
