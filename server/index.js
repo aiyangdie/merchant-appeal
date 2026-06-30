@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import {
-  initDatabase,
+  initDatabase, getPool,
   createSession, getSession, updateSession,
   addMessage, getMessages, getAllSessions, deleteSession, verifyAdmin,
   changeAdminPassword,
@@ -18,7 +18,7 @@ import {
   getDashboardStats, lookupSessions,
   registerUser, getUserByPhone, getUserById, updateUserApiMode,
   deductBalance, getAllUsers, adjustUserBalance, deleteUser,
-  getUserSessions, isChinese,
+  getUserSessions, getUserSessionsForClient, isChinese,
   trackUserAction, updateUserActivity, incrementLoginCount, incrementUserMessages, incrementUserSpent,
   checkDeepAnalysisQuota, incrementDeepAnalysisCount,
   saveDeepAnalysisResult, getDeepAnalysisResult,
@@ -43,9 +43,13 @@ import {
   createOrder, getOrderByNo, getOrderById, getUserOrders, updateOrderStatus, appendServiceMessage, getOrderServiceMessages,
   fixEncryptedData,
   saveComplaintDoc, getComplaintDoc,
+  formatUserForClient,
 } from './db.js'
 import { chatWithAI, streamChatWithAI, extractFieldsWithAI, expandFieldsForIndustry, assessCompletenessWithAI, buildCollectionInstruction, getAIConfig } from './ai.js'
-import { buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep } from './localAI.js'
+import { buildReportPrompt, TOTAL_STEPS, INFO_FIELDS, LOCAL_WELCOME, normalizeFieldValue, buildCollectionContext, findNextUnfilledStep, getAllCollectFields, getCollectionTotalSteps, getCollectionProgress, isFieldOptionalForScenario, isFieldHiddenForScenario } from './localAI.js'
+import { applyMessageExtractions, isDueDiligenceScenario, assessDDCompleteness, buildDDGuide } from './dueDiligence.js'
+import { expandOnlineChannels } from './onlineChannels.js'
+import { applyValidatedFieldUpdates, runRuleFieldExtractions, notifyFieldUpdates, notifyChannelFields, collectedDataChanged } from './fieldCollector.js'
 import { calculateCost } from './tokenizer.js'
 import {
   analyzeConversation, batchAnalyzeConversations, aggregateDailyMetrics,
@@ -59,7 +63,7 @@ import {
   aiOptimizeProduct, batchOptimizeProducts,
   getSmartRecommendations, updateUserInterestFromConversation, parseProductRecommendations,
   aiAutoCreateProducts, aiSuggestNewProducts, aiRecommendContactCard,
-  aiAssessRisk, aiGenerateContactCard,
+  aiAssessRisk, heuristicAssessRisk, aiGenerateContactCard,
   aiBargain, aiGenerateVirtualPersona,
 } from './mall.js'
 import { checkAllModels, checkSingleModel, autoSwitchIfNeeded, startHealthScheduler, callWithFallback } from './modelHealth.js'
@@ -68,6 +72,9 @@ import { runBackup, startBackupScheduler, stopBackupScheduler, getBackupStatus, 
 import { createPayment, handleWechatNotify, handleAlipayNotify, handleEpayNotify, handleCodePayNotify, queryPaymentStatus, getPaymentChannels, generateOutTradeNo } from './payment.js'
 import { fetchXianGuanShops, fetchXianGuanOrders, fetchXianGuanOrderDetail, fetchXianGuanOrderKamList, transformOrder, transformOrderDetail } from './services/xianGuanService.js'
 import { initEmailService, sendEmail, checkNewEmails } from './services/emailService.js'
+import wechatOAuthRoutes from './routes/wechatOAuthRoutes.js'
+import { getWechatOAuthAdminInfo } from './services/wechatOAuthService.js'
+import customerProfileRoutes from './routes/customerProfileRoutes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -158,6 +165,8 @@ app.use(express.json({ limit: '1mb' }))
 // 响应压缩中间件
 app.use(compression({
   filter: (req, res) => {
+    if (req.path === '/api/chat/stream') return false
+    if (res.getHeader('Content-Type') === 'text/event-stream') return false
     if (req.headers['x-no-compression']) return false
     return compression.filter(req, res)
   },
@@ -170,7 +179,9 @@ app.use(apiMetricsMiddleware)
 
 // 静态文件
 const distPath = path.join(__dirname, '..', 'dist')
+const uploadsPath = path.join(__dirname, '..', 'uploads')
 app.use(express.static(distPath))
+app.use('/uploads', express.static(uploadsPath))
 
 // ========== JWT 工具 ==========
 
@@ -277,7 +288,9 @@ app.get('/api/xianguan/test', async (req, res) => {
 // 从订单系统获取订单列表（支持闲鱼管家API和自定义订单系统）
 app.get('/api/orders/from-system', requireUser, async (req, res) => {
   try {
-    const { page_no = 1, page_size = 20, order_status, start_time, end_time, order_no, buyer_nick, keyword } = req.query;
+    const page_no = parseInt(req.query.page_no || req.query.page || 1, 10)
+    const page_size = parseInt(req.query.page_size || 20, 10)
+    const { order_status, start_time, end_time, order_no, buyer_nick, keyword } = req.query;
 
     if (XIANGUAN_APPID && XIANGUAN_APPSECRET) {
       try {
@@ -305,13 +318,25 @@ app.get('/api/orders/from-system', requireUser, async (req, res) => {
       } catch (xgError) {
         console.error('闲鱼管家API调用失败:', xgError.message);
         if (!ORDER_SYSTEM_URL) {
-          return res.status(500).json({ error: '闲鱼管家API调用失败: ' + xgError.message });
+          return res.json({
+            success: true,
+            data: [],
+            total: 0,
+            configured: false,
+            message: '闲鱼订单接口暂时不可用：' + xgError.message,
+          });
         }
       }
     }
 
     if (!ORDER_SYSTEM_URL) {
-      return res.status(500).json({ error: '订单系统未配置，请配置闲鱼管家API或订单系统URL' });
+      return res.json({
+        success: true,
+        data: [],
+        total: 0,
+        configured: false,
+        message: '订单系统未配置，暂无法拉取闲鱼订单。请联系管理员在后台配置闲鱼管家 API。',
+      });
     }
 
     const url = `${ORDER_SYSTEM_URL}/api/external/orders?page=${page_no}&page_size=${page_size}${order_status ? `&status=${order_status}` : ''}`
@@ -352,13 +377,21 @@ app.get('/api/orders/from-system/:orderNo', requireUser, async (req, res) => {
       } catch (xgError) {
         console.error('闲鱼管家API调用失败:', xgError.message);
         if (!ORDER_SYSTEM_URL) {
-          return res.status(500).json({ error: '闲鱼管家API调用失败: ' + xgError.message });
+          return res.status(404).json({
+            success: false,
+            configured: false,
+            error: '闲鱼订单接口暂时不可用：' + xgError.message,
+          });
         }
       }
     }
 
     if (!ORDER_SYSTEM_URL) {
-      return res.status(500).json({ error: '订单系统未配置，请配置闲鱼管家API或订单系统URL' });
+      return res.status(404).json({
+        success: false,
+        configured: false,
+        error: '订单系统未配置，暂无法查询订单详情',
+      });
     }
 
     const url = `${ORDER_SYSTEM_URL}/api/external/order/${orderNo}`
@@ -473,7 +506,12 @@ app.get('/api/sessions/:id/order', requireUser, async (req, res) => {
   }
 })
 
+// ========== 微信 OAuth（客户站） ==========
+app.use('/api/wechat/oauth', wechatOAuthRoutes)
+
 // ========== 用户 API ==========
+
+app.use('/api/user', customerProfileRoutes)
 
 app.post('/api/user/register', authLimiter, async (req, res) => {
   try {
@@ -497,7 +535,7 @@ app.post('/api/user/register', authLimiter, async (req, res) => {
     await incrementLoginCount(u.id)
     await updateUserActivity(u.id, ip)
     const token = signToken({ userId: u.id, role: 'user' })
-    res.json({ user: { id: u.id, phone: u.phone, nickname: u.nickname, balance: u.balance, api_mode: u.api_mode }, token, isNew: result.isNew })
+    res.json({ user: formatUserForClient(u), token, isNew: result.isNew })
   } catch (err) {
     if (err.message === 'CHINESE_NAME_REQUIRED') return res.status(400).json({ error: '名称必须为中文' })
     console.error('Register error:', err)
@@ -516,10 +554,21 @@ app.post('/api/user/login', authLimiter, async (req, res) => {
     await updateUserActivity(user.id, ip)
     await trackUserAction(user.id, 'login', '', ip, req.headers['user-agent'] || '')
     const token = signToken({ userId: user.id, role: 'user' })
-    res.json({ user: { id: user.id, phone: user.phone, nickname: user.nickname, balance: user.balance, api_mode: user.api_mode }, token })
+    res.json({ user: formatUserForClient(user), token })
   } catch (err) {
     console.error('Login error:', err)
     res.status(500).json({ error: '登录失败' })
+  }
+})
+
+// 客户站案件列表（结构化字段，无需传 userId）
+app.get('/api/user/cases', requireUser, async (req, res) => {
+  try {
+    const sessions = await getUserSessionsForClient(req.userId)
+    res.json({ sessions })
+  } catch (err) {
+    console.error('Get user cases error:', err)
+    res.status(500).json({ error: '获取案件列表失败' })
   }
 })
 
@@ -540,7 +589,7 @@ app.get('/api/user/:id', requireUser, async (req, res) => {
     if (String(req.userId) !== String(req.params.id)) return res.status(403).json({ error: '无权访问' })
     const user = await getUserById(req.params.id)
     if (!user) return res.status(404).json({ error: '用户不存在' })
-    res.json({ user: { id: user.id, phone: user.phone, nickname: user.nickname, balance: user.balance, api_mode: user.api_mode } })
+    res.json({ user: formatUserForClient(user) })
   } catch (err) {
     res.status(500).json({ error: '获取用户信息失败' })
   }
@@ -557,7 +606,7 @@ app.put('/api/user/:id/api-mode', requireUser, async (req, res) => {
     if (custom_api_key && custom_api_key.length > 200) return res.status(400).json({ error: 'API Key 过长' })
     await updateUserApiMode(req.params.id, api_mode, custom_api_key || '')
     const user = await getUserById(req.params.id)
-    res.json({ user: { id: user.id, phone: user.phone, nickname: user.nickname, balance: user.balance, api_mode: user.api_mode } })
+    res.json({ user: formatUserForClient(user) })
   } catch (err) {
     res.status(500).json({ error: '更新失败' })
   }
@@ -693,7 +742,22 @@ app.get('/api/sessions/:id/info', optionalUser, async (req, res) => {
     const session = await getSession(req.params.id)
     if (!session) return res.status(404).json({ error: '会话不存在' })
     if (session.user_id && req.userId && String(session.user_id) !== String(req.userId)) return res.status(403).json({ error: '无权访问' })
-    res.json({ step: session.step, collectedData: session.collected_data || {}, totalSteps: TOTAL_STEPS, fields: INFO_FIELDS.map(f => ({ key: f.key, label: f.label, group: f.group, icon: f.icon })) })
+    const collectedData = session.collected_data || {}
+    const allFields = getAllCollectFields(collectedData)
+    const progress = getCollectionProgress(collectedData)
+    res.json({
+      step: session.step,
+      collectedData,
+      totalSteps: progress.total,
+      progress,
+      fields: allFields.filter(f => !isFieldHiddenForScenario(f.key, collectedData)).map(f => ({
+        key: f.key,
+        label: f.label,
+        group: f.group,
+        icon: f.icon,
+        optional: isFieldOptionalForScenario(f.key, collectedData),
+      })),
+    })
   } catch (err) { res.status(500).json({ error: '获取失败' }) }
 })
 
@@ -715,7 +779,7 @@ app.put('/api/sessions/:id/field', optionalUser, async (req, res) => {
     const normalizedValue = normalizeFieldValue(key, value || '', collectedData)
     // 记录变更（仅值真正改变时）
     if (normalizedValue !== oldValue) {
-      const fieldDef = INFO_FIELDS.find(f => f.key === key)
+      const fieldDef = getAllCollectFields(collectedData).find(f => f.key === key)
       const label = fieldDef?.label || key
       const reason = oldValue && oldValue !== '用户暂未提供' && oldValue !== '⏳待补充'
         ? `用户手动将"${label}"从"${oldValue}"修改为"${normalizedValue}"`
@@ -724,7 +788,8 @@ app.put('/api/sessions/:id/field', optionalUser, async (req, res) => {
     }
     collectedData[key] = normalizedValue
     await updateSession(req.params.id, session.step, collectedData)
-    res.json({ success: true, collectedData, normalizedValue, wasNormalized: normalizedValue !== (value || '').trim() })
+    const progress = getCollectionProgress(collectedData)
+    res.json({ success: true, collectedData, normalizedValue, wasNormalized: normalizedValue !== (value || '').trim(), progress })
   } catch (err) { console.error(err); res.status(500).json({ error: '更新失败' }) }
 })
 
@@ -1338,12 +1403,21 @@ async function simulateTypingSSE(res, text, chunkSize = 3, delayMs = 18) {
 }
 
 // ========== AI 流式转发工具函数 ==========
-async function pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType }) {
+function sseWrite(res, data) {
+  if (res.writableEnded) return
+  res.write(data)
+  if (typeof res.flush === 'function') res.flush()
+}
+
+async function pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType, streamStart, model, safeSend }) {
+  const send = safeSend || ((data) => sseWrite(res, data))
   const reader = streamResult.body.getReader()
   const decoder = new TextDecoder()
   let fullContent = ''
   let buffer = ''
   let usageHandled = false
+  let firstChunkSent = false
+  const t0 = streamStart || Date.now()
 
   while (true) {
     const { done, value } = await reader.read()
@@ -1362,7 +1436,15 @@ async function pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId
         if (rawDelta) {
           fullContent += rawDelta
           const delta = stripEmoji(rawDelta)
-          if (delta) res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`)
+          if (delta) {
+            if (!firstChunkSent) {
+              firstChunkSent = true
+              const firstChunkMs = Date.now() - t0
+              send(`data: ${JSON.stringify({ type: 'timing', firstChunkMs, model })}\n\n`)
+              send(`data: ${JSON.stringify({ type: 'status', phase: 'outputting' })}\n\n`)
+            }
+            send(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`)
+          }
         }
         if (parsed.usage && !usageHandled) {
           usageHandled = true
@@ -1449,54 +1531,24 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
       }
     }
 
-    // 新会话：保存欢迎消息到数据库（刷新后能恢复完整历史）
-    // 注意：需要先获取会话和订单信息
     const session = await getSession(sessionId)
     const currentStep = session?.step || 0
     const collectedData = session?.collected_data || {}
 
-    // 获取绑定的订单信息
+    // 订单信息：仅用缓存，外部拉取放后台（避免阻塞首字）
     let orderInfo = null
     const hasValidOrderData = session?.order_data && typeof session.order_data === 'object' && Object.keys(session.order_data).length > 0 && session.order_data.order_no
-    console.log(`[订单上下文] 会话 ${sessionId}, order_no: ${session?.order_no}, hasValidOrderData: ${hasValidOrderData}`)
     if (hasValidOrderData) {
       orderInfo = session.order_data
-      console.log(`[订单上下文] 使用缓存订单: ${orderInfo.order_no}`)
-    } else if (session?.order_no) {
-      console.log(`[订单上下文] 从订单系统获取: ${session.order_no}`)
-      try {
-        const orderRes = await fetch(`${ORDER_SYSTEM_URL}/api/external/order/${session.order_no}`, {
-          headers: { 'X-Api-Key': APPEAL_API_KEY }
-        })
-        if (orderRes.ok) {
-          const orderResult = await orderRes.json()
-          if (orderResult.success && orderResult.data) {
-            orderInfo = orderResult.data
-            console.log(`[订单上下文] 获取成功: ${orderInfo.order_no}`)
-          }
+    } else if (session?.order_no && ORDER_SYSTEM_URL) {
+      const pendingOrderNo = session.order_no
+      fetch(`${ORDER_SYSTEM_URL}/api/external/order/${pendingOrderNo}`, {
+        headers: { 'X-Api-Key': APPEAL_API_KEY },
+      }).then(r => r.ok ? r.json() : null).then(orderResult => {
+        if (orderResult?.success && orderResult.data) {
+          console.log(`[订单上下文] 后台获取成功: ${orderResult.data.order_no}`)
         }
-      } catch (e) {
-        console.error('获取订单信息失败:', e)
-      }
-    }
-
-    // 发送欢迎消息
-    if (isNew) {
-      if (orderInfo) {
-        const orderWelcome = `您好！我注意到您已绑定了订单信息：
-
-【当前订单】
-• 订单号: ${orderInfo.order_no}
-• 买家: ${orderInfo.buyer_nick || orderInfo.customer_name || '未知'}
-• 商品: ${orderInfo.goods?.title || orderInfo.product_name || '未知'}
-• 金额: ¥${orderInfo.pay_amount_fen ? (orderInfo.pay_amount_fen / 100).toFixed(2) : orderInfo.pay_amount}
-• 状态: ${orderInfo.status || '未知'}
-
-请问您这个订单遇到了什么问题？我可以帮您分析申诉方案。`
-        await addMessage(sessionId, 'assistant', orderWelcome)
-      } else {
-        await addMessage(sessionId, 'assistant', LOCAL_WELCOME)
-      }
+      }).catch(e => console.error('后台获取订单失败:', e.message))
     }
 
     await addMessage(sessionId, 'user', content)
@@ -1517,25 +1569,52 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
         if (parseFloat(user.balance) > 0 || isModelFreeStream) {
           apiKeyToUse = null
           canUseAI = true
-          isOfficialMode = !isModelFreeStream // 免费模型不扣费
+          isOfficialMode = !isModelFreeStream
         }
       }
     }
 
-    // SSE 头
+    // SSE 头 — 尽早建立连接，让前端立刻进入「输出中」状态
     res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Cache-Control', 'no-cache, no-transform')
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no')
     res.flushHeaders()
 
-    // 防止客户端断开后继续写入死连接
     let clientDisconnected = false
     req.on('close', () => { clientDisconnected = true })
-    const safeSend = (data) => { if (!clientDisconnected && !res.writableEnded) res.write(data) }
+    const safeSend = (data) => {
+      if (!clientDisconnected && !res.writableEnded) sseWrite(res, data)
+    }
 
-    // 先发送 sessionId + 当前收集进度
-    safeSend(`data: ${JSON.stringify({ type: 'start', sessionId, isNew, step: currentStep, totalSteps: TOTAL_STEPS })}\n\n`)
+    const streamProgress = getCollectionProgress(collectedData)
+    const modelLabel = activeModelStream?.display_name || activeModelStream?.model_name || 'AI'
+    safeSend(`data: ${JSON.stringify({ type: 'start', sessionId, isNew, step: currentStep, totalSteps: streamProgress.total, progress: streamProgress, model: { name: modelLabel, provider: activeModelStream?.provider, id: activeModelStream?.model_name } })}\n\n`)
+    safeSend(`data: ${JSON.stringify({ type: 'status', phase: 'preparing', model: modelLabel })}\n\n`)
+
+    // 欢迎语写入 DB 放后台，不阻塞流式首字
+    if (isNew) {
+      ;(async () => {
+        try {
+          if (orderInfo) {
+            const orderWelcome = `您好！我注意到您已绑定了订单信息：
+
+【当前订单】
+• 订单号: ${orderInfo.order_no}
+• 买家: ${orderInfo.buyer_nick || orderInfo.customer_name || '未知'}
+• 商品: ${orderInfo.goods?.title || orderInfo.product_name || '未知'}
+• 金额: ¥${orderInfo.pay_amount_fen ? (orderInfo.pay_amount_fen / 100).toFixed(2) : orderInfo.pay_amount}
+• 状态: ${orderInfo.status || '未知'}
+
+请问您这个订单遇到了什么问题？我可以帮您分析申诉方案。`
+            await addMessage(sessionId, 'assistant', orderWelcome)
+          } else {
+            await addMessage(sessionId, 'assistant', LOCAL_WELCOME)
+          }
+        } catch (e) { console.error('欢迎语写入失败:', e.message) }
+      })()
+    }
+
 
     // ===== AI-First: 用 _collection_complete 标记判断阶段 =====
     const isCollectionDone = collectedData._collection_complete === true
@@ -1572,74 +1651,30 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
             return null
           })
 
+          safeSend(`data: ${JSON.stringify({ type: 'status', phase: 'connecting', model: modelLabel })}\n\n`)
+
           // 流式回复（用户秒看到内容）
           const streamResult = await streamChatWithAI(allMessages, apiKeyToUse, enrichedData)
-          const firstByteMs = Date.now() - stepStartTime
-          safeSend(`data: ${JSON.stringify({ type: 'timing', firstByteMs })}\n\n`)
+          const connectMs = Date.now() - stepStartTime
+          safeSend(`data: ${JSON.stringify({ type: 'timing', connectMs, firstByteMs: connectMs, model: streamResult.model || modelLabel })}\n\n`)
+          safeSend(`data: ${JSON.stringify({ type: 'status', phase: 'waiting', model: streamResult.model || modelLabel })}\n\n`)
 
-          const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat_collection' })
+          const fullContent = await pipeAIStream(res, streamResult, {
+            isOfficialMode, user, sessionId, usageType: 'chat_collection',
+            streamStart: stepStartTime, model: streamResult.model || modelLabel, safeSend,
+          })
           if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
 
           const totalMs = Date.now() - stepStartTime
-          safeSend(`data: ${JSON.stringify({ type: 'timing', totalMs, firstByteMs })}\n\n`)
+          safeSend(`data: ${JSON.stringify({ type: 'timing', totalMs, connectMs, model: streamResult.model || modelLabel })}\n\n`)
+          safeSend(`data: ${JSON.stringify({ type: 'status', phase: 'done' })}\n\n`)
 
-          // 处理后台AI提取结果
+          // 处理后台AI提取 + 规则提取（订单/商户号/法人/AppID/渠道字段，始终生效）
+          let allInfoUpdates = []
           const aiResult = await extractionPromise
           if (aiResult && Object.keys(aiResult.extracted).length > 0) {
-            const fieldValidators = {
-              merchant_id: v => /^\d{8,12}$/.test(v.replace(/\s/g, '')),
-              legal_id_last4: v => /^\d{3}[\dxX]$/.test(v.replace(/\s/g, '')),
-              bank_account_last4: v => /^\d{4}$/.test(v.replace(/\s/g, '')),
-              contact_phone: v => /^1[3-9]\d{9}$/.test(v.replace(/[\s\-]/g, '')),
-              license_no: v => /^[0-9A-Z]{15,18}$/i.test(v.replace(/\s/g, '')),
-              business_model: v => v.length <= 30,
-              problem_type: v => v.length <= 20,
-              industry: v => v.length <= 20,
-              violation_reason: v => v.length <= 60,
-              merchant_name: v => v.length <= 40,
-              company_name: v => v.length <= 50 && !/^(就是|哎呀|那个|反正)/.test(v),
-              legal_name: v => v.length >= 2 && v.length <= 10 && /^[\u4e00-\u9fff·]+$/.test(v),
-              bank_name: v => v.length <= 20 && /银行|信用社|支付宝|财付通/.test(v) && !/[？?怎么吗呢呀吧]/.test(v),
-              complaint_status: v => v.length <= 50 && !/[？?]$/.test(v.trim()),
-              refund_policy: v => v.length <= 80 && !/[？?]$/.test(v.trim()),
-              appeal_history: v => v.length <= 60 && !/[？?]$/.test(v.trim()),
-            }
-            const aiInfoUpdates = []
-            const allFieldDefs = [...INFO_FIELDS, ...(updatedData._dynamic_fields || [])]
-            for (const [key, value] of Object.entries(aiResult.extracted)) {
-              let fieldDef = allFieldDefs.find(f => f.key === key)
-              if (!fieldDef && key && !key.startsWith('_') && value) {
-                const v = String(value).trim()
-                if (v.length > 0 && v.length <= 100) fieldDef = { key, label: key, group: '补充信息', icon: '📌', dynamic: true }
-              }
-              if (!fieldDef) continue
-              const v = String(value).trim()
-              if (!v) continue
-              const validator = fieldValidators[key]
-              if (validator && !validator(v)) continue
-              const existing = updatedData[key]
-              const shouldUpdate = aiResult.correction || !existing || existing === '用户暂未提供' || existing === '⏳待补充'
-              if (shouldUpdate) {
-                const oldVal = existing || ''
-                const source = (existing && existing !== '用户暂未提供' && existing !== '⏳待补充') ? 'ai_correction' : 'ai_extract'
-                const reason = source === 'ai_correction'
-                  ? `AI根据用户最新描述将"${fieldDef.label}"从"${oldVal}"更正为"${v}"`
-                  : `AI从用户对话中识别并提取了"${fieldDef.label}"`
-                logFieldChange(sessionId, key, fieldDef.label, oldVal, v, source, reason).catch(() => {})
-                updatedData[key] = v
-                aiInfoUpdates.push({ key, label: fieldDef.label, value: v, group: fieldDef.group || '补充信息', icon: fieldDef.icon || '📌' })
-              }
-            }
-            if (aiInfoUpdates.length > 0) {
-              updatedStep = findNextUnfilledStep(0, updatedData)
-              if (updatedStep >= TOTAL_STEPS) updatedStep = TOTAL_STEPS
-              for (const upd of aiInfoUpdates) {
-                safeSend(`data: ${JSON.stringify({ type: 'info_update', ...upd, step: updatedStep, totalSteps: TOTAL_STEPS })}\n\n`)
-              }
-              await updateSession(sessionId, updatedStep, updatedData)
-              console.log(`[AI提取成功] session=${sessionId} 提取${aiInfoUpdates.length}个字段, step→${updatedStep}`)
-            }
-            // 扣费
+            const aiUpdates = await applyValidatedFieldUpdates(sessionId, updatedData, aiResult.extracted, { correction: aiResult.correction, source: 'ai_extract' })
+            allInfoUpdates.push(...aiUpdates)
             if (aiResult.inputTokens || aiResult.outputTokens) {
               const multiplierStr = await getSystemConfig('cost_multiplier')
               const multiplier = parseFloat(multiplierStr || '2')
@@ -1652,6 +1687,24 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
             }
           }
 
+          const ruleResult = await runRuleFieldExtractions(sessionId, content, updatedData)
+          updatedData = ruleResult.updatedData
+          allInfoUpdates.push(...ruleResult.updates)
+
+          const streamProgressAfter = getCollectionProgress(updatedData)
+          const shouldPersist = collectedDataChanged(collectedData, updatedData)
+            || allInfoUpdates.length > 0
+            || ruleResult.channelExpansion.newFields.length > 0
+
+          if (shouldPersist) {
+            updatedStep = ruleResult.step
+            const dynamicTotal = streamProgressAfter.total
+            notifyFieldUpdates(safeSend, allInfoUpdates, updatedStep, dynamicTotal, streamProgressAfter)
+            notifyChannelFields(safeSend, ruleResult.channelExpansion, updatedStep, dynamicTotal)
+            await updateSession(sessionId, updatedStep, updatedData)
+            console.log(`[字段提取] session=${sessionId} 规则+AI共更新${allInfoUpdates.length}个字段, 渠道:${ruleResult.channelExpansion.channelLabels?.join('、') || '无'}`)
+          }
+
           // 行业自适应字段扩展（当 industry 首次被识别时触发）
           if (updatedData.industry && !updatedData._dynamic_fields) {
             try {
@@ -1659,9 +1712,11 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
               if (expansion && expansion.fields?.length > 0) {
                 updatedData._dynamic_fields = expansion.fields
                 updatedData._industry_tip = expansion.industryTip
+                const dynamicTotal = getCollectionTotalSteps(updatedData)
+                updatedStep = findNextUnfilledStep(0, updatedData)
                 await updateSession(sessionId, updatedStep, updatedData)
                 for (const df of expansion.fields) {
-                  safeSend(`data: ${JSON.stringify({ type: 'info_update', key: df.key, label: df.label, value: '', group: df.group || '行业信息', icon: df.icon || '🏭', step: updatedStep, totalSteps: TOTAL_STEPS, dynamic: true })}\n\n`)
+                  safeSend(`data: ${JSON.stringify({ type: 'info_update', key: df.key, label: df.label, value: '', group: df.group || '行业信息', icon: df.icon || '🏭', step: updatedStep, totalSteps: dynamicTotal, dynamic: true })}\n\n`)
                 }
                 console.log(`[行业扩展] 为 ${updatedData.industry} 生成 ${expansion.fields.length} 个动态字段`)
                 if (expansion.inputTokens || expansion.outputTokens) {
@@ -1678,29 +1733,41 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
             } catch (e) { console.error('Industry expansion error (non-fatal):', e.message) }
           }
 
-          // 完成度检查（有核心字段且已收集8+项时触发）
+          // 完成度检查
           const postFilledFields = Object.entries(updatedData).filter(([k, v]) => !k.startsWith('_') && v && String(v).trim() && v !== '用户暂未提供' && v !== '⏳待补充')
-          const hasCore = updatedData.industry && updatedData.problem_type && updatedData.violation_reason
-          if (hasCore && postFilledFields.length >= 8) {
-            try {
-              const assessment = await assessCompletenessWithAI(updatedData, apiKeyToUse)
-              safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: assessment.ready })}\n\n`)
-              if (assessment.inputTokens || assessment.outputTokens) {
-                const multiplierStr = await getSystemConfig('cost_multiplier')
-                const multiplier = parseFloat(multiplierStr || '2')
-                const tokenInfo = calculateCost(assessment.inputTokens, assessment.outputTokens, multiplier)
-                if (isOfficialMode && tokenInfo.cost > 0) {
-                  await deductBalance(user.id, tokenInfo.cost)
-                  await incrementUserSpent(user.id, tokenInfo.cost)
-                  try { await recordTokenUsage({ userId: user.id, sessionId, type: 'completeness_check', inputTokens: assessment.inputTokens, outputTokens: assessment.outputTokens, totalTokens: assessment.inputTokens + assessment.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+
+          if (isDueDiligenceScenario(updatedData)) {
+            updatedData.scenario_type = 'due_diligence'
+            const ddAssess = assessDDCompleteness(updatedData)
+            safeSend(`data: ${JSON.stringify({ type: 'completeness', score: ddAssess.score, ready: ddAssess.ready, scenario: 'due_diligence', missing: ddAssess.missing })}\n\n`)
+            if (ddAssess.ready) {
+              updatedData._collection_complete = true
+              await updateSession(sessionId, updatedStep, updatedData)
+              safeSend(`data: ${JSON.stringify({ type: 'completeness', score: ddAssess.score, ready: true, triggerDDGuide: true, scenario: 'due_diligence' })}\n\n`)
+            }
+          } else {
+            const hasCore = updatedData.industry && updatedData.problem_type && updatedData.violation_reason
+            if (hasCore && postFilledFields.length >= 8) {
+              try {
+                const assessment = await assessCompletenessWithAI(updatedData, apiKeyToUse)
+                safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: assessment.ready })}\n\n`)
+                if (assessment.inputTokens || assessment.outputTokens) {
+                  const multiplierStr = await getSystemConfig('cost_multiplier')
+                  const multiplier = parseFloat(multiplierStr || '2')
+                  const tokenInfo = calculateCost(assessment.inputTokens, assessment.outputTokens, multiplier)
+                  if (isOfficialMode && tokenInfo.cost > 0) {
+                    await deductBalance(user.id, tokenInfo.cost)
+                    await incrementUserSpent(user.id, tokenInfo.cost)
+                    try { await recordTokenUsage({ userId: user.id, sessionId, type: 'completeness_check', inputTokens: assessment.inputTokens, outputTokens: assessment.outputTokens, totalTokens: assessment.inputTokens + assessment.outputTokens, cost: tokenInfo.cost, multiplier, apiMode: 'official' }) } catch {}
+                  }
                 }
-              }
-              if (assessment.ready && assessment.score >= 75) {
-                updatedData._collection_complete = true
-                await updateSession(sessionId, updatedStep, updatedData)
-                safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: true, triggerReport: true })}\n\n`)
-              }
-            } catch (e) { console.error('Completeness check error (non-fatal):', e.message) }
+                if (assessment.ready && assessment.score >= 75) {
+                  updatedData._collection_complete = true
+                  await updateSession(sessionId, updatedStep, updatedData)
+                  safeSend(`data: ${JSON.stringify({ type: 'completeness', score: assessment.score, ready: true, triggerReport: true })}\n\n`)
+                }
+              } catch (e) { console.error('Completeness check error (non-fatal):', e.message) }
+            }
           }
         } catch (err) {
           console.error('AI collection error:', err.message)
@@ -1752,6 +1819,30 @@ app.post('/api/chat/stream', chatLimiter, optionalUser, async (req, res) => {
             const streamResult = await streamChatWithAI(allMessages, apiKeyToUse, collectedData)
             const fullContent = await pipeAIStream(res, streamResult, { isOfficialMode, user, sessionId, usageType: 'chat' })
             if (fullContent) await addMessage(sessionId, 'assistant', fullContent)
+
+            // 收集完成后仍持续提取用户补充的信息（法人、AppID、订单等）
+            try {
+              let postData = { ...collectedData }
+              const ruleResult = await runRuleFieldExtractions(sessionId, content, postData)
+              postData = ruleResult.updatedData
+              let postUpdates = [...ruleResult.updates]
+
+              const aiPost = await extractFieldsWithAI(content, postData, currentStep, apiKeyToUse, allMessages.slice(-6)).catch(() => null)
+              if (aiPost?.extracted && Object.keys(aiPost.extracted).length > 0) {
+                const aiUpdates = await applyValidatedFieldUpdates(sessionId, postData, aiPost.extracted, { correction: aiPost.correction, source: 'ai_extract' })
+                postUpdates.push(...aiUpdates)
+              }
+
+              if (postUpdates.length > 0 || ruleResult.channelExpansion.newFields.length > 0 || collectedDataChanged(collectedData, postData)) {
+                const step = ruleResult.step
+                const postProgress = getCollectionProgress(postData)
+                const total = postProgress.total
+                notifyFieldUpdates(safeSend, postUpdates, step, total, postProgress)
+                notifyChannelFields(safeSend, ruleResult.channelExpansion, step, total)
+                await updateSession(sessionId, step, postData)
+                console.log(`[后续提取] session=${sessionId} 补充${postUpdates.length}个字段`)
+              }
+            } catch (e) { console.error('Post-collection extraction error:', e.message) }
           }
         } catch (err) {
           console.error('AI post-report error:', err.message)
@@ -1875,6 +1966,12 @@ app.post('/api/sessions/:id/generate-appeal-text', requireUser, async (req, res)
     const session = await getSession(req.params.id)
     if (!session) return res.status(404).json({ error: '会话不存在' })
     const d = session.collected_data || {}
+    if (isDueDiligenceScenario(d)) {
+      return res.status(400).json({
+        error: '当前为「商户尽职调查」场景，无需生成申诉文案。请点击顶部「尽调填写助手」，复制经营说明、订单等内容到商家助手小程序表单。',
+        scenario: 'due_diligence',
+      })
+    }
     if (!d.industry && !d.violation_reason) return res.status(400).json({ error: '请先完成信息收集' })
 
     // 检查是否已有缓存（force=true 时跳过缓存）
@@ -2002,7 +2099,7 @@ ${complaintStrategy ? `\n${complaintStrategy}` : ''}
         const appealBody = {
           model: appealAiCfg.model,
           messages: [
-            { role: 'system', content: '你是全平台商户号申诉实战专家，覆盖微信支付、支付宝、抖音、快手、美团等平台。请严格按JSON格式输出，不要输出任何其他内容。' },
+            { role: 'system', content: '你是微信支付商户号申诉实战专家，精通 pay.weixin.qq.com 申诉表单五段文案。请严格按JSON格式输出，不要输出任何其他内容。' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.6,
@@ -2323,6 +2420,34 @@ app.get('/api/sessions/:id/complaint-doc', optionalUser, async (req, res) => {
   } catch (err) { res.status(500).json({ error: '获取失败' }) }
 })
 
+// ========== 商户尽职调查填写指引 ==========
+
+app.get('/api/sessions/:id/due-diligence-guide', optionalUser, async (req, res) => {
+  try {
+    const session = await getSession(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
+    const guide = buildDDGuide(d)
+    res.json({ guide })
+  } catch (err) {
+    console.error('Due diligence guide error:', err)
+    res.status(500).json({ error: '获取尽调指引失败' })
+  }
+})
+
+app.post('/api/sessions/:id/generate-dd-content', requireUser, async (req, res) => {
+  try {
+    const session = await getSession(req.params.id)
+    if (!session) return res.status(404).json({ error: '会话不存在' })
+    const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
+    const guide = buildDDGuide(d)
+    res.json({ guide, cached: false })
+  } catch (err) {
+    console.error('Generate DD content error:', err)
+    res.status(500).json({ error: '生成尽调内容失败' })
+  }
+})
+
 // ========== 投诉回复话术生成（免费·本地规则） ==========
 
 app.post('/api/sessions/:id/generate-complaint-reply', requireUser, async (req, res) => {
@@ -2632,7 +2757,7 @@ app.get('/api/sessions/:id/appeal-guide', requireUser, async (req, res) => {
 app.get('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
   try {
     const sessionId = req.params.id
-    const [rows] = await pool.execute(
+    const [rows] = await getPool().execute(
       'SELECT appeal_status, user_feedback, submitted_at, result_at, rejection_reason, resubmit_count, created_at FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
       [sessionId]
     )
@@ -2667,7 +2792,7 @@ app.put('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
       return res.status(400).json({ error: '无效的状态值' })
     }
     // Check if appeal text exists for this session
-    const [rows] = await pool.execute(
+    const [rows] = await getPool().execute(
       'SELECT id FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
       [sessionId]
     )
@@ -2683,7 +2808,7 @@ app.put('/api/sessions/:id/appeal-progress', requireUser, async (req, res) => {
     if (status === 'resubmitted') { updates.push('resubmit_count = resubmit_count + 1') }
 
     params.push(rows[0].id)
-    await pool.execute(`UPDATE appeal_texts SET ${updates.join(', ')} WHERE id = ?`, params)
+    await getPool().execute(`UPDATE appeal_texts SET ${updates.join(', ')} WHERE id = ?`, params)
 
     const statusLabels = {
       generated: '已生成文案', submitted: '已提交申诉', under_review: '审核中',
@@ -2706,7 +2831,7 @@ app.post('/api/sessions/:id/resubmit-strategy', requireUser, async (req, res) =>
     const d = typeof session.collected_data === 'string' ? JSON.parse(session.collected_data || '{}') : (session.collected_data || {})
 
     // 获取驳回原因
-    const [rows] = await pool.execute(
+    const [rows] = await getPool().execute(
       'SELECT rejection_reason, resubmit_count FROM appeal_texts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
       [sessionId]
     )
@@ -2793,11 +2918,11 @@ app.get('/api/user/:id/appeal-records', requireUser, async (req, res) => {
   try {
     if (String(req.userId) !== String(req.params.id)) return res.status(403).json({ error: '无权访问' })
     const uid = parseInt(req.params.id)
-    const [rows] = await pool.execute(`
+    const [rows] = await getPool().execute(`
       SELECT at.session_id, at.appeal_status, at.submitted_at, at.result_at, at.rejection_reason, at.resubmit_count, at.created_at,
              s.collected_data
       FROM appeal_texts at
-      LEFT JOIN sessions s ON at.session_id = s.session_id
+      LEFT JOIN sessions s ON at.session_id = s.id
       WHERE at.user_id = ?
       ORDER BY at.created_at DESC
       LIMIT 20
@@ -3151,6 +3276,10 @@ app.put('/api/admin/password', requireAdmin, async (req, res) => {
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try { res.json({ users: await getAllUsers() }) }
   catch (err) { console.error(err); res.status(500).json({ error: '获取用户列表失败' }) }
+})
+
+app.get('/api/admin/wechat-oauth', requireAdmin, (req, res) => {
+  res.json(getWechatOAuthAdminInfo())
 })
 
 app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
@@ -4378,11 +4507,17 @@ app.post('/api/mall/products/:id/persona', async (req, res) => {
 app.post('/api/risk-assess', async (req, res) => {
   const t0 = Date.now()
   try {
-    const { collectedData } = req.body || {}
+    const { collectedData, fast } = req.body || {}
+    if (fast) {
+      const result = heuristicAssessRisk(collectedData || {})
+      return res.json(result)
+    }
     const result = await aiAssessRisk(collectedData || {})
     logAIActivity({ action: 'AI风险评估', category: 'risk', detail: `${result.label}: ${result.description || ''}`, duration_ms: Date.now()-t0 }).catch(()=>{})
     res.json(result)
-  } catch (err) { res.json({ level: 'medium', label: '评估中', description: '评估失败' }) }
+  } catch (err) {
+    res.json(heuristicAssessRisk(req.body?.collectedData || {}))
+  }
 })
 
 // --- 后台: AI行为日志 ---

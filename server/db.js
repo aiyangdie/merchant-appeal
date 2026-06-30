@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise'
 import bcrypt from 'bcryptjs'
 import { encrypt, decrypt, safeEncrypt, safeDecrypt, hmacHash } from './utils/crypto.js'
+import { upgradeWechatAvatarUrl } from '../shared/wechatAvatar.js'
 
 // 敏感配置字段 — 存储时加密、读取时解密
 const SENSITIVE_SYS_KEYS = ['deepseek_api_key', 'zhipu_api_key', 'siliconflow_api_key']
@@ -153,8 +154,15 @@ export async function initDatabase() {
     'ALTER TABLE users MODIFY last_ip VARCHAR(512) DEFAULT ""',
     'ALTER TABLE users ADD COLUMN deep_analysis_count INT DEFAULT 0',
     'ALTER TABLE users ADD COLUMN deep_analysis_month VARCHAR(7) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN wechat_openid VARCHAR(64) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN wechat_unionid VARCHAR(64) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN profile_completed TINYINT(1) DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN wechat_oauth_scope VARCHAR(32) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN wechat_oauth_proxy VARCHAR(128) DEFAULT ""',
   ]
   for (const sql of userMigrations) { try { await pool.execute(sql) } catch { /* 已存在 */ } }
+  try { await pool.execute('ALTER TABLE users ADD UNIQUE INDEX idx_wechat_openid (wechat_openid)') } catch { /* 已存在 */ }
 
   // 迁移：加密现有明文数据（phone、nickname、last_ip）
   await migrateEncryptUserData()
@@ -1009,6 +1017,10 @@ function decryptUserRow(row) {
   }
 }
 
+function isRealPhone(phone) {
+  return phone && /^1[3-9]\d{9}$/.test(String(phone).trim())
+}
+
 export async function registerUser(phone, nickname) {
   const hash = hmacHash(phone)
   const [existing] = await pool.execute('SELECT * FROM users WHERE phone_hash = ?', [hash])
@@ -1058,14 +1070,50 @@ export async function deductBalance(userId, amount) {
   return { success: true, newBalance: parseFloat(user.balance).toFixed(2) }
 }
 
+export function formatUserForAdmin(user) {
+  if (!user) return null
+  const phone = user.phone || ''
+  const realPhone = isRealPhone(phone)
+  const avatarUrl = upgradeWechatAvatarUrl(user.avatar_url || '')
+  const isWechatUser = !!user.wechat_openid
+  const oauthScope = user.wechat_oauth_scope || ''
+  const oauthUserinfo = oauthScope === 'snsapi_userinfo' || (!oauthScope && !!avatarUrl)
+  return {
+    id: user.id,
+    phone: realPhone ? phone : '',
+    phoneDisplay: realPhone ? phone : '未绑定',
+    nickname: user.nickname || '',
+    avatarUrl,
+    balance: user.balance,
+    api_mode: user.api_mode,
+    created_at: user.created_at,
+    last_active_at: user.last_active_at,
+    last_ip: user.last_ip,
+    login_count: user.login_count,
+    total_messages: user.total_messages,
+    total_spent: user.total_spent,
+    session_count: user.session_count,
+    isWechatUser,
+    hasRealPhone: realPhone,
+    profileCompleted: !!user.profile_completed,
+    wechatOpenidPreview: user.wechat_openid ? `${user.wechat_openid.slice(0, 8)}…` : '',
+    oauthScope: oauthScope || (isWechatUser ? (oauthUserinfo ? 'snsapi_userinfo' : 'snsapi_base') : ''),
+    oauthAuthorized: isWechatUser,
+    oauthUserinfo,
+    oauthProxy: user.wechat_oauth_proxy || '',
+    viaOpenProxy: !!(user.wechat_oauth_proxy && /open\.aikex\.ink/i.test(user.wechat_oauth_proxy)),
+  }
+}
+
 export async function getAllUsers() {
   const [rows] = await pool.execute(`
     SELECT u.id, u.phone, u.nickname, u.balance, u.api_mode, u.created_at,
       u.last_active_at, u.last_ip, u.login_count, u.total_messages, u.total_spent,
+      u.wechat_openid, u.wechat_unionid, u.avatar_url, u.profile_completed, u.wechat_oauth_scope, u.wechat_oauth_proxy,
       (SELECT COUNT(*) FROM sessions WHERE user_id = u.id) as session_count
     FROM users u ORDER BY u.created_at DESC
   `)
-  return rows.map(r => decryptUserRow(r))
+  return rows.map(r => formatUserForAdmin(decryptUserRow(r)))
 }
 
 export async function adjustUserBalance(userId, amount) {
@@ -1110,7 +1158,7 @@ export async function deleteUser(userId) {
 
 export async function getUserSessions(userId) {
   const [rows] = await pool.execute(`
-    SELECT s.id, s.created_at, s.status, s.step,
+    SELECT s.id, s.created_at, s.status, s.step, s.collected_data,
       (SELECT COUNT(*) FROM messages WHERE session_id = s.id) as message_count,
       (SELECT content FROM messages WHERE session_id = s.id AND role = 'user'
        ORDER BY created_at ASC LIMIT 1) as first_message,
@@ -1123,6 +1171,44 @@ export async function getUserSessions(userId) {
     LIMIT 50
   `, [userId])
   return rows
+}
+
+function parseCollectedData(raw) {
+  if (!raw) return {}
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return v && typeof v === 'object' ? v : {}
+  } catch {
+    return {}
+  }
+}
+
+/** 客户站案件列表：附带标题、场景、摘要 */
+export async function getUserSessionsForClient(userId) {
+  const rows = await getUserSessions(userId)
+  return rows.map((s) => {
+    const collected = parseCollectedData(s.collected_data)
+    const first = (s.first_message || '').trim()
+    const company = collected.company_name || collected.merchant_name || ''
+    const merchantId = collected.merchant_id || ''
+    const isDD = collected.dd_deadline || collected.dd_notification
+      || /尽调|尽职调查/.test(first)
+      || collected.scenario === 'due_diligence'
+    const title = company || (merchantId ? `商户号 ${merchantId}` : '') || first.slice(0, 36) || '申诉咨询'
+    const preview = (s.last_message || first || '').replace(/\s+/g, ' ').slice(0, 100)
+    return {
+      id: s.id,
+      createdAt: s.created_at,
+      status: s.status,
+      step: s.step,
+      messageCount: Number(s.message_count || 0),
+      title,
+      preview,
+      merchantId: merchantId || null,
+      scenario: isDD ? 'due_diligence' : 'appeal',
+      scenarioLabel: isDD ? '商户尽调' : '商户申诉',
+    }
+  })
 }
 
 export async function lookupSessions(keyword, userId = null) {
@@ -2830,4 +2916,92 @@ export async function getComplaintDoc(sessionId) {
     [sessionId]
   )
   return rows.length > 0 ? rows[0] : null
+}
+
+// ========== 微信 OAuth 客户站用户 ==========
+
+export function formatUserForClient(user) {
+  if (!user) return null
+  const phone = user.phone || ''
+  const realPhone = isRealPhone(phone)
+  return {
+    id: user.id,
+    phone: realPhone ? String(phone).trim() : '',
+    nickname: user.nickname || '',
+    avatarUrl: upgradeWechatAvatarUrl(user.avatar_url || ''),
+    balance: parseFloat(user.balance || 0),
+    api_mode: user.api_mode,
+    profileCompleted: !!user.profile_completed,
+    needsPhoneBind: !realPhone,
+  }
+}
+
+export async function getUserByWechatOpenid(openid) {
+  const [rows] = await pool.execute('SELECT * FROM users WHERE wechat_openid = ?', [openid])
+  return rows.length > 0 ? decryptUserRow(rows[0]) : null
+}
+
+export async function findOrCreateWechatUser({ openid, unionid, nickname, avatarUrl, oauthScope, oauthProxy }) {
+  const avatar = upgradeWechatAvatarUrl(avatarUrl || '')
+  const nick = (nickname || '微信用户').trim().slice(0, 20)
+  const scope = oauthScope || ''
+  const proxy = oauthProxy || ''
+  let user = await getUserByWechatOpenid(openid)
+
+  if (user) {
+    const nickEnc = encrypt(nick)
+    const completed = isRealPhone(user.phone) ? 1 : 0
+    await pool.execute(
+      `UPDATE users SET nickname = ?, avatar_url = ?, wechat_unionid = COALESCE(?, wechat_unionid),
+       profile_completed = ?, wechat_oauth_scope = ?, wechat_oauth_proxy = ? WHERE id = ?`,
+      [nickEnc, avatar, unionid || null, completed, scope, proxy, user.id]
+    )
+    user = await getUserById(user.id)
+    return user
+  }
+
+  const hash = hmacHash(`wechat:${openid}`)
+  const phoneEnc = encrypt(`wx_${openid.slice(-10)}`)
+  const nickEnc = encrypt(nick)
+  await pool.execute(
+    `INSERT INTO users (phone, phone_hash, nickname, wechat_openid, wechat_unionid, avatar_url, profile_completed, wechat_oauth_scope, wechat_oauth_proxy)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [phoneEnc, hash, nickEnc, openid, unionid || null, avatar, scope, proxy]
+  )
+  return await getUserByWechatOpenid(openid)
+}
+
+export async function completeUserProfile(userId, { phone, nickname }) {
+  const user = await getUserById(userId)
+  if (!user) throw new Error('用户不存在')
+
+  const sets = []
+  const params = []
+
+  const p = phone && String(phone).trim()
+  const hasReal = isRealPhone(user.phone)
+  if (!p && !hasReal) throw new Error('PHONE_REQUIRED')
+  if (p) {
+    if (!/^1[3-9]\d{9}$/.test(p)) throw new Error('INVALID_PHONE')
+    const hash = hmacHash(p)
+    const [dup] = await pool.execute(
+      'SELECT id FROM users WHERE phone_hash = ? AND id != ?',
+      [hash, userId]
+    )
+    if (dup.length > 0) throw new Error('该手机号已被其他账号绑定')
+    sets.push('phone = ?', 'phone_hash = ?')
+    params.push(encrypt(p), hash)
+  }
+
+  if (nickname && String(nickname).trim()) {
+    const n = String(nickname).trim()
+    if (!isChinese(n)) throw new Error('CHINESE_NAME_REQUIRED')
+    sets.push('nickname = ?')
+    params.push(encrypt(n))
+  }
+
+  sets.push('profile_completed = 1')
+  params.push(userId)
+  await pool.execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params)
+  return await getUserById(userId)
 }

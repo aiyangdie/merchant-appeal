@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react'
+import { resolveAuthHeaders } from '../lib/auth.js'
 
 const SECTIONS = [
   { key: 'complaint_summary', label: '案件概述', icon: '📋', desc: '事件全貌+核心诉求' },
@@ -23,7 +24,7 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
 
   async function loadExisting() {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/complaint-doc`, { headers: getAuthHeaders() })
+      const res = await fetch(`/api/sessions/${sessionId}/complaint-doc`, { headers: resolveAuthHeaders(getAuthHeaders) })
       const data = await res.json()
       if (data.doc) setDoc(data.doc)
     } catch {}
@@ -41,7 +42,7 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
       const timeout = setTimeout(() => controller.abort(), 130000)
       const res = await fetch(`/api/sessions/${sessionId}/generate-complaint-doc`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: resolveAuthHeaders(getAuthHeaders),
         body: JSON.stringify({ userId, force }),
         signal: controller.signal,
       })
@@ -123,8 +124,8 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
             </svg>
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">投诉材料整理</h2>
-            <p className="text-[10px] text-gray-400">AI智能整理，可直接复制使用</p>
+            <h2 className="text-sm font-semibold text-gray-900">微信申诉材料包</h2>
+            <p className="text-[10px] text-gray-400">对齐微信商户平台申诉表单，可直接复制</p>
           </div>
         </div>
         {onClose && (
@@ -142,8 +143,8 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">AI 投诉材料整理</h3>
-            <p className="text-xs text-gray-400 mb-1 px-4">根据您提供的信息，AI将为您整理一份完整的投诉/申诉材料文档</p>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">AI 整理微信申诉材料</h3>
+            <p className="text-xs text-gray-400 mb-1 px-4">根据已收集信息，生成可提交 pay.weixin.qq.com 的全套申诉材料</p>
             <p className="text-xs text-gray-400 mb-4 px-4">包含案件概述、证据清单、时间线、申诉要点等，可直接复制到Word使用</p>
             <div className="space-y-1.5 mb-5 px-4">
               {SECTIONS.map(s => (
@@ -160,14 +161,14 @@ export default function ComplaintDocPanel({ sessionId, userId, onClose, getAuthH
               </div>
             </div>
             {error && <p className="text-xs text-red-500 mt-3 bg-red-50 rounded-lg px-3 py-2 mx-4">{error}</p>}
-            <button onClick={() => generate()} disabled={loading || !sessionId}
+            <button onClick={() => { generate().catch(err => setError(err?.message || '生成失败')) }} disabled={loading || !sessionId || !userId}
               className="mt-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
               {loading ? (
                 <span className="flex items-center gap-2">
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                   AI整理中...
                 </span>
-              ) : '📋 一键整理投诉材料'}
+              ) : '📋 一键整理申诉材料'}
             </button>
             <p className="text-[10px] text-gray-300 mt-2">使用官方API按实际Token消耗计费</p>
           </div>

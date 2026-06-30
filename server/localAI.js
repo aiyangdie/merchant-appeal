@@ -1,6 +1,14 @@
 // ========== 本地规则引擎：信息收集 + 智能答疑（不消耗 AI Token） ==========
 
 import { BUILT_IN_CASES, VIOLATION_KNOWLEDGE, matchViolation, matchBuiltInCases, assessRisk, generateMaterialChecklist } from './knowledgeBase.js'
+import { isDueDiligenceScenario, parseMerchantId, parseWechatOrders, mergeOrderLists, getStoredOrders, formatOrderInfo, getDDRequiredKeys, assessDDCompleteness } from './dueDiligence.js'
+import {
+  CHANNEL_REPLACED_STATIC_KEYS,
+  getChannelFieldDefs,
+  expandOnlineChannels,
+  extractChannelFieldsFromMessage,
+  detectOnlineChannels,
+} from './onlineChannels.js'
 
 // 信息收集字段定义（顺序很重要：先了解业务 → 再了解问题 → 再收集详细信息）
 const INFO_FIELDS = [
@@ -44,14 +52,9 @@ const INFO_FIELDS = [
 
   // ===== 第五阶段：经营场景信息（申诉表单必填） =====
   { key: 'business_scenario', label: '经营场景', group: '经营场景', icon: '🌐',
-    question: '申诉表单要填经营场景：\n① 线上（小程序/公众号/H5）\n② 线下（实体店）\n③ 都有',
+    question: '申诉表单要填经营场景：\n① 线上（小程序/公众号/网站/H5）\n② 线下（实体店）\n③ 都有',
     why: '申诉表单必填项。' },
-  { key: 'miniprogram_name', label: '小程序/公众号名称', group: '经营场景', icon: '📱',
-    question: '小程序或公众号叫什么名字？没有就说"没有"~',
-    why: '线上经营需要填写，审核会查验。' },
-  { key: 'miniprogram_appid', label: '小程序AppID', group: '经营场景', icon: '🔑',
-    question: '小程序AppID是什么？wx开头的那串，不知道可以跳过~',
-    why: '申诉表单要填，非必须。' },
+  // 小程序/公众号/网站等专属字段 → 由 onlineChannels 根据对话动态生成
 
   // ===== 第六阶段：投诉与售后 =====
   { key: 'complaint_status', label: '投诉情况', group: '投诉与售后', icon: '📞',
@@ -62,9 +65,9 @@ const INFO_FIELDS = [
     why: '申诉表单有"退款机制"栏，必须填写。' },
 
   // ===== 第七阶段：交易订单信息（申诉表单要求提供） =====
-  { key: 'order_info', label: '交易订单号', group: '交易订单', icon: '🧾',
-    question: '提供2-3个微信支付订单号+对应的商品/服务，例如：\n420000284420251129... - 代理记账服务\n\n在商户后台「交易中心→交易账单」能找到，不会查说"跳过"~',
-    why: '证明正常经营的关键证据。' },
+  { key: 'order_info', label: '交易订单', group: '交易订单', icon: '🧾',
+    question: '提供2-3笔订单，格式如下：\n微信交易订单号：420000... / 订单商品/服务内容：商品名称\n\n也可直接粘贴账单截图文字，系统会自动识别商品名称和微信交易单号~',
+    why: '尽调/申诉均需提供真实交易凭证，每笔订单分开展示。' },
 
   // ===== 第八阶段：结算和联系信息 =====
   { key: 'bank_name', label: '开户银行', group: '结算账户', icon: '🏦',
@@ -83,19 +86,158 @@ const INFO_FIELDS = [
 
 const TOTAL_STEPS = INFO_FIELDS.length
 
-// 期望数字输入的字段（不能把纯数字当垃圾输入）
+/** 申诉场景下可跳过、不计入必收进度的字段 */
+const APPEAL_OPTIONAL_KEYS = new Set([
+  'license_no', 'legal_id_last4', 'bank_name', 'bank_account_last4', 'contact_phone', 'appeal_history',
+])
+
+/** 尽调场景不需要追问的申诉专用字段 */
+const APPEAL_ONLY_KEYS = new Set([
+  'business_scenario', 'complaint_status', 'refund_policy', 'bank_name', 'bank_account_last4',
+  'contact_phone', 'appeal_history', 'license_no', 'legal_id_last4',
+])
+
+/** 渠道名称/链接类选填（有 AppID 即可） */
+const CHANNEL_OPTIONAL_KEYS = new Set([
+  'miniprogram_name', 'oa_name', 'fenchuan_name', 'fenchuan_link',
+  'zhishixingqiu_name', 'zhishixingqiu_link', 'website_name', 'website_url', 'website_icp',
+])
+
+/** 通知解析自动带入，无需用户再填 */
+const AUTO_FILLED_KEYS = new Set(['scenario_type', 'dd_deadline', 'violation_reason'])
+
+export function isFieldOptionalForScenario(key, data = {}) {
+  if (APPEAL_OPTIONAL_KEYS.has(key)) return true
+  if (CHANNEL_OPTIONAL_KEYS.has(key)) return true
+  if (isDueDiligenceScenario(data)) {
+    if (APPEAL_ONLY_KEYS.has(key)) return true
+    if (AUTO_FILLED_KEYS.has(key)) return true
+  }
+  return false
+}
+
+/** 尽调场景下不在面板展示申诉专用字段 */
+export function isFieldHiddenForScenario(key, data = {}) {
+  return isDueDiligenceScenario(data) && APPEAL_ONLY_KEYS.has(key)
+}
+
+/** 进度条统计用的必收字段（按场景过滤） */
+export function getProgressFields(data = {}) {
+  const allFields = getAllCollectFields(data)
+  if (isDueDiligenceScenario(data)) {
+    const requiredKeys = new Set([...getDDRequiredKeys(), 'legal_name'])
+    for (const f of data._dynamic_fields || []) requiredKeys.add(f.key)
+    return allFields.filter(f => requiredKeys.has(f.key))
+  }
+  return allFields.filter(f => !isFieldOptionalForScenario(f.key, data))
+}
+
+/** 客户信息面板进度（必收 / 选填分开统计） */
+export function getCollectionProgress(data = {}) {
+  const allFields = getAllCollectFields(data)
+  const visibleFields = allFields.filter(f => !isFieldHiddenForScenario(f.key, data))
+  const isDD = isDueDiligenceScenario(data)
+  const requiredFields = getProgressFields(data)
+  const optionalFields = visibleFields.filter(f => !requiredFields.some(r => r.key === f.key))
+  const isFilled = (key) => data[key] && String(data[key]).trim()
+  const filled = requiredFields.filter(f => isFilled(f.key)).length
+  const optionalFilled = optionalFields.filter(f => isFilled(f.key)).length
+  const ddAssess = isDD ? assessDDCompleteness(data) : null
+  return {
+    scenario: isDD ? 'due_diligence' : 'appeal',
+    filled,
+    total: requiredFields.length,
+    optionalFilled,
+    optionalTotal: optionalFields.length,
+    coreComplete: isDD ? ddAssess?.ready : filled >= requiredFields.length,
+    collectionComplete: data._collection_complete === true,
+    missingRequired: requiredFields.filter(f => !isFilled(f.key)).map(f => f.label),
+  }
+}
+
+const EXTRA_FIELD_LABELS = {
+  oa_id: '公众号AppID',
+  oa_name: '公众号名称',
+  miniprogram_appid: '小程序AppID',
+  miniprogram_name: '小程序名称',
+  website_url: '网站地址',
+  website_name: '网站名称',
+  website_icp: 'ICP备案号',
+  zhishixingqiu_name: '知识星球名称',
+  zhishixingqiu_link: '知识星球链接',
+  fenchuan_name: '纷传圈子名称',
+  fenchuan_link: '纷传链接',
+  dd_deadline: '尽调截止时间',
+  scenario_type: '场景类型',
+  service_scope_details: '服务权益明细',
+  content_delivery_method: '商品/服务内容',
+  refund_trigger_condition: '收费/退款说明',
+  compliance_certifications: '资质证明',
+  channel: '经营渠道',
+}
+
+/** 合并静态 + 渠道 + 行业字段，并补齐 collected_data 里已有值但无定义的项 */
+export function getAllCollectFields(data = {}) {
+  const channelText = [data.channel, data.industry, data.content_delivery_method, data.problem_type].filter(Boolean).join('\n')
+  const channels = data._online_channels?.length
+    ? data._online_channels
+    : detectOnlineChannels(channelText, data)
+  const staticFields = INFO_FIELDS.filter(f => {
+    if (CHANNEL_REPLACED_STATIC_KEYS.has(f.key) && channels.length > 0) return false
+    return true
+  })
+  const channelFields = data._channel_fields?.length
+    ? data._channel_fields
+    : getChannelFieldDefs(channels)
+  const industryFields = data._dynamic_fields || []
+  const seen = new Set()
+  const result = []
+  for (const f of [...staticFields, ...channelFields, ...industryFields]) {
+    if (!f?.key || seen.has(f.key)) continue
+    seen.add(f.key)
+    result.push(f)
+  }
+  // 已有数据但不在字段表中的 key（如通知解析出的 AppID）也展示在客户信息
+  for (const [key, val] of Object.entries(data)) {
+    if (key.startsWith('_') || key === 'wechat_orders' || seen.has(key)) continue
+    if (!val || !String(val).trim() || String(val).includes('用户暂未提供')) continue
+    seen.add(key)
+    result.push({
+      key,
+      label: EXTRA_FIELD_LABELS[key] || key,
+      group: key.includes('order') ? '交易订单' : (key.includes('appid') || key.includes('oa_') ? '线上渠道' : '已识别信息'),
+      icon: '📌',
+    })
+  }
+  return result
+}
+
+export function getCollectionTotalSteps(data = {}) {
+  return getProgressFields(data).length
+}
+
+// 找到下一个未填写的必收字段（跳过选填/申诉专用项）
+function findNextUnfilledStep(fromStep, data) {
+  const allFields = getAllCollectFields(data)
+  for (let i = fromStep; i < allFields.length; i++) {
+    const key = allFields[i].key
+    if (isFieldOptionalForScenario(key, data)) continue
+    if (!data[key] || !String(data[key]).trim()) return i
+  }
+  return allFields.length
+}
 const NUMERIC_FIELDS = new Set(['merchant_id', 'legal_id_last4', 'bank_account_last4', 'contact_phone', 'miniprogram_appid'])
 
 // AI-First 欢迎消息（鼓励用户一次性说出多个信息）
-const LOCAL_WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
+const LOCAL_WELCOME = `您好！我是您的**微信支付商户号申诉顾问**，专门帮商家解决微信收款被限制、冻结、封禁等问题~
 
-不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
+专注：交易拦截、收款限额、支付权限关闭、资金冻结、商户号封禁、尽职调查通知等，并帮您生成可提交到微信商户平台的申诉材料。
 
 💼 **先说说您的情况吧：**
 
-比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
+比如「我做餐饮的，微信商户号被冻结了」——随便说就行，我能听懂~
 
-💡 有问题随时问我，比如"为什么要这个信息"。
+💡 有问题随时问我，比如「为什么要这个信息」。
 🔒 您的信息只用于本次咨询，不会泄露。`
 
 // "为什么"问题检测
@@ -344,14 +486,26 @@ function extractFieldsFromMessage(text, existingData = {}) {
   const phoneMatch = t.match(/1[3-9]\d{9}/)
   if (phoneMatch && !existingData.contact_phone) extracted.contact_phone = phoneMatch[0]
 
-  // 商户号（8-12位纯数字，排除手机号）
-  const noPhone = t.replace(/1[3-9]\d{9}/g, '')
-  const merchantMatch = noPhone.match(/(?:商户号[：:是为]?\s*)(\d{8,12})/) || noPhone.match(/\b(\d{10})\b/)
-  if (merchantMatch && !existingData.merchant_id) extracted.merchant_id = (merchantMatch[1] || merchantMatch[0]).trim()
+  // 商户号（10位，以1开头）
+  if (!existingData.merchant_id) {
+    const mid = parseMerchantId(t)
+    if (mid) extracted.merchant_id = mid
+  }
+
+  // 微信交易订单（商品名称 + 交易单号）
+  const incomingOrders = parseWechatOrders(t)
+  if (incomingOrders.length > 0) {
+    const existing = getStoredOrders(existingData)
+    const merged = mergeOrderLists(existing, incomingOrders)
+    extracted.wechat_orders = JSON.stringify(merged)
+    extracted.order_info = formatOrderInfo(merged)
+  }
+
+  Object.assign(extracted, extractChannelFieldsFromMessage(t, existingData))
 
   // 统一社会信用代码（18位字母数字）
   const licenseMatch = t.match(/[0-9A-HJ-NP-Z]{18}/i)
-  if (licenseMatch && !existingData.license_no) extracted.license_no = licenseMatch[0].toUpperCase()
+  if (licenseMatch && !existingData.license_no && !/^wx/i.test(licenseMatch[0])) extracted.license_no = licenseMatch[0].toUpperCase()
 
   // 银行名称
   for (const bank of BANK_NAMES) {
@@ -410,10 +564,16 @@ function extractFieldsFromMessage(text, existingData = {}) {
     }
   }
 
-  // 法人姓名（明确提及法人+2-4字中文名）
+  // 法人姓名
   if (!existingData.legal_name) {
-    const legalMatch = t.match(/(?:法人|法定代表人|法代)[是为：:叫]\s*([\u4e00-\u9fa5]{2,4})/)
-    if (legalMatch) extracted.legal_name = legalMatch[1]
+    const legalPatterns = [
+      /法人(?:名字|姓名)?[，,：:\s]+([\u4e00-\u9fff·]{2,6})/,
+      /(?:法人|法定代表人|法代)[是为：:叫\s]+([\u4e00-\u9fff·]{2,6})/,
+    ]
+    for (const pat of legalPatterns) {
+      const m = t.match(pat)
+      if (m) { extracted.legal_name = m[1].trim(); break }
+    }
   }
 
   // 商户名称（明确提及商户名+中文）
@@ -490,15 +650,6 @@ function inferFieldsFromData(data) {
   }
 
   return { inferred, reasons }
-}
-
-// 找到下一个未填写的字段步骤（跳过已有数据的）
-function findNextUnfilledStep(fromStep, data) {
-  for (let i = fromStep; i < TOTAL_STEPS; i++) {
-    const key = INFO_FIELDS[i].key
-    if (!data[key] || !data[key].trim()) return i
-  }
-  return TOTAL_STEPS // 全部填完
 }
 
 // 判断消息是否明显不是回答当前问题（而是其他字段的数据）
@@ -807,13 +958,10 @@ function normalizeFieldValue(key, rawValue, existingData = {}) {
 const FIELD_VALIDATORS = {
   merchant_id: (v) => {
     const cleaned = v.replace(/\s+/g, '')
-    // 商户号通常是10位数字
-    if (/^\d{8,12}$/.test(cleaned)) return { valid: true, cleaned }
-    if (/\d{8,12}/.test(cleaned)) {
-      const match = cleaned.match(/\d{8,12}/)
-      return { valid: true, cleaned: match[0], hint: `已提取商户号：${match[0]}` }
-    }
-    return { valid: false, message: '⚠️ 商户号格式似乎不太对，通常是10位数字（如1234567890）。\n\n可在商户平台 pay.weixin.qq.com → 账户中心 → 商户信息 中查看。\n\n请重新输入您的商户号~' }
+    if (/^1\d{9}$/.test(cleaned)) return { valid: true, cleaned }
+    const tenDigit = cleaned.match(/(?<![\d])1\d{9}(?![\d])/)
+    if (tenDigit) return { valid: true, cleaned: tenDigit[0], hint: `已提取商户号：${tenDigit[0]}` }
+    return { valid: false, message: '⚠️ 商户号格式似乎不太对，微信支付商户号通常是10位数字且以1开头（如1114096895）。\n\n可在商户平台 pay.weixin.qq.com → 账户中心 → 商户信息 中查看。\n\n请重新输入您的商户号~' }
   },
   legal_id_last4: (v) => {
     const cleaned = v.replace(/\s+/g, '')
@@ -1535,20 +1683,21 @@ function generateConfirmation(key, value, rawInput, data = {}) {
  * @param {object} orderInfo 绑定的订单信息（可选）
  */
 export function buildCollectionContext(data, currentStep, orderInfo = null) {
+  const allFields = getAllCollectFields(data)
   const collected = []
   const remaining = []
 
-  for (let i = 0; i < INFO_FIELDS.length; i++) {
-    const field = INFO_FIELDS[i]
+  for (const field of allFields) {
     const value = data[field.key]
     if (value && String(value).trim() && !String(value).includes('⏳待补充') && !String(value).includes('用户暂未提供') && !String(value).includes('用户未提供')) {
       collected.push(`• ${field.label}: ${value}`)
     } else {
-      remaining.push(`• ${field.label} — ${field.question.split('\n')[0].replace(/^[^\s]*\s/, '')}`)
+      const q = field.question ? field.question.split('\n')[0].replace(/^[^\s]*\s/, '') : field.label
+      remaining.push(`• ${field.label} — ${q}`)
     }
   }
 
-  let ctx = `\n\n===== 信息收集进度 (${collected.length}/${INFO_FIELDS.length}) =====\n`
+  let ctx = `\n\n===== 信息收集进度 (${collected.length}/${allFields.length}) =====\n`
   if (collected.length > 0) {
     ctx += `\n【已收集】\n${collected.join('\n')}\n`
   }
@@ -1556,6 +1705,26 @@ export function buildCollectionContext(data, currentStep, orderInfo = null) {
     const show = remaining.slice(0, 4)
     ctx += `\n【待收集（按优先级）】\n${show.join('\n')}\n`
     if (remaining.length > 4) ctx += `...还有${remaining.length - 4}项\n`
+  }
+
+  if (isDueDiligenceScenario(data)) {
+    ctx += `\n\n===== 【商户尽职调查场景 — 重要】=====\n`
+    ctx += `用户收到「商户尽职调查通知」，核心任务是协助填写「微信支付商家助手」小程序中的尽调表单，不是写申诉书。\n`
+    ctx += `引导重点：经营说明（200字）、平台类型+商家名称+售卖商品/服务、资金来源/用途、2-3笔真实微信交易单号。\n`
+    ctx += `不要追问违规原因细节或申诉历史；告知用户可在顶部工具栏打开「尽调填写」面板复制标准表述。\n`
+    if (data.dd_deadline) ctx += `截止时间：${data.dd_deadline}，请提醒用户尽快提交。\n`
+  }
+
+  if (data._online_channels?.length) {
+    const labels = (data._channel_fields || [])
+      .reduce((acc, f) => { if (f.channelLabel && !acc.includes(f.channelLabel)) acc.push(f.channelLabel); return acc }, [])
+    ctx += `\n\n===== 【已识别线上经营渠道】=====\n`
+    ctx += `${labels.join('、') || data._online_channels.join('、')}\n`
+    ctx += `只收集上述渠道相关信息，不要追问用户未提及的其他平台（如用户只有公众号就不要问小程序AppID）。\n`
+    if (data._channel_tip) ctx += `${data._channel_tip}\n`
+  } else if (/纯线上|线上|网上|网店/.test(data.business_model || '')) {
+    ctx += `\n\n===== 【线上经营 — 待确认渠道】=====\n`
+    ctx += `用户说是线上经营，但尚未明确具体渠道。请自然地问：主要通过什么线上方式经营？如微信小程序、公众号、网站、知识星球、纷传、抖音等。\n`
   }
 
   // 订单上下文 - 如果绑定了订单，AI需要知道
@@ -1638,16 +1807,26 @@ export function buildCollectionContext(data, currentStep, orderInfo = null) {
   }
 
   ctx += `\n===== 对话指导 =====\n`
-  ctx += `你是一位资深微信商户号申诉顾问（5年经验，处理过数百起案件），正在与客户一对一咨询。\n`
-  ctx += `核心原则：\n`
-  ctx += `1. 每次回复先确认刚获取的信息，给出相关的专业见解，再自然引导下一个话题\n`
-  ctx += `2. 收集到行业+处罚类型+违规原因后，必须主动给出初步风险评估和成功率判断\n`
-  ctx += `3. 每次只引导1-2个信息，像专业咨询不像填表\n`
-  ctx += `4. 优先收集：行业→经营模式→处罚类型→违规原因（这4个是分析基础）\n`
-  ctx += `5. 如果用户一次性提供了多个信息，全部确认并给出综合分析\n`
-  ctx += `6. 用户有情绪/焦虑时先安抚，给出专业判断让用户安心\n`
-  ctx += `7. 不要用[X/16]格式，不要说"当前问题"，像真人顾问一样自然对话\n`
-  ctx += `8. 对于可跳过的字段（信用代码、身份证后四位、账户后四位），如果用户不方便提供可以跳过\n`
+  if (isDueDiligenceScenario(data)) {
+    ctx += `你是一位微信支付商户尽职调查填写顾问，正在帮客户准备商家助手小程序的尽调材料。\n`
+    ctx += `核心原则：\n`
+    ctx += `1. 确认已获取的商户号、公司名称、经营渠道、订单号\n`
+    ctx += `2. 引导用户提供2-3笔微信交易单号（420000开头）及对应商品/服务\n`
+    ctx += `3. 信息足够时提示用户打开「尽调填写」面板，按步骤复制内容到小程序表单\n`
+    ctx += `4. 不要生成申诉书，不要追问「违规原因」\n`
+    ctx += `5. 用户粘贴尽调通知时，主动解析商户名称、商户号、截止时间\n`
+  } else {
+    ctx += `你是一位资深微信商户号申诉顾问（5年经验，处理过数百起案件），正在与客户一对一咨询。\n`
+    ctx += `核心原则：\n`
+    ctx += `1. 每次回复先确认刚获取的信息，给出相关的专业见解，再自然引导下一个话题\n`
+    ctx += `2. 收集到行业+处罚类型+违规原因后，必须主动给出初步风险评估和成功率判断\n`
+    ctx += `3. 每次只引导1-2个信息，像专业咨询不像填表\n`
+    ctx += `4. 优先收集：行业→经营模式→处罚类型→违规原因（这4个是分析基础）\n`
+    ctx += `5. 如果用户一次性提供了多个信息，全部确认并给出综合分析\n`
+    ctx += `6. 用户有情绪/焦虑时先安抚，给出专业判断让用户安心\n`
+    ctx += `7. 不要用[X/16]格式，不要说"当前问题"，像真人顾问一样自然对话\n`
+    ctx += `8. 对于可跳过的字段（信用代码、身份证后四位、账户后四位），如果用户不方便提供可以跳过\n`
+  }
 
   return ctx
 }
@@ -1803,7 +1982,7 @@ ${c.report_content ? `- **申诉材料参考**：${c.report_content.slice(0, 500
     }
   }
 
-  return `你是专为商家打造的全平台商户号申诉战略专家AI，拥有8年微信支付/支付宝/抖音/快手/美团等全平台风控申诉实战经验，以最高申诉成功率为唯一目标。请根据以下商户信息，生成一份完整的商户号申诉评估报告和可直接提交的申诉材料。
+  return `你是专为商家打造的**微信支付商户号申诉**战略专家AI，拥有8年微信支付风控申诉实战经验，以最高申诉成功率为唯一目标。请根据以下商户信息，生成一份完整的微信商户申诉评估报告和可直接提交到 pay.weixin.qq.com 的申诉材料。
 
 ████████████████████████████████████████████
 █ 【最高优先级 — 反幻觉铁律，违反即报废】 █
@@ -1920,4 +2099,4 @@ ${(d.problem_type || '').includes('冻结') || (d.problem_type || '').includes('
 4. **二次申诉预案**：若首次被驳回，建议的增量证据和策略调整方向`
 }
 
-export { INFO_FIELDS, TOTAL_STEPS, LOCAL_WELCOME, INDUSTRY_KNOWLEDGE, matchIndustry, normalizeFieldValue, matchViolation, matchBuiltInCases, assessRisk, generateMaterialChecklist, findNextUnfilledStep }
+export { INFO_FIELDS, TOTAL_STEPS, LOCAL_WELCOME, INDUSTRY_KNOWLEDGE, matchIndustry, normalizeFieldValue, matchViolation, matchBuiltInCases, assessRisk, generateMaterialChecklist, findNextUnfilledStep, extractFieldsFromMessage }

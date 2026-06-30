@@ -7,6 +7,9 @@ dist/
 *.log
 data/
 backups/
+uploads/
+.cursor/
+customer-web/node_modules/
 .DS_Store
 Thumbs.db
 *.swp

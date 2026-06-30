@@ -7,36 +7,32 @@ import AIAnalysisPanel from '../components/AIAnalysisPanel'
 import AppealTextPanel from '../components/AppealTextPanel'
 import ComplaintDocPanel from '../components/ComplaintDocPanel'
 import AppealGuidePanel from '../components/AppealGuidePanel'
+import DueDiligencePanel from '../components/DueDiligencePanel'
 import UserCenter from '../components/UserCenter'
-import UserAvatar from '../components/UserAvatar'
-
-const WELCOME = `您好！我是您的商户号申诉顾问，专门帮商家解决各种平台处罚问题~
-
-不管是微信支付、支付宝、抖音还是其他平台，商户号被封、限额、冻结，我都能帮您分析+写申诉材料。
-
-💼 **先说说您的情况吧：**
-
-比如"我做餐饮的，商户号被冻结了"，或者"游戏行业，说我涉嫌赌博"——随便说就行，我能听懂~
-
-🛠️ **平台功能一览（顶部工具栏）：**
-📄 **申诉文案** — 一键生成可直接复制到微信后台的申诉材料
-📋 **投诉材料** — 生成完整申诉文书（可复制到Word）
-🗺️ **申诉指导** — 完整流程 + 投诉回复话术 + 95017电话话术 + 材料清单 + 进度追踪
-
-💡 有问题随时问我，比如"为什么要这个信息"。
-🔒 您的信息只用于本次咨询，不会泄露。`
-
-// ========== 视图模式 ==========
-// 'auth'      — 登录/注册（手机号 + 中文名）
-// 'apiSelect' — 选择 API 模式
-// 'chat'      — 正常聊天
-// 'myHistory' — 我的历史对话列表
-// 'history'   — 只读查看某条历史会话
-
-function isChinese(str) {
-  if (!str) return false
-  return /^[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\u{2ceb0}-\u{2ebef}\u{30000}-\u{3134f}]+$/u.test(str.trim())
-}
+import { WELCOME } from './chat/constants.js'
+import {
+  isDDScenario,
+  sanitizeCollected,
+  smartFormatAmount,
+  getOrderStatusStyle,
+  fmtTime,
+} from './chat/utils.js'
+import ChatHeader from './chat/components/ChatHeader.jsx'
+import ChatToolStrip from './chat/components/ChatToolStrip.jsx'
+import ChatMoreSheet from './chat/components/ChatMoreSheet.jsx'
+import ChatInputFooter from './chat/components/ChatInputFooter.jsx'
+import HistoryDrawer from './chat/components/HistoryDrawer.jsx'
+import ToolsHubPage from './chat/components/ToolsHubPage.jsx'
+import ChatBottomNav from './chat/components/ChatBottomNav.jsx'
+import ThemePicker from './chat/components/ThemePicker.jsx'
+import AuthView from './chat/components/AuthView.jsx'
+import BindPhoneView from './chat/components/BindPhoneView.jsx'
+import HomeTab from './chat/components/HomeTab.jsx'
+import CasesTab from './chat/components/CasesTab.jsx'
+import {
+  fetchProfile, getStoredUser, getToken, needsPhoneBind, normalizeUser, clearAuth,
+} from '../lib/auth.js'
+import { readMobileTab, writeMobileTab, consumeOneShotQuery, isMobileTab } from '../lib/appNav.js'
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([])
@@ -50,11 +46,6 @@ export default function ChatPage() {
 
   // 用户状态
   const [user, setUser] = useState(null)
-  const [authPhone, setAuthPhone] = useState('')
-  const [authNickname, setAuthNickname] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [authMode, setAuthMode] = useState('login') // 'login' | 'register'
   const tokenRef = useRef(localStorage.getItem('appeal_token') || '')
 
   function getAuthHeaders() {
@@ -62,17 +53,48 @@ export default function ChatPage() {
     if (tokenRef.current) h['Authorization'] = `Bearer ${tokenRef.current}`
     return h
   }
+
+  async function ensureSession() {
+    if (sessionIdRef.current) return sessionIdRef.current
+    if (!user?.id) return null
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json()
+      if (data.sessionId) {
+        setSessionId(data.sessionId)
+        sessionIdRef.current = data.sessionId
+        localStorage.setItem('appeal_session_id', data.sessionId)
+        return data.sessionId
+      }
+    } catch (e) {
+      console.error('ensureSession failed:', e)
+    }
+    return null
+  }
+
+  function withSession(action) {
+    return async () => {
+      setMobileTab('chat')
+      await ensureSession()
+      action?.()
+    }
+  }
+
   function saveToken(token) {
     tokenRef.current = token || ''
     if (token) localStorage.setItem('appeal_token', token)
     else localStorage.removeItem('appeal_token')
   }
   function handleAuthExpired() {
-    saveToken('')
-    localStorage.removeItem('appeal_user')
+    clearAuth()
+    tokenRef.current = ''
     localStorage.removeItem('appeal_session_id')
     setUser(null); setSessionId(null); setMessages([]); setLoading(false)
-    setView('auth'); setAuthPhone(''); setAuthNickname(''); setAuthError('登录已过期，请重新登录')
+    setView('auth')
   }
 
   // API 模式选择
@@ -91,10 +113,13 @@ export default function ChatPage() {
 
   // 历史侧边栏（右滑打开）
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showThemePicker, setShowThemePicker] = useState(false)
   const [deletedSessions, setDeletedSessions] = useState(() => {
     try { return JSON.parse(localStorage.getItem('appeal_deleted_sessions') || '[]') } catch { return [] }
   })
   const touchRef = useRef({ startX: 0, startY: 0, dragging: false })
+  const edgeSwipeRef = useRef(null)
 
   // 充值
   const [showRecharge, setShowRecharge] = useState(false)
@@ -108,56 +133,23 @@ export default function ChatPage() {
   const [paymentStatus, setPaymentStatus] = useState('') // pending | paid | failed
   const paymentPollRef = useRef(null)
 
-  // 清理 collectedData：去掉内部 _ 前缀字段，确保所有值都是字符串
-  function sanitizeCollected(raw) {
-    if (!raw || typeof raw !== 'object') return {}
-    const clean = {}
-    for (const [k, v] of Object.entries(raw)) {
-      if (k.startsWith('_')) continue
-      clean[k] = typeof v === 'string' ? v : (v != null ? String(v) : '')
-    }
-    return clean
-  }
-
-  // 智能格式化金额（订单数据金额单位不一致，有的已是元，有的需要转换）
-  function formatOrderAmount(order) {
-    // 优先使用 _fen 字段（最准确）
-    if (order.pay_amount_fen) {
-      return parseFloat(order.pay_amount_fen / 100).toFixed(2)
-    }
-    if (order.total_amount_fen) {
-      return parseFloat(order.total_amount_fen / 100).toFixed(2)
-    }
-    // 如果金额大于10000，说明是分单位
-    let amount = order.pay_amount || order.total_amount || 0
-    if (amount > 10000) {
-      amount = amount / 100
-    }
-    return parseFloat(amount).toFixed(2)
-  }
-
-  // 格式化金额（自动判断是分还是元）
-  function smartFormatAmount(amount) {
-    if (!amount && amount !== 0) return '0.00'
-    amount = parseFloat(amount)
-    if (isNaN(amount)) return '0.00'
-    // 如果金额大于10000，说明是分单位
-    if (amount > 10000) {
-      return (amount / 100).toFixed(2)
-    }
-    return amount.toFixed(2)
-  }
-
-  // 获取订单状态颜色
-  function getOrderStatusStyle(status, orderStatus) {
-    // orderStatus: 12=待发货, 23=已退款, 其他=未知
-    if (orderStatus === 12) {
-      return { bg: 'bg-green-100', text: 'text-green-700', label: status || '待发货' }
-    }
-    if (orderStatus === 23 || status?.includes('退款') || status?.includes('关闭')) {
-      return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '已关闭' }
-    }
-    return { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '未知' }
+  // 清理 collectedData：去掉内部 _ 前缀字段；数组/对象保留结构供订单等展示
+  async function refreshInfoFromServer(sid) {
+    const id = sid || sessionIdRef.current
+    if (!id) return
+    try {
+      const res = await fetch(`/api/sessions/${id}/info`, { headers: getAuthHeaders() })
+      if (!res.ok) return
+      const infoData = await res.json()
+      const cleaned = sanitizeCollected(infoData.collectedData)
+      setCollectedInfo(cleaned)
+      setInfoFields(infoData.fields || [])
+      setInfoStep(infoData.step || 0)
+      setInfoTotal(infoData.totalSteps || 14)
+      setInfoProgress(infoData.progress || null)
+      if (isDDScenario(cleaned)) setShowDueDiligence(true)
+      setAnalysisKey(prev => prev + 1)
+    } catch {}
   }
 
   // 信息收集面板
@@ -165,12 +157,20 @@ export default function ChatPage() {
   const [infoFields, setInfoFields] = useState([])
   const [infoStep, setInfoStep] = useState(0)
   const [infoTotal, setInfoTotal] = useState(14)
+  const [infoProgress, setInfoProgress] = useState(null)
   const [showInfoPanel, setShowInfoPanel] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [showAppealPanel, setShowAppealPanel] = useState(false)
   const [showComplaintDoc, setShowComplaintDoc] = useState(false)
   const [showAppealGuide, setShowAppealGuide] = useState(false)
-  const [showUserCenter, setShowUserCenter] = useState(false)
+  const [showDueDiligence, setShowDueDiligence] = useState(false)
+  const [mobileTab, setMobileTabState] = useState(() => readMobileTab()) // home | chat | tools | cases | me
+
+  function setMobileTab(tab) {
+    if (!isMobileTab(tab)) return
+    setMobileTabState(tab)
+    writeMobileTab(tab)
+  }
   const [analysisKey, setAnalysisKey] = useState(0) // force re-fetch analysis
   const [newChatAnim, setNewChatAnim] = useState(false) // new chat transition
   const [chatFading, setChatFading] = useState(false) // fade-out before reset
@@ -181,6 +181,7 @@ export default function ChatPage() {
   const [riskLevel, setRiskLevel] = useState(null) // { level, label, description, factors, suggestion }
   const [riskTransition, setRiskTransition] = useState(false)
   const prevRiskRef = useRef(null)
+  const riskAbortRef = useRef(null)
   // AI砍价
   const [bargainProduct, setBargainProduct] = useState(null)
   const [bargainHistory, setBargainHistory] = useState([])
@@ -198,6 +199,7 @@ export default function ChatPage() {
   const [boundOrder, setBoundOrder] = useState(null)
   const [orderList, setOrderList] = useState([])
   const [orderListLoading, setOrderListLoading] = useState(false)
+  const [orderListHint, setOrderListHint] = useState('')
   const [orderNoInput, setOrderNoInput] = useState('')
   const [orderNoLoading, setOrderNoLoading] = useState(false)
   const [orderSearchResults, setOrderSearchResults] = useState([])
@@ -302,6 +304,11 @@ export default function ChatPage() {
     prevProModeRef.current = isProfessionalMode
   }, [isProfessionalMode])
 
+  // 尽调场景自动关闭误打开的申诉文案面板
+  useEffect(() => {
+    if (isDDScenario(collectedInfo) && showAppealPanel) setShowAppealPanel(false)
+  }, [collectedInfo, showAppealPanel])
+
   useEffect(() => {
     fetch('/api/contact-card').then(r => r.json()).then(d => {
       if (d.enabled) setContactCard(d)
@@ -322,47 +329,84 @@ export default function ChatPage() {
       .catch(() => {})
   }, [sessionId])
 
+  async function loadOrderList(showAlert = false) {
+    setOrderListLoading(true)
+    setOrderListHint('')
+    try {
+      const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() })
+      const data = await res.json()
+      if (data.success && Array.isArray(data.data)) {
+        const sorted = data.data.sort((a, b) => {
+          if (a.order_status === 12 && b.order_status !== 12) return -1
+          if (b.order_status === 12 && a.order_status !== 12) return 1
+          return 0
+        })
+        setOrderList(sorted)
+        if (data.configured === false && data.message) setOrderListHint(data.message)
+      } else {
+        setOrderList([])
+        const msg = data.message || data.error || '获取订单失败'
+        setOrderListHint(msg)
+        if (showAlert) alert(msg)
+      }
+    } catch {
+      setOrderList([])
+      const msg = '连接失败，请稍后重试'
+      setOrderListHint(msg)
+      if (showAlert) alert(msg)
+    } finally {
+      setOrderListLoading(false)
+    }
+  }
+
   // 打开订单面板时自动加载订单列表
   useEffect(() => {
-    if (showOrderPanel && orderList.length === 0) {
-      setOrderListLoading(true)
-      fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() })
-        .then(r => r.json())
-        .then(d => {
-          if (d.success && d.data) {
-            // 显示所有订单，按状态排序（待发货优先）
-            const sorted = d.data.sort((a, b) => {
-              if (a.order_status === 12 && b.order_status !== 12) return -1
-              if (b.order_status === 12 && a.order_status !== 12) return 1
-              return 0
-            })
-            setOrderList(sorted)
-          } else {
-            setOrderList([])
-          }
-        })
-        .catch(() => setOrderList([]))
-        .finally(() => setOrderListLoading(false))
+    if (showOrderPanel && orderList.length === 0 && !orderListLoading) {
+      loadOrderList(false)
     }
   }, [showOrderPanel])
 
-  // AI风险评估：当收集到违规相关信息时自动评估
+  // AI风险评估：即时规则评估 + 防抖后 AI 精评
   useEffect(() => {
     const hasRiskData = collectedInfo.violation_reason || collectedInfo.problem_type || collectedInfo.penalty_type
     if (!hasRiskData) return
     const dataKey = JSON.stringify({ v: collectedInfo.violation_reason, p: collectedInfo.problem_type, t: collectedInfo.penalty_type })
     if (prevRiskRef.current === dataKey) return
     prevRiskRef.current = dataKey
+
     fetch('/api/risk-assess', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ collectedData: collectedInfo }),
-    }).then(r => r.json()).then(d => {
-      if (d.level) {
+      body: JSON.stringify({ collectedData: collectedInfo, fast: true }),
+    }).then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.level) {
         setRiskLevel(d)
         setRiskTransition(true)
         setTimeout(() => setRiskTransition(false), 600)
       }
     }).catch(() => {})
+
+    if (riskAbortRef.current) riskAbortRef.current.abort()
+    const timer = setTimeout(() => {
+      const ctrl = new AbortController()
+      riskAbortRef.current = ctrl
+      fetch('/api/risk-assess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectedData: collectedInfo }),
+        signal: ctrl.signal,
+      }).then(r => r.ok ? r.json() : null).then(d => {
+        if (d?.level) {
+          setRiskLevel(d)
+          setRiskTransition(true)
+          setTimeout(() => setRiskTransition(false), 600)
+        }
+      }).catch(() => {})
+    }, 1500)
+
+    return () => {
+      clearTimeout(timer)
+      riskAbortRef.current?.abort()
+    }
   }, [collectedInfo])
 
   // 智能名片展示：检测AI回复中的关键转化节点
@@ -388,7 +432,7 @@ export default function ChatPage() {
     }
   }, [messages, contactCard, contactCards])
 
-  // 组件卸载时清理支付轮询定时器
+  // 组件卸载时清理支付轮询与流式打字定时器
   useEffect(() => {
     return () => {
       if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null }
@@ -396,15 +440,17 @@ export default function ChatPage() {
   }, [])
 
   const scrollTimerRef = useRef(null)
+  const lastMsgContent = messages.length ? messages[messages.length - 1]?.content : ''
+  const lastMsgStreaming = messages.length ? messages[messages.length - 1]?.streaming : false
   useEffect(() => {
     if (view === 'chat') {
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
       scrollTimerRef.current = setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }, 80)
+        bottomRef.current?.scrollIntoView({ behavior: lastMsgStreaming ? 'auto' : 'smooth', block: 'end' })
+      }, lastMsgStreaming ? 0 : 80)
     }
     return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current) }
-  }, [messages.length, view])
+  }, [messages.length, lastMsgContent, lastMsgStreaming, view])
 
   // 发送完成后自动聚焦输入框
   useEffect(() => {
@@ -413,49 +459,100 @@ export default function ChatPage() {
     }
   }, [loading, view])
 
+  function enterApp(u) {
+    const nu = normalizeUser(u)
+    tokenRef.current = getToken()
+    setUser(nu)
+    localStorage.setItem('appeal_user', JSON.stringify(nu))
+    if (needsPhoneBind(nu)) {
+      setView('bindPhone')
+      setReady(true)
+      return
+    }
+    restoreSession(nu)
+  }
+
+  async function openSessionFromCases(sid) {
+    if (!sid) return
+    localStorage.setItem('appeal_session_id', sid)
+    setSessionId(sid)
+    sessionIdRef.current = sid
+    setMobileTab('chat')
+    try {
+      const [msgData, infoData] = await Promise.all([
+        fetch(`/api/sessions/${sid}/messages`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
+        fetch(`/api/sessions/${sid}/info`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
+      ])
+      if (msgData?.messages?.length) {
+        setMessages(msgData.messages)
+        if (infoData) {
+          setCollectedInfo(sanitizeCollected(infoData.collectedData))
+          setInfoFields(infoData.fields || [])
+          setInfoStep(infoData.step || 0)
+          setInfoTotal(infoData.totalSteps || 14)
+          setInfoProgress(infoData.progress || null)
+        }
+      } else {
+        setMessages([{ role: 'assistant', content: WELCOME }])
+      }
+    } catch {
+      setMessages([{ role: 'assistant', content: WELCOME }])
+    }
+    setView('chat')
+  }
+
   // 恢复用户登录状态
   useEffect(() => {
-    const savedUser = localStorage.getItem('appeal_user')
-    if (savedUser) {
-      try {
-        const u = JSON.parse(savedUser)
-        fetch(`/api/user/${u.id}`, { headers: getAuthHeaders() })
-          .then(r => {
-            if (r.status === 401) { handleAuthExpired(); setReady(true); return null }
-            if (!r.ok) {
-              // 用户已被删除或不存在 → 清除本地状态，跳转登录
-              localStorage.removeItem('appeal_user')
-              localStorage.removeItem('appeal_session_id')
-              localStorage.removeItem('appeal_token')
-              setUser(null); setView('auth'); setReady(true)
-              return null
-            }
-            return r.json()
-          })
-          .then(data => {
-            if (!data) return
-            if (data?.user) {
-              setUser(data.user)
-              localStorage.setItem('appeal_user', JSON.stringify(data.user))
-              restoreSession(data.user)
-            } else {
-              localStorage.removeItem('appeal_user')
-              localStorage.removeItem('appeal_session_id')
-              localStorage.removeItem('appeal_token')
-              setView('auth'); setReady(true)
-            }
-          })
-          .catch(() => { setUser(u); restoreSession(u) })
-      } catch {
-        localStorage.removeItem('appeal_user')
-        setView('auth'); setReady(true)
-      }
+    const params = new URLSearchParams(window.location.search)
+    const urlSessionId = params.get('sessionId')
+    if (urlSessionId) {
+      localStorage.setItem('appeal_session_id', urlSessionId)
+    }
+    const forceBind = params.get('bindPhone') === '1'
+    const queryTab = params.get('tab')
+    if (isMobileTab(queryTab)) {
+      setMobileTabState(queryTab)
+      writeMobileTab(queryTab)
+    }
+    consumeOneShotQuery(['sessionId', 'bindPhone', 'tab'])
+
+    const token = getToken()
+    tokenRef.current = token
+    const savedUser = getStoredUser()
+    if (token && savedUser) {
+      fetchProfile()
+        .then(u => {
+          if (forceBind && needsPhoneBind(u)) {
+            setUser(normalizeUser(u))
+            setView('bindPhone')
+            setReady(true)
+            return
+          }
+          enterApp(u)
+        })
+        .catch(() => {
+          clearAuth()
+          setView('auth')
+          setReady(true)
+        })
     } else {
-      setView('auth'); setReady(true)
+      setView('auth')
+      setReady(true)
     }
   }, [])
 
+  // 浏览器前进/后退同步 Tab hash
+  useEffect(() => {
+    function onHashChange() {
+      const tab = readMobileTab()
+      setMobileTabState(tab)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
   function restoreSession(u) {
+    const tab = readMobileTab()
     const saved = localStorage.getItem('appeal_session_id')
     if (saved) {
       Promise.all([
@@ -471,49 +568,30 @@ export default function ChatPage() {
             setInfoFields(infoData.fields || [])
             setInfoStep(infoData.step || 0)
             setInfoTotal(infoData.totalSteps || 14)
+            setInfoProgress(infoData.progress || null)
           }
         } else {
           localStorage.removeItem('appeal_session_id')
           setMessages([{ role: 'assistant', content: WELCOME }])
         }
-        setView('chat'); setReady(true)
-      }).catch(() => { setMessages([{ role: 'assistant', content: WELCOME }]); setView('chat'); setReady(true) })
+        setView('chat')
+        setMobileTabState(tab)
+        writeMobileTab(tab)
+        setReady(true)
+      }).catch(() => {
+        setMessages([{ role: 'assistant', content: WELCOME }])
+        setView('chat')
+        setMobileTabState(tab)
+        writeMobileTab(tab)
+        setReady(true)
+      })
     } else {
       setMessages([{ role: 'assistant', content: WELCOME }])
-      setView('chat'); setReady(true)
+      setView('chat')
+      setMobileTabState(tab)
+      writeMobileTab(tab)
+      setReady(true)
     }
-  }
-
-  // ========== 注册/登录 ==========
-
-  async function handleAuth() {
-    const phone = authPhone.trim()
-    if (!phone || phone.length < 2) { setAuthError('请输入有效的手机号'); return }
-    if (authMode === 'register') {
-      const name = authNickname.trim()
-      if (!name) { setAuthError('请输入您的名称'); return }
-      if (!isChinese(name)) { setAuthError('名称必须为中文'); return }
-    }
-    setAuthError(''); setAuthLoading(true)
-    try {
-      const url = authMode === 'register' ? '/api/user/register' : '/api/user/login'
-      const body = authMode === 'register'
-        ? { phone, nickname: authNickname.trim() }
-        : { phone }
-      const res = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (data.error) { setAuthError(data.error); return }
-      if (data.user) {
-        if (data.token) saveToken(data.token)
-        setUser(data.user)
-        localStorage.setItem('appeal_user', JSON.stringify(data.user))
-        restoreSession(data.user)
-      }
-    } catch { setAuthError('网络错误，请重试') }
-    finally { setAuthLoading(false) }
   }
 
   // ========== API 模式 ==========
@@ -543,6 +621,140 @@ export default function ChatPage() {
   // ========== 发送消息 ==========
 
   const lastFailedMsg = useRef(null)
+  const streamTargetRef = useRef('')
+  const streamOutputStartRef = useRef(null)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamStatus, setStreamStatus] = useState(null)
+
+  function patchStreamStatus(patch) {
+    setStreamStatus(prev => {
+      if (!prev) {
+        return {
+          phase: 'connecting',
+          startedAt: Date.now(),
+          model: null,
+          connectMs: null,
+          firstChunkMs: null,
+          totalMs: null,
+          receivedChars: 0,
+          displayedChars: 0,
+          outputElapsedMs: 0,
+          elapsedMs: 0,
+          ...patch,
+        }
+      }
+      const next = { ...prev, ...patch }
+      if (next.firstChunkMs != null && next.startedAt) {
+        next.outputElapsedMs = Math.max(0, (next.elapsedMs || 0) - next.firstChunkMs)
+      }
+      return next
+    })
+  }
+
+  function beginStreamStatus() {
+    streamOutputStartRef.current = null
+    setStreamStatus({
+      phase: 'connecting',
+      startedAt: Date.now(),
+      model: null,
+      connectMs: null,
+      firstChunkMs: null,
+      totalMs: null,
+      receivedChars: 0,
+      displayedChars: 0,
+      outputElapsedMs: 0,
+      elapsedMs: 0,
+    })
+  }
+
+  function finishStreamStatus(timing = {}) {
+    const full = streamTargetRef.current
+    setStreamStatus(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        phase: 'done',
+        ...timing,
+        displayedChars: full.length,
+        receivedChars: full.length,
+        elapsedMs: Date.now() - prev.startedAt,
+      }
+    })
+    setTimeout(() => setStreamStatus(null), 2000)
+  }
+
+  function appendStreamContent(delta) {
+    streamTargetRef.current += delta
+    const full = streamTargetRef.current
+    const now = Date.now()
+    if (!streamOutputStartRef.current) streamOutputStartRef.current = now
+
+    setMessages(prev => {
+      const updated = [...prev]
+      const last = updated[updated.length - 1]
+      if (last?.role !== 'assistant') return prev
+      updated[updated.length - 1] = { ...last, content: full, streaming: true }
+      return updated
+    })
+
+    setStreamStatus(prev => {
+      if (!prev) return prev
+      const firstChunkMs = prev.firstChunkMs ?? (now - prev.startedAt)
+      const elapsedMs = now - prev.startedAt
+      return {
+        ...prev,
+        phase: 'outputting',
+        firstChunkMs,
+        displayedChars: full.length,
+        receivedChars: full.length,
+        elapsedMs,
+        outputElapsedMs: Math.max(0, elapsedMs - firstChunkMs),
+      }
+    })
+
+    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
+  }
+
+  function finalizeStreamMessage() {
+    const full = streamTargetRef.current
+    setMessages(prev => {
+      const updated = [...prev]
+      const last = updated[updated.length - 1]
+      if (last?.role === 'assistant') {
+        updated[updated.length - 1] = full
+          ? { ...last, content: full, streaming: false }
+          : { ...last, streaming: false }
+      }
+      return updated
+    })
+    setIsStreaming(false)
+  }
+
+  function resetStreamState() {
+    streamTargetRef.current = ''
+    streamOutputStartRef.current = null
+    setStreamStatus(null)
+  }
+
+  useEffect(() => {
+    if (!streamStatus || streamStatus.phase === 'done') return
+    const id = setInterval(() => {
+      setStreamStatus(prev => {
+        if (!prev || prev.phase === 'done') return prev
+        const elapsedMs = Date.now() - prev.startedAt
+        const next = { ...prev, elapsedMs }
+        if (prev.firstChunkMs != null) {
+          next.outputElapsedMs = Math.max(0, elapsedMs - prev.firstChunkMs)
+        }
+        if (prev.phase === 'outputting') {
+          next.displayedChars = streamTargetRef.current.length
+          next.receivedChars = streamTargetRef.current.length
+        }
+        return next
+      })
+    }, 100)
+    return () => clearInterval(id)
+  }, [streamStatus?.phase, streamStatus?.startedAt])
 
   async function doStreamRequest(text, retryCount = 0) {
     const MAX_RETRIES = 2
@@ -564,8 +776,7 @@ export default function ChatPage() {
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
-    let streamingContent = ''
-    let msgAdded = false
+    let gotContent = false
 
     try {
       while (true) {
@@ -593,29 +804,30 @@ export default function ChatPage() {
               }
               if (parsed.totalSteps) setInfoTotal(parsed.totalSteps)
               if (parsed.step !== undefined) setInfoStep(parsed.step)
+              if (parsed.progress) setInfoProgress(parsed.progress)
+              if (parsed.model?.name) patchStreamStatus({ model: parsed.model.name, phase: 'preparing' })
             } else if (parsed.type === 'info_update') {
-              setCollectedInfo(prev => ({ ...prev, [parsed.key]: parsed.value }))
+              setCollectedInfo(prev => {
+                const next = { ...prev, [parsed.key]: parsed.value }
+                if (isDDScenario(next)) setShowDueDiligence(true)
+                return next
+              })
               if (parsed.step !== undefined) setInfoStep(parsed.step)
+              if (parsed.totalSteps) setInfoTotal(parsed.totalSteps)
+              if (parsed.progress) setInfoProgress(parsed.progress)
               if (!infoFields.find(f => f.key === parsed.key)) {
                 setInfoFields(prev => [...prev, { key: parsed.key, label: parsed.label, group: parsed.group, icon: parsed.icon }])
               }
-              // 仅桌面端自动展开信息面板，手机端静默收集不打断
-              if (window.innerWidth >= 1024) setShowInfoPanel(true)
+              // 信息收集静默进行，统一在「我的」查看
               setAnalysisKey(prev => prev + 1)
+            } else if (parsed.type === 'status') {
+              patchStreamStatus({
+                phase: parsed.phase,
+                model: parsed.model || undefined,
+              })
             } else if (parsed.type === 'chunk') {
-              streamingContent += parsed.content
-              const currentContent = streamingContent
-              if (!msgAdded) {
-                msgAdded = true
-                setLoading(false)
-                setMessages(prev => [...prev, { role: 'assistant', content: currentContent }])
-              } else {
-                setMessages(prev => {
-                  const updated = [...prev]
-                  updated[updated.length - 1] = { ...updated[updated.length - 1], content: currentContent }
-                  return updated
-                })
-              }
+              gotContent = true
+              appendStreamContent(parsed.content)
             } else if (parsed.type === 'usage') {
               if (parsed.balance !== null && parsed.balance !== undefined && user) {
                 const u = { ...user, balance: parsed.balance }
@@ -623,7 +835,7 @@ export default function ChatPage() {
                 localStorage.setItem('appeal_user', JSON.stringify(u))
               }
               // 附加 token 用量到最后一条 assistant 消息
-              if (parsed.tokenUsage && msgAdded) {
+              if (parsed.tokenUsage && gotContent) {
                 setMessages(prev => {
                   const updated = [...prev]
                   const last = updated[updated.length - 1]
@@ -634,8 +846,14 @@ export default function ChatPage() {
                 })
               }
             } else if (parsed.type === 'timing') {
-              // 附加延迟信息到最后一条 assistant 消息
-              if (msgAdded) {
+              patchStreamStatus({
+                connectMs: parsed.connectMs ?? parsed.firstByteMs ?? undefined,
+                firstChunkMs: parsed.firstChunkMs ?? undefined,
+                totalMs: parsed.totalMs ?? undefined,
+                model: parsed.model || undefined,
+                phase: parsed.firstChunkMs ? 'outputting' : (parsed.connectMs != null || parsed.firstByteMs != null ? 'waiting' : undefined),
+              })
+              if (gotContent) {
                 setMessages(prev => {
                   const updated = [...prev]
                   const last = updated[updated.length - 1]
@@ -649,8 +867,10 @@ export default function ChatPage() {
                 })
               }
             } else if (parsed.type === 'completeness') {
-              // 信息收集完成度通知
-              if (parsed.triggerReport) {
+              if (parsed.triggerDDGuide) {
+                setAnalysisKey(prev => prev + 1)
+                setShowDueDiligence(true)
+              } else if (parsed.triggerReport) {
                 setAnalysisKey(prev => prev + 1)
                 // 收集完成后自动显示AI分析面板
                 if (window.innerWidth >= 1280) setShowAIPanel(true)
@@ -660,17 +880,19 @@ export default function ChatPage() {
                 }
               }
             } else if (parsed.type === 'error') {
+              finalizeStreamMessage()
+              setIsStreaming(false)
               const role = parsed.needRecharge ? 'system' : 'assistant'
-              if (!msgAdded) {
-                msgAdded = true
-                setMessages(prev => [...prev, { role, content: parsed.content }])
-              } else {
-                setMessages(prev => {
-                  const updated = [...prev]
-                  updated[updated.length - 1] = { role, content: parsed.content }
-                  return updated
-                })
-              }
+              setMessages(prev => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant' && (last.streaming || !gotContent)) {
+                  updated[updated.length - 1] = { role, content: parsed.content, streaming: false }
+                } else {
+                  updated.push({ role, content: parsed.content })
+                }
+                return updated
+              })
               if (parsed.sessionId && parsed.sessionId !== sessionId) {
                 setSessionId(parsed.sessionId)
                 localStorage.setItem('appeal_session_id', parsed.sessionId)
@@ -681,7 +903,7 @@ export default function ChatPage() {
       }
     } catch (streamErr) {
       // 流读取中断（网络断开等）— 自动重试
-      if (retryCount < MAX_RETRIES && !streamingContent) {
+      if (retryCount < MAX_RETRIES && !gotContent) {
         console.log(`[重试] 第${retryCount + 1}次重试...`)
         await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)))
         return doStreamRequest(text, retryCount + 1)
@@ -689,24 +911,50 @@ export default function ChatPage() {
       throw streamErr
     }
 
-    if (!msgAdded) {
-      setMessages(prev => [...prev, { role: 'assistant', content: '抱歉，未收到回复，请重试。' }])
+    finalizeStreamMessage()
+    finishStreamStatus()
+    if (!gotContent) {
+      setMessages(prev => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        if (last?.role === 'assistant' && last.streaming) {
+          updated[updated.length - 1] = { ...last, content: '抱歉，未收到回复，请重试。', streaming: false }
+        } else {
+          updated.push({ role: 'assistant', content: '抱歉，未收到回复，请重试。' })
+        }
+        return updated
+      })
+      setIsStreaming(false)
     }
     lastFailedMsg.current = null
+    refreshInfoFromServer()
   }
 
   async function handleSend() {
     const text = input.trim()
-    if (!text || loading) return
+    if (!text || loading || isStreaming) return
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: text }])
+    resetStreamState()
+    beginStreamStatus()
+    setMessages(prev => [
+      ...prev,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '', streaming: true },
+    ])
+    setIsStreaming(true)
     setLoading(true)
     try {
       await doStreamRequest(text)
     } catch (err) {
       console.error('Send error:', err)
+      finalizeStreamMessage()
+      resetStreamState()
+      setIsStreaming(false)
       lastFailedMsg.current = text
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ 网络出现问题，发送失败。', retryable: true }])
+      setMessages(prev => {
+        const updated = prev.filter(m => !(m.role === 'assistant' && m.streaming && !m.content))
+        return [...updated, { role: 'assistant', content: '⚠️ 网络出现问题，发送失败。', retryable: true }]
+      })
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -715,16 +963,27 @@ export default function ChatPage() {
 
   async function handleRetry() {
     const text = lastFailedMsg.current
-    if (!text || loading) return
-    // 移除上一条错误消息
-    setMessages(prev => prev.filter(m => !m.retryable))
+    if (!text || loading || isStreaming) return
+    setMessages(prev => [
+      ...prev.filter(m => !m.retryable),
+      { role: 'assistant', content: '', streaming: true },
+    ])
+    resetStreamState()
+    beginStreamStatus()
+    setIsStreaming(true)
     setLoading(true)
     try {
       await doStreamRequest(text)
     } catch (err) {
       console.error('Retry error:', err)
+      finalizeStreamMessage()
+      resetStreamState()
+      setIsStreaming(false)
       lastFailedMsg.current = text
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ 重试仍然失败，请检查网络后再试。', retryable: true }])
+      setMessages(prev => {
+        const updated = prev.filter(m => !(m.role === 'assistant' && m.streaming && !m.content))
+        return [...updated, { role: 'assistant', content: '⚠️ 重试仍然失败，请检查网络后再试。', retryable: true }]
+      })
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -812,7 +1071,7 @@ export default function ChatPage() {
       sessionIdRef.current = null  // 清除 ref
       setBoundOrder(null)  // 清除绑定的订单
       setMessages([{ role: 'assistant', content: WELCOME }])
-      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setAnalysisKey(0); contactShownRef.current = false
+      setCollectedInfo({}); setInfoFields([]); setInfoStep(0); setShowInfoPanel(false); setShowAIPanel(false); setShowComplaintDoc(false); setShowAppealGuide(false); setShowDueDiligence(false); setAnalysisKey(0); contactShownRef.current = false
       setRiskLevel(null); prevRiskRef.current = null
       setView('chat')
       setChatFading(false)
@@ -823,12 +1082,15 @@ export default function ChatPage() {
 
   function handleFieldUpdate(key, value) {
     setCollectedInfo(prev => ({ ...prev, [key]: value }))
-    setAnalysisKey(prev => prev + 1) // trigger AI analysis refresh
-    // 在聊天中显示修改通知，让用户知道修改已生效
+    setAnalysisKey(prev => prev + 1)
+    refreshInfoFromServer()
     const fieldDef = infoFields.find(f => f.key === key)
     const label = fieldDef ? fieldDef.label : key
     const display = value.length > 30 ? value.slice(0, 30) + '...' : value
-    setMessages(prev => [...prev, { role: 'assistant', content: `✅ 已更新「${label}」为：${display}\n\n后续的申诉策略和材料会根据修改后的信息重新调整~` }])
+    const hint = isDDScenario(collectedInfo)
+      ? '后续的尽调填写内容与材料清单会根据修改后的信息自动更新~'
+      : '后续的申诉策略和材料会根据修改后的信息重新调整~'
+    setMessages(prev => [...prev, { role: 'assistant', content: `✅ 已更新「${label}」为：${display}\n\n${hint}` }])
   }
 
   function handleExportChat() {
@@ -879,11 +1141,12 @@ export default function ChatPage() {
   }
 
   function handleLogout() {
-    saveToken('')
-    localStorage.removeItem('appeal_user')
+    clearAuth()
+    tokenRef.current = ''
     localStorage.removeItem('appeal_session_id')
     setUser(null); setSessionId(null); setMessages([])
-    setView('auth'); setAuthPhone(''); setAuthNickname(''); setAuthError('')
+    setMobileTab('home')
+    setView('auth')
   }
 
   async function openRecharge() {
@@ -1014,27 +1277,40 @@ export default function ChatPage() {
 
   // ========== 右滑手势打开历史侧边栏 ==========
 
-  function handleTouchStart(e) {
-    const t = e.touches[0]
-    touchRef.current = { startX: t.clientX, startY: t.clientY, dragging: false }
-  }
-  function handleTouchMove(e) {
-    if (drawerOpen) return
-    const t = e.touches[0]
-    const dx = t.clientX - touchRef.current.startX
-    const dy = t.clientY - touchRef.current.startY
-    // 只在从左边缘开始且水平滑动时触发
-    if (touchRef.current.startX < 30 && dx > 20 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      touchRef.current.dragging = true
+  useEffect(() => {
+    const el = edgeSwipeRef.current
+    if (!el) return
+
+    function onStart(e) {
+      const t = e.touches[0]
+      touchRef.current = { startX: t.clientX, startY: t.clientY, dragging: false }
     }
-  }
-  function handleTouchEnd() {
-    if (touchRef.current.dragging) {
-      setDrawerOpen(true)
-      loadMySessions()
+    function onMove(e) {
+      if (drawerOpen) return
+      const t = e.touches[0]
+      const dx = t.clientX - touchRef.current.startX
+      const dy = t.clientY - touchRef.current.startY
+      if (touchRef.current.startX < 30 && dx > 20 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        touchRef.current.dragging = true
+      }
     }
-    touchRef.current.dragging = false
-  }
+    function onEnd() {
+      if (touchRef.current.dragging) {
+        setDrawerOpen(true)
+        loadMySessions()
+      }
+      touchRef.current.dragging = false
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [drawerOpen, user?.id])
 
   function openDrawer() {
     setDrawerOpen(true)
@@ -1071,7 +1347,9 @@ export default function ChatPage() {
 
   function continueSession(sid) {
     setSessionId(sid)
+    sessionIdRef.current = sid
     localStorage.setItem('appeal_session_id', sid)
+    setMobileTab('chat')
     Promise.all([
       fetch(`/api/sessions/${sid}/messages`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
       fetch(`/api/sessions/${sid}/info`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null),
@@ -1082,15 +1360,37 @@ export default function ChatPage() {
         setInfoFields(infoData.fields || [])
         setInfoStep(infoData.step || 0)
         setInfoTotal(infoData.totalSteps || 14)
+        setInfoProgress(infoData.progress || null)
       }
       setAnalysisKey(prev => prev + 1)
       setView('chat')
     }).catch(() => setView('chat'))
   }
 
-  function fmtTime(d) {
-    if (!d) return ''
-    try { const t = new Date(d); return isNaN(t.getTime()) ? String(d).slice(0,16) : t.toLocaleString('zh-CN') } catch { return String(d) }
+  async function openOrderPanel() {
+    if (!sessionId) {
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ userId: user?.id }),
+        })
+        const data = await res.json()
+        if (data.sessionId) {
+          setSessionId(data.sessionId)
+          sessionIdRef.current = data.sessionId
+          localStorage.setItem('appeal_session_id', data.sessionId)
+        }
+      } catch (e) {
+        console.error('创建session失败:', e)
+      }
+    }
+    setShowOrderPanel(true)
+  }
+
+  function openHistoryMenu() {
+    if (window.innerWidth < 640) openDrawer()
+    else openMyHistory()
   }
 
   // ========== 加载页 ==========
@@ -1109,96 +1409,13 @@ export default function ChatPage() {
     )
   }
 
-  // ========== 登录/注册视图 ==========
+  // ========== 登录 / 绑定手机 ==========
   if (view === 'auth') {
-    return (
-      <div className="min-h-screen min-h-dvh bg-gray-50 flex items-center justify-center px-4 relative overflow-hidden">
-        {/* 装饰性背景元素 */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-[#07C160]/[0.06] rounded-full blur-2xl" />
-        <div className="absolute bottom-20 right-10 w-40 h-40 bg-blue-400/[0.06] rounded-full blur-2xl" />
-        <div className="absolute top-1/3 right-1/4 w-24 h-24 bg-purple-400/[0.05] rounded-full blur-2xl" />
+    return <AuthView onSuccess={enterApp} />
+  }
 
-        <div className="w-full max-w-sm animate-scale-in relative z-10">
-          <div className="text-center mb-8">
-            <div className="w-[72px] h-[72px] mx-auto mb-5 rounded-[22px] bg-[#07C160] flex items-center justify-center shadow-lg ">
-              <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">商户号申诉助手</h1>
-            <p className="text-sm text-gray-400 mt-1.5">AI 智能生成专业申诉材料</p>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 border border-white/60" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' }}>
-            <div className="flex bg-gray-100/70 rounded-xl p-0.5 mb-5">
-              <button onClick={() => { setAuthMode('login'); setAuthError('') }}
-                className={`flex-1 py-2.5 text-sm font-medium rounded-[10px] transition-all ${authMode === 'login' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}>登录</button>
-              <button onClick={() => { setAuthMode('register'); setAuthError('') }}
-                className={`flex-1 py-2.5 text-sm font-medium rounded-[10px] transition-all ${authMode === 'register' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}>注册</button>
-            </div>
-
-            <div className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">手机号</label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
-                  </div>
-                  <input type="tel" value={authPhone} onChange={e => setAuthPhone(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAuth()}
-                    placeholder="请输入手机号" autoFocus
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200/80 bg-gray-50/50 text-sm focus:ring-2 focus:ring-[#07C160]/20 focus:border-[#07C160]/50 focus:bg-white transition-all placeholder:text-gray-300" />
-                </div>
-              </div>
-              {authMode === 'register' && (
-                <div className="animate-slide-up">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                    名称 <span className="text-red-400">*</span>
-                    <span className="text-gray-300 font-normal ml-1">必须中文</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
-                    </div>
-                    <input type="text" value={authNickname} onChange={e => setAuthNickname(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAuth()}
-                      placeholder="请输入中文名称"
-                      className={`w-full pl-10 pr-4 py-2.5 rounded-xl border bg-gray-50/50 text-sm focus:ring-2 focus:ring-[#07C160]/20 focus:border-[#07C160]/50 focus:bg-white transition-all placeholder:text-gray-300 ${
-                        authNickname && !isChinese(authNickname.trim()) ? 'border-red-300 bg-red-50/30' : 'border-gray-200/80'
-                      }`} />
-                  </div>
-                  {authNickname && !isChinese(authNickname.trim()) && (
-                    <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                      请输入纯中文字符
-                    </p>
-                  )}
-                </div>
-              )}
-              {authError && (
-                <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 px-3 py-2.5 rounded-xl animate-scale-in">
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                  {authError}
-                </div>
-              )}
-              <button onClick={handleAuth} disabled={authLoading}
-                className="w-full py-3 bg-[#07C160] text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-green-500/20 disabled:opacity-50 shadow-sm transition-all active:scale-[0.98]">
-                {authLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    处理中...
-                  </span>
-                ) : authMode === 'register' ? '注册并进入' : '登录'}
-              </button>
-            </div>
-          </div>
-
-          <div className="text-center mt-6">
-            <Link to="/admin" className="text-xs text-gray-300 hover:text-gray-500 transition-colors">管理员入口</Link>
-          </div>
-        </div>
-      </div>
-    )
+  if (view === 'bindPhone') {
+    return <BindPhoneView user={user} onSuccess={enterApp} />
   }
 
   // ========== API 模式选择视图 ==========
@@ -1396,227 +1613,105 @@ export default function ChatPage() {
   const visibleSessions = getVisibleSessions()
 
   return (
-    <div className={`h-screen h-dvh flex flex-col overflow-hidden ${isProfessionalMode ? 'pro-mode' : ''} ${proModeAnim ? 'mode-switch-anim' : ''} ${riskLevel?.level ? `risk-${riskLevel.level}` : ''} ${riskTransition ? 'risk-transition' : ''}`}
-      style={{ background: riskLevel?.level ? `var(--risk-bg)` : (isProfessionalMode ? 'var(--pro-bg)' : '#f5f5f5') }}
-      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-      <header className={`flex-shrink-0 safe-top transition-all duration-500 ${riskLevel?.level ? 'risk-header' : (isProfessionalMode ? 'pro-header' : 'glass border-b border-black/[0.06]')}`}>
-        <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* 头像：普通模式=绿色，专业模式=深色科技风 */}
-            {isProfessionalMode ? (
-              <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
-                <svg className="w-[18px] h-[18px] text-white relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                </svg>
-              </div>
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-[#07C160] flex items-center justify-center shadow-sm flex-shrink-0 ">
-                <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className={`text-sm font-semibold truncate tracking-tight ${isProfessionalMode ? 'text-stone-800' : 'text-gray-900'}`}>
-                  {isProfessionalMode ? '申诉专业工作台' : '商户号申诉助手'}
-                </h1>
-                {isProfessionalMode && (
-                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-md font-bold border border-amber-200 tracking-wider">PRO</span>
-                )}
-                {riskLevel?.level && (
-                  <span className={`risk-badge risk-icon-pulse inline-flex items-center gap-1`}>
-                    {riskLevel.level === 'severe' ? '🔴' : riskLevel.level === 'high' ? '🟠' : riskLevel.level === 'medium' ? '🟡' : '🟢'}
-                    {riskLevel.label}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {isProfessionalMode ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
-                    信息收集中 · {Object.keys(collectedInfo).filter(k => collectedInfo[k] && String(collectedInfo[k]).trim()).length}/{infoFields.length || infoTotal}
-                  </span>
-                ) : user?.api_mode === 'custom' ? (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-500 rounded-md font-medium">自定义API</span>
-                ) : parseFloat(user?.balance || 0) > 0 ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-green-50 text-green-600">
-                    ¥{parseFloat(user?.balance || 0).toFixed(2)}
-                  </span>
-                ) : (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-600">免费模型</span>
-                )}
-                {user && <span className={`text-[10px] truncate max-w-[80px] ${isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>{user.nickname}</span>}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            {/* AI分析面板切换 */}
-            <button onClick={() => setShowAIPanel(!showAIPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg xl:hidden ${
-                showAIPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="AI分析">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
-            </button>
-            {/* 客户信息面板切换 */}
-            <button onClick={() => setShowInfoPanel(!showInfoPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg lg:hidden ${
-                showInfoPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-wechat-green bg-green-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="客户信息">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {hasInfoData && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${isProfessionalMode ? 'bg-amber-500' : 'bg-wechat-green'}`} />}
-            </button>
-            {/* 申诉全流程指导 */}
-            <button onClick={() => setShowAppealGuide(!showAppealGuide)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showAppealGuide
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-indigo-500 bg-indigo-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="申诉指导·话术·95017">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
-              </svg>
-            </button>
-            {/* 投诉材料整理 */}
-            <button onClick={() => setShowComplaintDoc(!showComplaintDoc)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showComplaintDoc
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-blue-500 bg-blue-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="投诉材料整理">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-            </button>
-            {/* 申诉文案面板切换 */}
-            <button onClick={() => setShowAppealPanel(!showAppealPanel)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                showAppealPanel
-                  ? (isProfessionalMode ? 'text-amber-700 bg-amber-50' : 'text-orange-500 bg-orange-50')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="申诉文案">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-            </button>
-            {/* 联系技术人员 */}
-            {contactCard && (
-              <button onClick={() => setShowContact(true)}
-                className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50'}`} title="联系技术人员">
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
-                </svg>
-              </button>
-            )}
-            {/* 用户中心（头像） */}
-            <button onClick={() => setShowUserCenter(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg overflow-hidden hover:ring-2 hover:ring-offset-1 hover:ring-green-300 transition-all" title="用户中心">
-              <UserAvatar name={user?.nickname || '用户'} size={32} style={{ borderRadius: 8 }} />
-            </button>
-            {/* 订单绑定 */}
-            <button onClick={async () => {
-              // 如果没有session，先创建一个
-              if (!sessionId) {
-                try {
-                  const res = await fetch('/api/sessions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user?.id })
-                  })
-                  const data = await res.json()
-                  if (data.sessionId) {
-                    setSessionId(data.sessionId)
-                    sessionIdRef.current = data.sessionId
-                    localStorage.setItem('appeal_session_id', data.sessionId)
-                  }
-                } catch (e) {
-                  console.error('创建session失败:', e)
-                }
-              }
-              setShowOrderPanel(true)
-            }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${boundOrder ? (isProfessionalMode ? 'text-amber-600 bg-amber-50' : 'text-wechat-green bg-green-50') : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')}`} title={boundOrder ? '已绑定订单' : '绑定订单'}>
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-              {boundOrder && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wechat-green rounded-full" />}
-            </button>
-            <button onClick={openRecharge}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="充值">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button onClick={() => { if (window.innerWidth < 640) openDrawer(); else openMyHistory() }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="历史对话">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button onClick={() => { setSelectedApiMode(user?.api_mode || 'official'); setCustomKey(''); setView('apiSelect') }}
-              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title="切换API">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-            <button onClick={handleExportChat}
-              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg ${
-                messages.length <= 1
-                  ? (isProfessionalMode ? 'text-stone-200 cursor-not-allowed' : 'text-gray-200 cursor-not-allowed')
-                  : (isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')
-              }`} title="导出对话" disabled={messages.length <= 1}>
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            </button>
-            <button onClick={handleNewChat}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-400 hover:text-amber-600 hover:bg-amber-50/50' : 'text-gray-400 hover:text-wechat-green hover:bg-green-50'}`} title="新对话">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-            <div className={`w-px h-4 mx-0.5 hidden sm:block ${isProfessionalMode ? 'bg-amber-200/40' : 'bg-gray-200'}`} />
-            <button onClick={handleLogout}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg ${isProfessionalMode ? 'text-stone-300 hover:text-red-400 hover:bg-red-50' : 'text-gray-300 hover:text-red-400 hover:bg-red-50'}`} title="退出">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className={`mp-app h-screen h-dvh flex flex-col overflow-hidden min-h-0 ${isProfessionalMode ? 'pro-mode' : ''} ${proModeAnim ? 'mode-switch-anim' : ''} ${riskLevel?.level ? `risk-${riskLevel.level}` : ''} ${riskTransition ? 'risk-transition' : ''}`}>
+      <ChatHeader
+        tab={mobileTab}
+        isProfessionalMode={isProfessionalMode}
+        infoProgress={infoProgress}
+        collectedInfo={collectedInfo}
+        infoTotal={infoTotal}
+        boundOrder={boundOrder}
+        onOpenHistory={openHistoryMenu}
+        onOpenMore={() => setShowMoreMenu(true)}
+      />
 
-      {/* 手机端静默数据收集进度条 */}
+      {mobileTab === 'home' ? (
+        <HomeTab
+          user={user}
+          onGoChat={() => setMobileTab('chat')}
+          onGoTools={() => setMobileTab('tools')}
+          onGoCases={() => setMobileTab('cases')}
+        />
+      ) : mobileTab === 'cases' ? (
+        <CasesTab onOpenChat={openSessionFromCases} />
+      ) : mobileTab === 'me' ? (
+        <UserCenter
+          embedded
+          user={user}
+          onClose={() => setMobileTab('home')}
+          onRecharge={() => { setMobileTab('chat'); openRecharge() }}
+          getAuthHeaders={getAuthHeaders}
+          collectedInfo={collectedInfo}
+          infoProgress={infoProgress}
+          infoTotal={infoTotal}
+          boundOrder={boundOrder}
+          onOpenInfo={withSession(() => setShowInfoPanel(true))}
+          onOpenTools={() => setMobileTab('tools')}
+          onBindOrder={withSession(() => openOrderPanel())}
+          onOpenHistory={withSession(() => openHistoryMenu())}
+          onOpenTheme={withSession(() => setShowThemePicker(true))}
+          onApiMode={() => { setSelectedApiMode(user?.api_mode || 'official'); setCustomKey(''); setView('apiSelect') }}
+          onLogout={handleLogout}
+          onContact={() => { setMobileTab('chat'); setShowContact(true) }}
+          contactAvailable={!!(contactCard || contactCards.length > 0)}
+        />
+      ) : mobileTab === 'tools' ? (
+        <ToolsHubPage
+          collectedInfo={collectedInfo}
+          hasInfoData={hasInfoData}
+          showAppealPanel={showAppealPanel}
+          showComplaintDoc={showComplaintDoc}
+          showAppealGuide={showAppealGuide}
+          showDueDiligence={showDueDiligence}
+          showAIPanel={showAIPanel}
+          showInfoPanel={showInfoPanel}
+          onToggleAppeal={withSession(() => setShowAppealPanel(v => !v))}
+          onToggleComplaint={withSession(() => setShowComplaintDoc(v => !v))}
+          onToggleGuide={withSession(() => setShowAppealGuide(v => !v))}
+          onToggleDueDiligence={withSession(() => setShowDueDiligence(v => !v))}
+          onToggleAI={withSession(() => setShowAIPanel(v => !v))}
+          onToggleInfo={withSession(() => setShowInfoPanel(v => !v))}
+        />
+      ) : mobileTab === 'chat' ? (
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <ChatToolStrip
+        collectedInfo={collectedInfo}
+        hasInfoData={hasInfoData}
+        showAppealPanel={showAppealPanel}
+        showComplaintDoc={showComplaintDoc}
+        showAppealGuide={showAppealGuide}
+        showDueDiligence={showDueDiligence}
+        showAIPanel={showAIPanel}
+        showInfoPanel={showInfoPanel}
+        onToggleAppeal={withSession(() => setShowAppealPanel(v => !v))}
+        onToggleComplaint={withSession(() => setShowComplaintDoc(v => !v))}
+        onToggleGuide={withSession(() => setShowAppealGuide(v => !v))}
+        onToggleDueDiligence={withSession(() => setShowDueDiligence(v => !v))}
+        onToggleAI={withSession(() => setShowAIPanel(v => !v))}
+        onToggleInfo={withSession(() => setShowInfoPanel(v => !v))}
+        onOpenMore={() => setShowMoreMenu(true)}
+      />
+
+      {/* 专业模式进度：仅桌面端顶栏下细线 */}
       {isProfessionalMode && hasInfoData && (
-        <div className="lg:hidden flex-shrink-0">
-          <div className="h-1 bg-gray-100 relative overflow-hidden">
-            <div className="h-full bg-amber-400 transition-all duration-700 ease-out rounded-r-full"
-              style={{ width: `${Math.min(100, Math.round((Object.keys(collectedInfo).filter(k => collectedInfo[k] && String(collectedInfo[k]).trim()).length / Math.max(infoFields.length || infoTotal || 1, 1)) * 100))}%` }} />
-            <div className="absolute inset-0 bg-gray-200" />
-          </div>
+        <div className="hidden md:block flex-shrink-0 pro-progress-bar">
+          <div className="pro-progress-fill"
+            style={{ width: `${Math.min(100, Math.round(((infoProgress?.filled ?? 0) / Math.max((infoProgress?.total ?? infoTotal) || 1, 1)) * 100))}%` }} />
         </div>
       )}
 
       {/* 三栏布局：AI面板(左) | 聊天(中) | 客户信息(右) */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0 chat-main-with-nav">
 
         {/* 左侧AI分析面板 - xl桌面端显示，移动端覆盖 */}
         <div className={`
           xl:relative xl:w-80 2xl:w-96 xl:border-r xl:block
           ${isProfessionalMode ? 'xl:border-amber-200/40' : 'xl:border-gray-200/60'}
-          ${showAIPanel ? 'fixed inset-0 z-40 xl:static xl:inset-auto xl:z-auto' : 'hidden xl:block'}
+          ${showAIPanel ? 'fixed inset-0 z-40 xl:static xl:inset-auto xl:z-auto' : 'hidden'}
         `}>
           {showAIPanel && <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] xl:hidden" onClick={() => setShowAIPanel(false)} />}
           <div className={`
-            ${showAIPanel ? 'absolute left-0 top-0 bottom-0 w-80 shadow-2xl xl:shadow-none xl:static xl:w-full panel-slide-left' : ''}
+            ${showAIPanel ? 'absolute left-0 top-0 bottom-0 panel-slide-left shadow-2xl xl:shadow-none xl:static xl:w-full' : ''}
             h-full
           `}>
             <AIAnalysisPanel
@@ -1631,126 +1726,26 @@ export default function ChatPage() {
         </div>
 
         {/* 中间聊天区域 */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <main onClick={e => {
             const prodCard = e.target.closest('.product-rec-card')
             if (prodCard) { const pid = prodCard.dataset.productId; if (pid) { fetch(`/api/mall/products/${pid}`).then(r=>r.json()).then(d=>{ if(d.product) setDetailProduct(d.product) }).catch(()=>{}) }; return }
             const contactRecCard = e.target.closest('.contact-rec-card')
             if (contactRecCard) { setShowContact(true); return }
-          }} className={`flex-1 overflow-y-auto overscroll-contain gpu-scroll ${isProfessionalMode ? 'pro-chat-bg pro-grid-bg' : 'bg-[#f5f5f5]'}`}>
-            <div className={`max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-5 space-y-0.5 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
-              {/* 已绑定订单信息卡片 */}
-              {boundOrder && (() => {
-                const boundImage = boundOrder.goods?.first_image || boundOrder.goods?.images?.[0] || ''
-                return (
-                <div className={`mb-3 p-3 rounded-xl border-2 ${isProfessionalMode ? 'bg-orange-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-                  <div className="flex gap-3">
-                    {boundImage && (
-                      <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                        <img src={boundImage} alt="商品图" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isProfessionalMode ? 'bg-amber-100' : 'bg-green-100'}`}>
-                            <svg className={`w-3.5 h-3.5 ${isProfessionalMode ? 'text-amber-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                          </div>
-                          <div>
-                            <p className={`text-xs font-medium ${isProfessionalMode ? 'text-amber-700' : 'text-green-700'}`}>关联订单</p>
-                            <p className="text-xs text-gray-400">{boundOrder.order_no}</p>
-                          </div>
-                        </div>
-                        <button onClick={() => setShowOrderPanel(true)} className={`text-xs px-2 py-1 rounded-lg ${isProfessionalMode ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'}`}>更换</button>
-                      </div>
-                      <div className="mt-1.5 text-xs">
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                          <div><span className="text-gray-400">买家: </span><span className="text-gray-700 font-medium">{boundOrder.buyer_nick || '未知'}</span></div>
-                          <div><span className="text-gray-400">订单状态: </span><span className="text-gray-600">{boundOrder.order_status_text || '未知'}</span></div>
-                          <div><span className="text-gray-400">订单金额: </span><span className={`font-bold ${isProfessionalMode ? 'text-amber-600' : 'text-green-600'}`}>¥{smartFormatAmount(boundOrder.pay_amount)}</span></div>
-                          <div><span className="text-gray-400">订单类型: </span><span className="text-gray-600">{boundOrder.order_type_text || '普通订单'}</span></div>
-                          <div className="col-span-2"><span className="text-gray-400">📞电话: </span><span className="text-gray-700">{boundOrder.receiver_mobile || '无'}</span></div>
-                          <div className="col-span-2"><span className="text-gray-400">📦收货人: </span><span className="text-gray-700">{boundOrder.receiver_name || '未填写'}</span></div>
-                          <div className="col-span-2"><span className="text-gray-400">📍地址: </span><span className="text-gray-500 truncate">{boundOrder.full_address || [boundOrder.receiver_state, boundOrder.receiver_city, boundOrder.receiver_district, boundOrder.receiver_address].filter(Boolean).join('') || '未填写'}</span></div>
-                          <div className="col-span-2"><span className="text-gray-400">商品: </span><span className="text-gray-700 truncate">{boundOrder.goods?.title || '未知商品'}</span></div>
-                          <div><span className="text-gray-400">🕐下单: </span><span className="text-gray-500">{boundOrder.order_time_date || (boundOrder.order_time ? new Date(boundOrder.order_time * 1000).toLocaleDateString() : '未知')}</span></div>
-                          {boundOrder.waybill_no && (
-                            <div className="col-span-2"><span className="text-gray-400">🚚快递: </span><span className="text-gray-500">{boundOrder.express_name || boundOrder.express_code}: {boundOrder.waybill_no}</span></div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                )
-              })()}
-              {/* 订单号输入区域 - 支持多种方式搜索 */}
-              {!boundOrder && (
-                <div className={`mb-3 p-3 rounded-xl border-2 ${isProfessionalMode ? 'bg-orange-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isProfessionalMode ? 'bg-amber-100' : 'bg-blue-100'}`}>
-                      <svg className={`w-4 h-4 ${isProfessionalMode ? 'text-amber-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    </div>
-                    <p className={`text-xs font-medium ${isProfessionalMode ? 'text-amber-700' : 'text-blue-700'}`}>查询我的订单</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={orderNoInput}
-                      onChange={(e) => { setOrderNoInput(e.target.value); setOrderSearchResults([]) }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && orderNoInput.trim()) { searchOrder(orderNoInput.trim()) } }}
-                      placeholder="订单号/姓名/手机号（回车搜索）"
-                      className={`flex-1 px-3 py-2 text-xs rounded-lg border ${isProfessionalMode ? 'border-amber-200 bg-white focus:ring-amber-300' : 'border-blue-200 bg-white focus:ring-blue-300'} focus:outline-none focus:ring-2`}
-                    />
-                    <button
-                      onClick={() => { if (orderNoInput.trim()) searchOrder(orderNoInput.trim()) }}
-                      disabled={orderNoLoading || !orderNoInput.trim()}
-                      className={`px-4 py-2 text-xs font-medium text-white rounded-lg disabled:opacity-50 ${isProfessionalMode ? 'bg-orange-500 hover:from-amber-600 hover:to-orange-600' : 'bg-blue-500 hover:from-blue-600 hover:to-indigo-600'}`}>
-                      {orderNoLoading ? '...' : '🔍'}
-                    </button>
-                  </div>
-                  {/* 搜索结果列表 */}
-                  {orderSearchResults.length > 0 && (
-                    <div className="mt-2 bg-white rounded-lg border border-gray-100 max-h-60 overflow-y-auto">
-                      {orderSearchResults.map((order, idx) => {
-                        const statusStyle = getOrderStatusStyle(order.order_status_text, order.order_status)
-                        const resultImage = order.goods?.first_image || order.goods?.images?.[0] || ''
-                        return (
-                        <div key={idx} onClick={() => selectOrder(order)}
-                          className="p-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 last:border-b-0">
-                          <div className="flex items-center gap-2">
-                            {resultImage && (
-                              <img src={resultImage} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-gray-700 truncate">{order.buyer_nick || '未知买家'}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>{statusStyle.label}</span>
-                                <span className="text-[10px] text-gray-400">{order.order_type_text || '普通订单'}</span>
-                              </div>
-                              <div className="text-[10px] text-gray-500 mt-0.5 truncate">
-                                📦{order.receiver_name || '未填写'} 📞{order.receiver_mobile || '无'}
-                              </div>
-                              <div className="text-[10px] text-gray-400 truncate mt-0.5">
-                                📍{order.full_address || [order.receiver_state, order.receiver_city, order.receiver_district, order.receiver_address].filter(Boolean).join('') || '未填写'}
-                              </div>
-                            </div>
-                            <div className="text-right flex-shrink-0 ml-2">
-                              <div className="text-xs font-bold text-orange-500">¥{smartFormatAmount(order.pay_amount)}</div>
-                              <div className="text-[10px] text-gray-400">{order.goods?.quantity || 1}件</div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                      })}
-                    </div>
-                  )}
-                  <p className="text-[10px] text-gray-400 mt-1.5">输入订单号、买家姓名或手机号快速查找</p>
-                </div>
-              )}
+          }} className={`chat-messages-area flex-1 min-h-0 overflow-y-auto overscroll-contain gpu-scroll ${isProfessionalMode ? 'pro-chat-bg pro-grid-bg' : 'mp-chat-bg'}`}>
+            <div className={`chat-thread mx-auto w-full max-w-3xl px-3 sm:px-4 py-3 sm:py-4 transition-opacity duration-150 ${chatFading ? 'opacity-0' : 'opacity-100'} ${newChatAnim ? 'animate-new-chat' : ''}`}>
               {messages.map((msg, i) => (
                 <React.Fragment key={i}>
-                  <ChatMessage role={msg.role} content={msg.content} animate={i === messages.length - 1} timing={msg.timing} tokenUsage={msg.tokenUsage} proMode={isProfessionalMode} />
+                  <ChatMessage
+                    role={msg.role}
+                    content={msg.content}
+                    animate={i === messages.length - 1}
+                    timing={msg.timing}
+                    tokenUsage={msg.tokenUsage}
+                    proMode={isProfessionalMode}
+                    streaming={msg.streaming}
+                    streamStatus={i === messages.length - 1 && msg.streaming ? streamStatus : null}
+                  />
                   {msg.retryable && (
                     <div className="flex justify-center py-2">
                       <button onClick={handleRetry} disabled={loading}
@@ -1764,109 +1759,35 @@ export default function ChatPage() {
                   )}
                 </React.Fragment>
               ))}
-              {loading && <TypingIndicator proMode={isProfessionalMode} />}
+              {loading && !isStreaming && <TypingIndicator proMode={isProfessionalMode} />}
               <div ref={bottomRef} />
             </div>
           </main>
 
-          <footer className={`flex-shrink-0 safe-bottom ${isProfessionalMode ? 'bg-white/80 backdrop-blur-xl border-t border-amber-200/40' : 'glass border-t border-black/[0.04]'}`}>
-            <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5">
-              {/* 智能快捷回复：根据对话阶段动态切换 */}
-              {!input && !loading && (() => {
-                let quickReplies = []
-                const msgCount = messages.length
-                const lastMsg = messages[msgCount - 1]
-                const lastContent = (lastMsg?.content || '').toLowerCase()
-                const hasInfo = Object.keys(collectedInfo).length > 0
-                const infoCount = Object.keys(collectedInfo).filter(k => !k.startsWith('_') && collectedInfo[k]).length
-
-                if (msgCount <= 2) {
-                  // 阶段1：开场
-                  quickReplies = ['我做餐饮的，商户号被冻结了', '游戏行业，说我涉嫌赌博', '电商卖货，收款被限额', '做直播的，交易异常被封了', '我不太懂，帮我看看怎么办']
-                } else if (lastContent.includes('信息收集完毕') || lastContent.includes('收集完成')) {
-                  // 阶段4：收集完成后
-                  quickReplies = ['帮我生成申诉文案', '查看申诉流程指导', '我有投诉需要处理', '帮我分析成功率', '有没有类似的成功案例']
-                } else if (infoCount >= 10) {
-                  // 阶段3：收集后期
-                  quickReplies = ['跳过这个问题', '我不确定，先跳过', '这个信息我后面补充']
-                } else if (hasInfo && infoCount < 10) {
-                  // 阶段2：信息收集中
-                  quickReplies = ['不记得了', '没有', '暂时没有', '这个我不太清楚', '为什么要这个信息']
-                } else if (lastContent.includes('驳回') || lastContent.includes('被拒')) {
-                  // 特殊：讨论驳回
-                  quickReplies = ['帮我分析驳回原因', '怎么重新申诉', '需要补充什么材料', '帮我打95017怎么说']
-                } else if (lastContent.includes('投诉') || lastContent.includes('纠纷')) {
-                  // 特殊：讨论投诉
-                  quickReplies = ['怎么回复消费者投诉', '投诉处理完了还会影响吗', '退款后投诉会撤销吗']
-                } else if (msgCount > 2) {
-                  // 通用对话中
-                  quickReplies = ['怎么操作', '还有什么要注意的', '帮我总结一下', '有没有专业团队帮忙']
-                }
-
-                return quickReplies.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 mb-2 animate-fadeIn">
-                    {quickReplies.map(q => (
-                      <button key={q} onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50) }}
-                        className={`px-3 py-1.5 text-[11px] rounded-full transition-all whitespace-nowrap ${
-                          isProfessionalMode
-                            ? 'bg-white border border-amber-200/60 text-stone-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50/60'
-                            : 'bg-white border border-gray-200/80 text-gray-600 hover:border-[#07C160]/40 hover:text-[#07C160] hover:bg-green-50/50'
-                        }`}>
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                ) : null
-              })()}
-              <div className="flex items-end gap-2">
-                <div className="flex-1 relative">
-                  <textarea ref={inputRef} value={input} autoFocus
-                    onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder={isProfessionalMode ? '描述您的情况或回答问题...' : '输入消息...'} rows={1} disabled={loading}
-                    className={`w-full resize-none rounded-2xl px-4 py-2.5 text-sm transition-all max-h-28 overflow-y-auto ${
-                      isProfessionalMode
-                        ? 'border border-amber-200/60 bg-white/90 text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-300/30 focus:border-amber-300 focus:bg-white'
-                        : 'border border-gray-200/60 bg-white/80 placeholder:text-gray-300 focus:ring-2 focus:ring-[#07C160]/15 focus:border-[#07C160]/40 focus:bg-white'
-                    }`}
-                    style={{ minHeight: '42px' }}
-                    onInput={e => { e.target.style.height = '42px'; e.target.style.height = Math.min(e.target.scrollHeight, 112) + 'px' }}
-                  />
-                  {input.length > 200 && (
-                    <span className={`absolute right-3 bottom-1.5 text-[10px] ${input.length > 4500 ? 'text-red-400' : isProfessionalMode ? 'text-stone-400' : 'text-gray-300'}`}>
-                      {input.length}/5000
-                    </span>
-                  )}
-                </div>
-                <button onClick={handleSend} disabled={!input.trim() || loading}
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    input.trim() && !loading
-                      ? (isProfessionalMode
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-500/30 active:scale-90'
-                          : 'bg-[#07C160] text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:shadow-green-500/30 active:scale-90')
-                      : (isProfessionalMode ? 'bg-amber-50 text-amber-300 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed')
-                  }`}>
-                  {loading ? (
-                    <svg className="w-[18px] h-[18px] animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                  ) : (
-                    <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-          </footer>
+          <ChatInputFooter
+            input={input}
+            setInput={setInput}
+            loading={loading || isStreaming}
+            streamStatus={streamStatus}
+            inputRef={inputRef}
+            isProfessionalMode={isProfessionalMode}
+            messages={messages}
+            collectedInfo={collectedInfo}
+            infoProgress={infoProgress}
+            onSend={handleSend}
+            onKeyDown={handleKeyDown}
+          />
         </div>
 
         {/* 右侧客户信息面板 - lg桌面端显示，移动端覆盖 */}
         <div className={`
           lg:relative lg:w-80 xl:w-80 2xl:w-96 lg:border-l lg:block
           ${isProfessionalMode ? 'lg:border-amber-200/40' : 'lg:border-gray-200/60'}
-          ${showInfoPanel ? 'fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto' : 'hidden lg:block'}
+          ${showInfoPanel ? 'fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto' : 'hidden'}
         `}>
           {showInfoPanel && <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] lg:hidden" onClick={() => setShowInfoPanel(false)} />}
           <div className={`
-            ${showInfoPanel ? 'absolute right-0 top-0 bottom-0 w-80 shadow-2xl lg:shadow-none lg:static lg:w-full panel-slide-right' : ''}
+            ${showInfoPanel ? 'absolute right-0 top-0 bottom-0 panel-slide-right shadow-2xl lg:shadow-none lg:static lg:w-full' : ''}
             h-full
           `}>
             <InfoPanel
@@ -1874,6 +1795,7 @@ export default function ChatPage() {
               fields={infoFields}
               step={infoStep}
               totalSteps={infoTotal}
+              progress={infoProgress}
               sessionId={sessionId}
               onClose={() => setShowInfoPanel(false)}
               onFieldUpdate={handleFieldUpdate}
@@ -1882,8 +1804,22 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+      </div>
+      ) : null}
 
       {/* 申诉全流程指导面板（覆盖层） */}
+      {showDueDiligence && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowDueDiligence(false)}>
+          <div className="ml-auto w-full max-w-lg h-full bg-white shadow-2xl flex flex-col panel-slide-right" onClick={e => e.stopPropagation()}>
+            <DueDiligencePanel
+              sessionId={sessionId}
+              onClose={() => setShowDueDiligence(false)}
+              getAuthHeaders={getAuthHeaders}
+            />
+          </div>
+        </div>
+      )}
+
       {showAppealGuide && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowAppealGuide(false)}>
           <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
@@ -1912,8 +1848,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 申诉文案面板（覆盖层） */}
-      {showAppealPanel && (
+      {/* 申诉文案面板（尽调场景不使用） */}
+      {showAppealPanel && !isDDScenario(collectedInfo) && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowAppealPanel(false)}>
           <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
           <div className="relative ml-auto w-80 sm:w-96 h-full shadow-2xl animate-slide-in" onClick={e => e.stopPropagation()}>
@@ -1922,19 +1858,11 @@ export default function ChatPage() {
               userId={user?.id}
               onClose={() => setShowAppealPanel(false)}
               getAuthHeaders={getAuthHeaders}
+              isDueDiligence={isDDScenario(collectedInfo)}
+              onOpenDueDiligence={() => setShowDueDiligence(true)}
             />
           </div>
         </div>
-      )}
-
-      {/* 用户中心弹窗 */}
-      {showUserCenter && (
-        <UserCenter
-          user={user}
-          onClose={() => setShowUserCenter(false)}
-          onRecharge={() => { setShowUserCenter(false); openRecharge() }}
-          getAuthHeaders={getAuthHeaders}
-        />
       )}
 
       {/* 订单绑定面板 */}
@@ -2011,8 +1939,8 @@ export default function ChatPage() {
                   <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                   </div>
-                  <p className="text-sm text-gray-500 mb-3">暂无订单数据</p>
-                  <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { setOrderList([]) } } catch {} setOrderListLoading(false) }} className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md">
+                  <p className="text-sm text-gray-500 mb-3">{orderListHint || '暂无订单数据'}</p>
+                  <button onClick={() => loadOrderList(true)} className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md">
                     刷新订单列表
                   </button>
                 </div>
@@ -2125,7 +2053,7 @@ export default function ChatPage() {
             </div>
             {/* 底部操作 */}
             <div className="px-6 py-4 border-t border-gray-100 safe-bottom">
-              <button onClick={async () => { setOrderListLoading(true); try { const res = await fetch('/api/orders/from-system?page=1&page_size=100', { headers: getAuthHeaders() }); const data = await res.json(); if (data.success && data.data) { const sorted = data.data.sort((a, b) => { if (a.order_status === 12 && b.order_status !== 12) return -1; if (b.order_status === 12 && a.order_status !== 12) return 1; return 0 }); setOrderList(sorted) } else { alert(data.error || '获取订单失败') } } catch (e) { alert('连接失败') } setOrderListLoading(false) }} disabled={orderListLoading}
+              <button onClick={() => loadOrderList(true)} disabled={orderListLoading}
                 className="w-full py-3 bg-orange-500 text-white font-bold rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-60">
                 {orderListLoading ? '加载中...' : '获取闲鱼订单'}
               </button>
@@ -2569,106 +2497,53 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ========== 历史侧边栏（右滑打开） ========== */}
-      <div className={`history-drawer-overlay ${drawerOpen ? 'open' : ''}`} onClick={closeDrawer} />
-      <div className={`history-drawer ${drawerOpen ? 'open' : ''} bg-white flex flex-col`}>
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0 safe-top">
-          <h2 className="text-sm font-semibold text-gray-900">历史对话</h2>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { closeDrawer(); handleNewChat() }}
-              className="text-xs text-[#07C160] font-medium hover:text-green-700">新对话</button>
-            <button onClick={closeDrawer} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-500 rounded-lg hover:bg-gray-50">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {mySessionsLoading ? (
-            <div className="text-center py-16 text-gray-400 text-xs">加载中...</div>
-          ) : visibleSessions.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <p className="text-gray-400 text-xs">暂无历史对话</p>
-            </div>
-          ) : (
-            <div className="py-2">
-              {visibleSessions.map(s => (
-                <SessionItem key={s.id} session={s} fmtTime={fmtTime}
-                  onView={() => { closeDrawer(); openHistory(s.id) }}
-                  onContinue={() => { closeDrawer(); continueSession(s.id) }}
-                  onDelete={() => softDeleteSession(s.id)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="px-4 py-2.5 border-t border-gray-100 flex-shrink-0 safe-bottom">
-          <button onClick={() => { closeDrawer(); openMyHistory() }}
-            className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 bg-gray-50 rounded-lg font-medium">
-            查看全部历史记录
-          </button>
-        </div>
-      </div>
+      <ChatMoreSheet
+        open={showMoreMenu}
+        onClose={() => setShowMoreMenu(false)}
+        boundOrder={boundOrder}
+        contactAvailable={!!(contactCard || contactCards.length > 0)}
+        canExport={messages.length > 1}
+        onNewChat={handleNewChat}
+        onOpenHistory={openHistoryMenu}
+        onBindOrder={openOrderPanel}
+        onRecharge={openRecharge}
+        onContact={() => setShowContact(true)}
+        onApiMode={() => { setSelectedApiMode(user?.api_mode || 'official'); setCustomKey(''); setView('apiSelect') }}
+        onExport={handleExportChat}
+        onLogout={handleLogout}
+        onOpenTheme={() => setShowThemePicker(true)}
+      />
 
-      {/* 移动端左边缘滑动提示 */}
-      <div className="swipe-hint sm:hidden" onClick={openDrawer} />
+      <ThemePicker open={showThemePicker} onClose={() => setShowThemePicker(false)} />
+
+      <ChatBottomNav
+        activeTab={mobileTab}
+        onTabChange={setMobileTab}
+      />
+
+      <HistoryDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        loading={mySessionsLoading}
+        sessions={visibleSessions}
+        fmtTime={fmtTime}
+        onNewChat={handleNewChat}
+        onViewAll={openMyHistory}
+        onView={(id) => { closeDrawer(); openHistory(id) }}
+        onContinue={(id) => { closeDrawer(); continueSession(id) }}
+        onDelete={softDeleteSession}
+      />
+
+      {/* 左边缘滑动手势区（仅咨询 Tab） */}
+      {mobileTab === 'chat' && (
+      <div
+        ref={edgeSwipeRef}
+        className="edge-swipe-zone sm:hidden"
+        aria-hidden
+      />
+      )}
+
     </div>
   )
 }
 
-// ========== 可滑动删除的会话条目 ==========
-function SessionItem({ session, fmtTime, onView, onContinue, onDelete }) {
-  const [offsetX, setOffsetX] = useState(0)
-  const [removing, setRemoving] = useState(false)
-  const touchStartRef = useRef({ x: 0, y: 0 })
-
-  function onTouchStart(e) {
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-  }
-  function onTouchMove(e) {
-    const dx = e.touches[0].clientX - touchStartRef.current.x
-    const dy = e.touches[0].clientY - touchStartRef.current.y
-    if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
-      e.preventDefault()
-      setOffsetX(Math.max(dx, -80))
-    }
-  }
-  function onTouchEnd() {
-    if (offsetX < -40) {
-      setOffsetX(-80)
-    } else {
-      setOffsetX(0)
-    }
-  }
-  function handleDelete() {
-    setRemoving(true)
-    setTimeout(() => onDelete(), 300)
-  }
-
-  return (
-    <div className={`session-item mx-2 mb-1.5 rounded-xl ${removing ? 'session-removing' : ''}`}>
-      <div className="session-delete-bg rounded-r-xl" onClick={handleDelete}>
-        <span>删除</span>
-      </div>
-      <div className="session-item-content rounded-xl px-3.5 py-3"
-        style={{ transform: `translateX(${offsetX}px)` }}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onClick={() => { if (offsetX === 0) onView() }}>
-        <p className="text-[13px] text-gray-800 line-clamp-2 leading-snug font-medium">{session.first_message || '新对话'}</p>
-        <div className="flex items-center justify-between mt-1.5">
-          <div className="text-[10px] text-gray-400 flex items-center gap-1.5">
-            <span>{fmtTime(session.created_at)}</span>
-            <span className="text-gray-200">·</span>
-            <span>{session.message_count} 条</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-              session.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'
-            }`}>{session.status === 'active' ? '进行中' : '已完成'}</span>
-            <button onClick={e => { e.stopPropagation(); onContinue() }}
-              className="text-[10px] px-2 py-0.5 text-[#07C160] bg-green-50 rounded-md font-medium hover:bg-green-100">继续</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}

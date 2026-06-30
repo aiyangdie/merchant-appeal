@@ -1,6 +1,7 @@
 ﻿import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import ChatPage from './pages/ChatPage'
+import WechatCallback from './pages/chat/components/WechatCallback.jsx'
 import ErrorBoundary from './components/ErrorBoundary'
 
 // 懒加载重试：部署新版本后旧chunk会404，自动重试一次并刷新缓存
@@ -45,13 +46,16 @@ const LoadingFallback = () => (
   </div>
 )
 
+const routerBasename = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined
+
 export default function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename={routerBasename}>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<ChatPage />} />
+            <Route path="/auth/wechat/callback" element={<WechatCallback />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminPage />} />
             <Route path="/service/:orderNo" element={<ServicePage />} />

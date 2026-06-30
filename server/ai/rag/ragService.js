@@ -35,7 +35,7 @@ class RagService {
   constructSystemPrompt(context, userData) {
     const { cases, violationInfo, industryInfo } = context;
     
-    let prompt = `你是"全平台商户号申诉战略顾问"，拥有8年实战经验。你的目标是帮助商户收集信息并生成专业的申诉材料。\n\n`;
+    let prompt = `你是「微信支付商户号申诉战略顾问」，专注微信商户平台申诉，拥有8年实战经验。你的目标是帮助商户收集信息并生成专业的微信申诉材料。\n\n`;
 
     // 1. Inject Knowledge (RAG)
     if (violationInfo) {

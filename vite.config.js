@@ -1,19 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isProd = mode === 'production'
+  return {
   plugins: [react()],
+  base: isProd ? '/chat/' : '/',
   server: {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
       },
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: isProd ? 'dist/chat' : 'dist',
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -39,4 +42,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
   },
-})
+}})

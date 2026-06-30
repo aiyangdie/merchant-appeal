@@ -1,4 +1,5 @@
 ﻿import React, { useState, memo, useMemo } from 'react'
+import { getStreamStatusLabel, getStreamStatusHint, formatElapsed, shouldShowBubbleStreamStatus } from '../lib/streamStatus.js'
 
 const CopyButton = memo(function CopyButton({ text, label }) {
   const [copied, setCopied] = useState(false)
@@ -192,9 +193,9 @@ function parseMarkdown(text) {
   return html
 }
 
-const CleanCopyBlock = memo(function CleanCopyBlock({ content }) {
-  const [showPreview, setShowPreview] = useState(false)
+const MessageActions = memo(function MessageActions({ content }) {
   const [copied, setCopied] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const cleaned = useMemo(() => cleanTextForCopy(content), [content])
 
   if (!cleaned || cleaned.length < 10) return null
@@ -206,37 +207,29 @@ const CleanCopyBlock = memo(function CleanCopyBlock({ content }) {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       const ta = document.createElement('textarea')
-      ta.value = cleaned; ta.style.position = 'fixed'; ta.style.left = '-9999px'
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy')
+      ta.value = cleaned
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
       document.body.removeChild(ta)
-      setCopied(true); setTimeout(() => setCopied(false), 2000)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-gray-100/60">
-      <div className="flex items-center gap-2">
-        <button onClick={handleCopy}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border ${
-            copied
-              ? 'bg-green-50 text-green-600 border-green-200'
-              : 'bg-green-50 text-green-700 border-green-200/80 hover:border-green-300 hover:shadow-sm'
-          }`}>
-          {copied ? (
-            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>已复制</>
-          ) : (
-            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>一键整理并复制</>
-          )}
-        </button>
-        <button onClick={() => setShowPreview(!showPreview)}
-          className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors">
-          {showPreview ? '收起预览' : '预览纯文本'}
-        </button>
-      </div>
+    <div className="msg-actions">
+      <button type="button" onClick={handleCopy} className="msg-action-btn msg-action-btn--primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        {copied ? '已复制' : '一键整理并复制'}
+      </button>
+      <button type="button" onClick={() => setShowPreview(v => !v)} className="msg-action-btn msg-action-btn--ghost">
+        预览纯文本
+      </button>
       {showPreview && (
-        <div className="mt-2 p-2.5 bg-gray-50/80 rounded-lg border border-gray-100 max-h-[200px] overflow-y-auto">
-          <pre className="text-[12px] text-gray-600 whitespace-pre-wrap font-sans leading-relaxed select-all">{cleaned}</pre>
-        </div>
+        <pre className="msg-plain-preview">{cleaned}</pre>
       )}
     </div>
   )
@@ -262,18 +255,17 @@ const ReportContent = memo(function ReportContent({ content }) {
     <div className="message-content text-sm leading-relaxed">
       {preContent && <div dangerouslySetInnerHTML={{ __html: parseMarkdown(preContent) }} />}
 
-      <div className="flex items-center gap-2.5 my-3 py-2.5 px-3 bg-gradient-to-r from-green-50/80 to-emerald-50/60 rounded-xl border border-green-100/60">
-        <CopyButton text={stripMarkdown(content)} label="一键复制全部" />
-        <span className="text-[10px] text-gray-400">纯文本 · 可直接粘贴到申诉表单</span>
+      <div className="flex items-center gap-2 my-2 py-1">
+        <CopyButton text={stripMarkdown(content)} label="复制全部" />
       </div>
 
       {sections.map((sec, i) => (
-        <div key={i} className="mb-2.5 rounded-xl border border-gray-100/80 overflow-hidden bg-white">
-          <div className="flex items-center justify-between px-3 py-2 bg-gray-50/70">
-            <span className="text-[11px] font-semibold text-gray-700 tracking-wide">{sec.title}</span>
+        <div key={i} className="msg-report-section">
+          <div className="msg-report-head">
+            <span className="msg-report-title">{sec.title}</span>
             <CopyButton text={sec.fullText} label="复制" />
           </div>
-          <div className="px-3 py-2 text-[13px]"
+          <div className="msg-report-body"
             dangerouslySetInnerHTML={{ __html: parseMarkdown(sec.content) }} />
         </div>
       ))}
@@ -281,19 +273,41 @@ const ReportContent = memo(function ReportContent({ content }) {
   )
 })
 
+const StreamStatusBar = memo(function StreamStatusBar({ status, proMode }) {
+  if (!status) return null
+  const label = getStreamStatusLabel(status)
+  const hint = getStreamStatusHint(status)
+  const isWaiting = ['preparing', 'connecting', 'waiting'].includes(status.phase)
+
+  return (
+    <div className={`stream-status-bar ${proMode ? 'stream-status-bar--pro' : ''} ${isWaiting ? 'stream-status-bar--wait' : ''}`}>
+      <span className={`stream-status-dot ${isWaiting ? 'pulse' : ''}`} />
+      <div className="stream-status-text">
+        <span className="stream-status-label">{label}</span>
+        {hint && <span className="stream-status-hint">{hint}</span>}
+      </div>
+    </div>
+  )
+})
+
 const MessageMeta = memo(function MessageMeta({ timing, tokenUsage }) {
   if (!timing && !tokenUsage) return null
-  const hasTiming = timing && (timing.totalMs || timing.firstByteMs)
+  const hasTiming = timing && (timing.totalMs || timing.firstChunkMs || timing.connectMs || timing.firstByteMs)
   const hasTokens = tokenUsage && (tokenUsage.inputTokens || tokenUsage.outputTokens)
   if (!hasTiming && !hasTokens) return null
 
+  const firstMs = timing.firstChunkMs || timing.firstByteMs
+  const connectMs = timing.connectMs || timing.firstByteMs
+
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 pt-1.5 border-t border-gray-100/60 text-[9px] text-gray-400 tabular-nums">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[10px] text-gray-400 tabular-nums">
       {hasTiming && (
-        <span className="flex items-center gap-0.5">
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          {timing.firstByteMs && <span>首字 {timing.firstByteMs}ms</span>}
-          {timing.totalMs && <span>· 总计 {(timing.totalMs / 1000).toFixed(1)}s</span>}
+        <span className="flex items-center gap-1 flex-wrap">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          {connectMs != null && <span>连接 {formatElapsed(connectMs)}</span>}
+          {firstMs != null && <span>· 首字 {formatElapsed(firstMs)}</span>}
+          {timing.totalMs != null && <span>· 总计 {formatElapsed(timing.totalMs)}</span>}
+          {timing.model && <span className="text-gray-300">· {timing.model}</span>}
         </span>
       )}
       {hasTokens && (
@@ -308,15 +322,16 @@ const MessageMeta = memo(function MessageMeta({ timing, tokenUsage }) {
   )
 })
 
-export default memo(function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false }) {
+export default memo(function ChatMessage({ role, content, animate = false, timing, tokenUsage, proMode = false, streaming = false, streamStatus = null }) {
   const isUser = role === 'user'
   const isSystem = role === 'system'
+  const isAdmin = role === 'admin'
 
   if (isSystem) {
     return (
-      <div className={`flex justify-center my-3 ${animate ? 'message-animate' : ''}`}>
-        <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl px-4 py-3 text-center ${proMode ? 'bg-amber-50 border border-amber-200/60' : 'bg-amber-50/80 border border-amber-100'}`}>
-          <div className={`message-content text-[13px] leading-relaxed ${proMode ? 'text-amber-800' : 'text-amber-800'}`}
+      <div className={`chat-bubble-row chat-bubble-row--system ${animate ? 'message-animate' : ''}`}>
+        <div className="chat-bubble chat-bubble--system">
+          <div className="message-content"
             dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }} />
         </div>
       </div>
@@ -324,80 +339,76 @@ export default memo(function ChatMessage({ role, content, animate = false, timin
   }
 
   const isReport = !isUser && content && (content.match(/^###\s+/gm) || []).length >= 2
+  const rowClass = [
+    'chat-bubble-row',
+    isUser ? 'chat-bubble-row--user' : 'chat-bubble-row--ai',
+    proMode ? 'chat-bubble-row--pro' : '',
+    animate ? 'message-animate' : '',
+  ].filter(Boolean).join(' ')
+
+  const bubbleClass = [
+    'chat-bubble',
+    isUser ? 'chat-bubble--user' : 'chat-bubble--ai',
+    isAdmin ? 'chat-bubble--admin' : '',
+    isReport ? 'chat-bubble--report' : '',
+    proMode ? 'chat-bubble--pro' : '',
+  ].filter(Boolean).join(' ')
+
+  const aiLabel = isAdmin ? '人工客服' : (proMode ? 'AI 专业顾问' : 'AI 助手')
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} my-1.5 sm:my-2.5 ${animate ? 'message-animate' : ''}`}>
+    <div className={rowClass}>
       {!isUser && (
-        <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mr-2 sm:mr-2.5 mt-0.5 ${
-          role === 'admin'
-            ? 'bg-orange-500 shadow-sm'
-            : proMode
-              ? 'bg-amber-500 shadow-sm shadow-amber-500/15'
-              : 'bg-[#07C160] shadow-sm'
-        }`}>
-          {role === 'admin' ? (
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
-          ) : proMode ? (
-            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-            </svg>
+        <div className={`msg-avatar msg-avatar--ai ${proMode ? 'msg-avatar--pro' : ''}`}>
+          {isAdmin ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
           ) : (
-            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
           )}
         </div>
       )}
 
-      <div
-        className={`${isReport ? 'max-w-[92%] lg:max-w-[80%]' : 'max-w-[78%] sm:max-w-[75%] lg:max-w-[70%]'} ${
-          isUser
-            ? (proMode
-                ? 'bg-amber-500 text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
-                : 'bg-[#07C160] text-white rounded-[20px] rounded-tr-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3')
-            : role === 'admin'
-              ? 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3 border border-orange-100/80'
-              : proMode
-                ? 'pro-bubble-ai rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
-                : 'bg-white text-gray-800 rounded-[20px] rounded-tl-[6px] px-3.5 sm:px-4 py-2.5 sm:py-3'
-        }`}
-        style={!isUser && role !== 'admin' && !proMode ? { boxShadow: 'var(--shadow-bubble)' } : isUser && !proMode ? { boxShadow: 'var(--shadow-bubble-user)' } : isUser && proMode ? { boxShadow: '0 1px 3px rgba(184,134,11,0.15)' } : {}}
-      >
-        {!isUser && (
-          <div className="flex items-center gap-1.5 mb-1">
-            {role === 'admin' ? (
-              <span className="text-[10px] text-orange-500 font-medium">人工客服</span>
-            ) : proMode ? (
-              <span className="text-[10px] text-amber-600 font-medium">AI 专业顾问</span>
-            ) : (
-              <span className="text-[10px] text-gray-400 font-medium">AI 助手</span>
-            )}
-          </div>
-        )}
-        {isUser ? (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
-        ) : isReport ? (
-          <>
-            <ReportContent content={content} />
-            <MessageMeta timing={timing} tokenUsage={tokenUsage} />
-          </>
-        ) : (
-          <>
-            <div
-              className="message-content text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
-            />
-            <CleanCopyBlock content={content} />
-            <MessageMeta timing={timing} tokenUsage={tokenUsage} />
-          </>
-        )}
+      <div className="chat-bubble-col">
+        <div className={bubbleClass}>
+          {!isUser && (
+            <div className="chat-bubble-label">{aiLabel}</div>
+          )}
+          {isUser ? (
+            <p className="chat-bubble-text chat-bubble-text--user">{content}</p>
+          ) : isReport ? (
+            <>
+              <ReportContent content={content} />
+              <MessageActions content={content} />
+              <MessageMeta timing={timing} tokenUsage={tokenUsage} />
+            </>
+          ) : (
+            <>
+              {streaming && shouldShowBubbleStreamStatus(streamStatus, content?.length || 0) && (
+                <StreamStatusBar status={streamStatus} proMode={proMode} />
+              )}
+              {streaming && !content ? (
+                <div className="flex gap-1.5 items-center py-1">
+                  <div className={`typing-dot w-2 h-2 rounded-full ${proMode ? 'bg-orange-300' : 'bg-[#07C160]/40'}`} />
+                  <div className={`typing-dot w-2 h-2 rounded-full ${proMode ? 'bg-orange-300' : 'bg-[#07C160]/40'}`} />
+                  <div className={`typing-dot w-2 h-2 rounded-full ${proMode ? 'bg-orange-300' : 'bg-[#07C160]/40'}`} />
+                </div>
+              ) : (
+                <div
+                  className="message-content chat-bubble-text"
+                  dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
+                />
+              )}
+              {streaming && content && <span className="stream-cursor" aria-hidden="true">▍</span>}
+              {!streaming && content && <MessageActions content={content} />}
+              {!streaming && <MessageMeta timing={timing} tokenUsage={tokenUsage} />}
+            </>
+          )}
+        </div>
       </div>
 
       {isUser && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center ml-2 sm:ml-2.5 mt-0.5 shadow-sm">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-          </svg>
+        <div className="msg-avatar msg-avatar--user">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
         </div>
       )}
     </div>

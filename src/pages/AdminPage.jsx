@@ -11,6 +11,7 @@ import TokenPanel from '../components/TokenPanel'
 import AIModelsPanel from '../components/AIModelsPanel'
 import MonitorPanel from '../components/MonitorPanel'
 import BackupPanel from '../components/BackupPanel'
+import UserAvatar from '../components/UserAvatar'
 
 const TABS = [
   { key: 'dashboard', label: '仪表盘', icon: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5' },
@@ -194,6 +195,14 @@ function SessionItem({ s, selectedSession, selectSession, handleDeleteSession, t
   )
 }
 
+function UserBadge({ ok, label, okClass = 'bg-green-50 text-green-700', noClass = 'bg-gray-100 text-gray-500' }) {
+  return (
+    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${ok ? okClass : noClass}`}>
+      {label}
+    </span>
+  )
+}
+
 function UserCard({ u, balanceInputs, setBalanceInputs, handleAdjustBalance, handleDeleteUser, fmtTime, timeAgo }) {
   const bal = parseFloat(u.balance || 0)
   const spent = parseFloat(u.total_spent || 0)
@@ -201,20 +210,36 @@ function UserCard({ u, balanceInputs, setBalanceInputs, handleAdjustBalance, han
   const sess = u.session_count || 0
   const logins = u.login_count || 0
   const registered = fmtTime(u.created_at)
+  const oauthLabel = u.isWechatUser
+    ? (u.oauthUserinfo ? '已授权昵称头像' : '仅静默 openid')
+    : '未走公众号登录'
+  const proxyLabel = u.viaOpenProxy ? '经 open.aikex.ink' : (u.isWechatUser ? '直连微信' : '')
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            {(u.nickname || '?')[0]}
-          </div>
-          <div>
-            <div className="font-semibold text-sm text-gray-800">{u.nickname || '-'}</div>
-            <div className="text-xs text-gray-400 flex items-center gap-1.5">
-              <span>{u.phone}</span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <UserAvatar url={u.avatarUrl} name={u.nickname || '用户'} size={36} style={{ borderRadius: '50%' }} />
+          <div className="min-w-0">
+            <div className="font-semibold text-sm text-gray-800 truncate">{u.nickname || '-'}</div>
+            <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className={u.hasRealPhone ? 'text-gray-600' : 'text-amber-600'}>
+                {u.phoneDisplay || u.phone || '未绑定'}
+              </span>
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                 u.api_mode === 'custom' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
               }`}>{u.api_mode === 'custom' ? '自定义API' : '官方API'}</span>
+            </div>
+            <div className="flex items-center gap-1 flex-wrap mt-1">
+              <UserBadge ok={u.isWechatUser} label={u.isWechatUser ? '公众号用户' : '非公众号'} okClass="bg-emerald-50 text-emerald-700" />
+              <UserBadge ok={u.hasRealPhone} label={u.hasRealPhone ? '已绑手机' : '未绑手机'} />
+              {u.isWechatUser && (
+                <>
+                  <UserBadge ok={u.oauthUserinfo} label={oauthLabel} okClass="bg-sky-50 text-sky-700" />
+                  {proxyLabel && (
+                    <UserBadge ok={u.viaOpenProxy} label={proxyLabel} okClass="bg-violet-50 text-violet-700" />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -283,6 +308,7 @@ export default function AdminPage() {
   const [toast, setToast] = useState('')
   const [mobileShowChat, setMobileShowChat] = useState(false)
   const [users, setUsers] = useState([])
+  const [wechatOAuthInfo, setWechatOAuthInfo] = useState(null)
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [balanceInputs, setBalanceInputs] = useState({})
   const [newPassword, setNewPassword] = useState('')
@@ -415,7 +441,14 @@ export default function AdminPage() {
 
   async function fetchUsers() {
     if (users.length === 0) setLoadingUsers(true)
-    try { setUsers((await (await adminFetch('/api/admin/users')).json()).users || []) }
+    try {
+      const [usersRes, oauthRes] = await Promise.all([
+        adminFetch('/api/admin/users'),
+        adminFetch('/api/admin/wechat-oauth'),
+      ])
+      setUsers((await usersRes.json()).users || [])
+      setWechatOAuthInfo(await oauthRes.json())
+    }
     catch (e) { console.error(e) } finally { setLoadingUsers(false) }
   }
   async function fetchRechargeOrders(filterOverride) {
@@ -1838,7 +1871,6 @@ export default function AdminPage() {
           </div>
           <button onClick={fetchUsers} className="text-xs text-gray-400 hover:text-wechat-green px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">刷新</button>
         </div>
-        {/* Summary bar */}
         {users.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
@@ -1852,6 +1884,25 @@ export default function AdminPage() {
                 <div className="text-[10px] opacity-60">{c.label}</div>
               </div>
             ))}
+          </div>
+        )}
+        {wechatOAuthInfo?.enabled && (
+          <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-xs text-violet-900 space-y-1">
+            <div className="font-semibold">公众号 OAuth 经 open.aikex.ink 多域名回调</div>
+            <div className="text-violet-800/80 leading-relaxed">
+              公众号「{wechatOAuthInfo.mpName}」网页授权走代理{' '}
+              <a href={wechatOAuthInfo.proxyBase || 'https://open.aikex.ink'} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                {wechatOAuthInfo.proxyBase || 'open.aikex.ink'}
+              </a>
+              ，回调域 <span className="font-mono">{wechatOAuthInfo.callbackHost || '—'}</span> 须在该站后台「回调域名管理」里启用，否则用户登录会报「回调域名未授权」。
+            </div>
+            <div className="flex flex-wrap gap-2 pt-0.5">
+              <a href={wechatOAuthInfo.openAdminUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[11px] font-medium hover:bg-violet-700">
+                打开 open.aikex.ink 后台
+              </a>
+              <span className="text-[10px] text-violet-700/70 self-center">scope: {wechatOAuthInfo.scope}</span>
+            </div>
           </div>
         )}
         {loadingUsers ? (

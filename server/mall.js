@@ -517,25 +517,41 @@ export async function aiAutoCreateProducts(recentAnalyses = []) {
 // ========== 8. AI风险评估（根据用户违规信息评估风险等级）==========
 
 /**
+ * 规则引擎快速风险评估（毫秒级，不调用 AI）
+ */
+export function heuristicAssessRisk(collectedData = {}) {
+  const vr = String(collectedData.violation_reason || collectedData.problem_type || '').toLowerCase()
+  const pt = String(collectedData.penalty_type || '').toLowerCase()
+  const combined = `${vr} ${pt}`
+
+  if (/涉嫌|诈骗|赌博|洗钱|违法|犯罪/.test(combined)) {
+    return { level: 'severe', label: '严重风险', description: '涉及法律或重大违规，建议寻求专业支持', confidence: 0.55, source: 'heuristic' }
+  }
+  if (/永久|封号|封禁|关闭|冻结|限制交易|止付/.test(combined)) {
+    return { level: 'high', label: '高风险', description: '账户或资金受限，需尽快准备申诉材料', confidence: 0.55, source: 'heuristic' }
+  }
+  if (/警告|限额|首次|一般违规|限制收款/.test(combined)) {
+    return { level: 'medium', label: '中等风险', description: '存在违规记录，可通过申诉争取恢复', confidence: 0.45, source: 'heuristic' }
+  }
+  if (vr || pt) {
+    return { level: 'medium', label: '待评估', description: '已记录违规信息，继续补充细节可提升判断准确度', confidence: 0.35, source: 'heuristic' }
+  }
+  return { level: 'low', label: '信息不足', description: '请补充违规原因与处罚类型', confidence: 0.2, source: 'heuristic' }
+}
+
+/**
  * AI评估违规风险等级：severe/high/medium/low
+ * 优先返回规则结果；AI 在时限内成功则覆盖
  */
 export async function aiAssessRisk(collectedData = {}) {
+  const heuristic = heuristicAssessRisk(collectedData)
   const cfg = await _getAIConfig()
+  if (!cfg.apiKey) return heuristic
 
   const context = Object.entries(collectedData)
     .filter(([k, v]) => v && !k.startsWith('_'))
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n') || '暂无信息'
-
-  if (!cfg.apiKey) {
-    // AI不可用时的事实推断
-    const vr = (collectedData.violation_reason || '').toLowerCase()
-    const hasFreeze = /冻结|封号|封禁|关闭/.test(vr)
-    const hasLegal = /涉嫌|诈骗|赌博|洗钱/.test(vr)
-    if (hasLegal) return { level: 'severe', label: '严重风险', description: '涉及法律风险，需要专业法律支持', confidence: 0.5 }
-    if (hasFreeze) return { level: 'high', label: '高风险', description: '账户已被冻结/封禁', confidence: 0.5 }
-    return { level: 'medium', label: '中等风险', description: '需要进一步了解情况', confidence: 0.3 }
-  }
 
   const prompt = `你是商户申诉风险评估AI。根据以下用户信息评估其违规解除的风险等级。
 
@@ -562,20 +578,20 @@ ${context}
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
       body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 300 }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(4500),
     })
-    if (!res.ok) return { level: 'medium', label: '评估中', description: '正在分析...', confidence: 0 }
+    if (!res.ok) return heuristic
 
     const data = await res.json()
     const text = data.choices?.[0]?.message?.content || ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return { level: 'medium', label: '评估中', description: '解析失败', confidence: 0 }
+    if (!jsonMatch) return heuristic
 
     const result = JSON.parse(jsonMatch[0])
-    return { ...result, confidence: 0.9 }
+    return { ...result, confidence: 0.9, source: 'ai' }
   } catch (err) {
     console.error('[Mall] AI风险评估失败:', err.message)
-    return { level: 'medium', label: '评估中', description: '评估服务暂时不可用', confidence: 0 }
+    return heuristic
   }
 }
 

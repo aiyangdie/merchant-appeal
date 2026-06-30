@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react'
+import { resolveAuthHeaders } from '../lib/auth.js'
 
 const SECTIONS = [
   { key: 'business_model', label: '业务模式说明', icon: '💼', dbKey: 'business_model', formField: '对应表单「业务模式说明」' },
@@ -8,7 +9,7 @@ const SECTIONS = [
   { key: 'supplementary', label: '补充文字说明', icon: '📝', dbKey: 'supplementary', formField: '对应表单「补充文字说明」' },
 ]
 
-export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHeaders }) {
+export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHeaders, isDueDiligence, onOpenDueDiligence }) {
   const [appealText, setAppealText] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -20,12 +21,41 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
   const [feedbackText, setFeedbackText] = useState('')
 
   useEffect(() => {
-    if (sessionId) loadExisting()
-  }, [sessionId])
+    if (sessionId && !isDueDiligence) loadExisting()
+  }, [sessionId, isDueDiligence])
+
+  if (isDueDiligence) {
+    return (
+      <div className="h-full bg-white flex flex-col">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">尽调填写内容</h2>
+            <p className="text-[10px] text-gray-400">尽职调查无需申诉文案</p>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-500 rounded-lg hover:bg-gray-50">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          )}
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 mb-4 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl">📋</div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">这是「商户尽职调查」</h3>
+          <p className="text-xs text-gray-500 leading-relaxed mb-1">不需要填写申诉表单里的「退款机制」「投诉说明」等内容。</p>
+          <p className="text-xs text-gray-500 leading-relaxed mb-5">请使用顶部 <b className="text-indigo-600">尽调填写助手</b>，里面有可直接复制的经营说明、订单分笔、材料清单。</p>
+          <button
+            onClick={() => { onClose?.(); onOpenDueDiligence?.() }}
+            className="px-5 py-2.5 bg-indigo-500 text-white text-sm font-semibold rounded-xl hover:bg-indigo-600 transition-colors">
+            打开尽调填写助手
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   async function loadExisting() {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/appeal-text`, { headers: getAuthHeaders() })
+      const res = await fetch(`/api/sessions/${sessionId}/appeal-text`, { headers: resolveAuthHeaders(getAuthHeaders) })
       const data = await res.json()
       if (data.appealText) setAppealText(data.appealText)
     } catch {}
@@ -33,7 +63,7 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
 
   async function generate(force = false, retryCount = 0) {
     if (!sessionId || !userId) {
-      setError('缺少会话信息，请刷新页面后重试')
+      setError('请先在「咨询」页发送一条消息，或从首页进入咨询后再生成')
       return
     }
     setLoading(true)
@@ -43,7 +73,7 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
       const timeout = setTimeout(() => controller.abort(), 90000) // 90秒前端超时
       const res = await fetch(`/api/sessions/${sessionId}/generate-appeal-text`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: resolveAuthHeaders(getAuthHeaders),
         body: JSON.stringify({ userId, force }),
         signal: controller.signal,
       })
@@ -121,7 +151,7 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
       }
       if (newStatus === 'rejected' && appealText?.resubmit_count > 0) body.status = 'rejected'
       const res = await fetch(`/api/sessions/${sessionId}/appeal-feedback`, {
-        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+        method: 'POST', headers: resolveAuthHeaders(getAuthHeaders), body: JSON.stringify(body),
       })
       const data = await res.json()
       if (data.appealText) setAppealText(data.appealText)
@@ -175,7 +205,7 @@ export default function AppealTextPanel({ sessionId, userId, onClose, getAuthHea
               ))}
             </div>
             {error && <p className="text-xs text-red-500 mt-3 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-            <button onClick={() => generate()} disabled={loading || !sessionId}
+            <button onClick={() => { generate().catch(err => setError(err?.message || '生成失败')) }} disabled={loading || !sessionId || !userId}
               className="mt-5 px-6 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
               {loading ? (
                 <span className="flex items-center gap-2">

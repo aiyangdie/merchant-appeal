@@ -60,7 +60,23 @@ function FieldHistory({ logs }) {
   )
 }
 
-function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyLogs, historyLoading }) {
+function OrderInfoDisplay({ value }) {
+  const blocks = String(value || '').split(/【订单\s*\d+】/).filter(Boolean)
+  if (blocks.length <= 1 && !/商品名称/.test(value)) {
+    return <p className="text-[12px] text-gray-800 mt-0.5 leading-relaxed break-all font-medium whitespace-pre-wrap">{value}</p>
+  }
+  return (
+    <div className="mt-1 space-y-2">
+      {String(value).split(/\n\n+/).filter(b => b.trim()).map((block, i) => (
+        <div key={i} className="bg-gray-50 rounded-lg p-2 text-[11px] leading-relaxed whitespace-pre-wrap text-gray-700">
+          {block.trim()}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EditableField({ fieldKey, label, value, optional, onSave, onShowHistory, historyLogs, historyLoading }) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
@@ -106,9 +122,11 @@ function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyL
   }
 
   return (
-    <div className={`px-3 py-2 group cursor-pointer hover:bg-gray-50/50 transition-colors ${filled ? 'animate-slide-in-right' : ''}`} onClick={filled ? startEdit : undefined}>
+    <div className={`px-3 py-2 group cursor-pointer hover:bg-gray-50/50 transition-colors ${filled ? 'animate-slide-in-right' : ''}`} onClick={startEdit}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[11px] ${filled ? 'text-gray-500' : 'text-gray-300'}`}>{label}</span>
+        <span className={`text-[11px] ${filled ? 'text-gray-500' : 'text-gray-400'}`}>
+          {label}{optional && <span className="text-gray-300 ml-1">选填</span>}
+        </span>
         <div className="flex items-center gap-1">
           {filled && (
             <>
@@ -130,12 +148,17 @@ function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyL
           {filled ? (
             <svg className="w-3 h-3 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd"/></svg>
           ) : (
-            <div className="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" />
+            <button onClick={e => { e.stopPropagation(); startEdit() }}
+              className="px-1.5 py-0.5 text-[9px] text-blue-500 bg-blue-50 rounded opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              填写
+            </button>
           )}
         </div>
       </div>
       {filled && (
-        <p className="text-[12px] text-gray-800 mt-0.5 leading-relaxed break-all line-clamp-2 font-medium">{value}</p>
+        fieldKey === 'order_info'
+          ? <OrderInfoDisplay value={value} />
+          : <p className="text-[12px] text-gray-800 mt-0.5 leading-relaxed break-all line-clamp-2 font-medium">{value}</p>
       )}
       {showHistory && (
         <div className="px-1 pb-2 pt-1">
@@ -150,12 +173,17 @@ function EditableField({ fieldKey, label, value, onSave, onShowHistory, historyL
   )
 }
 
-export default function InfoPanel({ collectedData, fields, step, totalSteps, onClose, sessionId, onFieldUpdate, getAuthHeaders }) {
+export default function InfoPanel({ collectedData, fields, step, totalSteps, progress, onClose, sessionId, onFieldUpdate, getAuthHeaders }) {
   const data = collectedData || {}
   const fieldList = fields || []
-  const filledCount = fieldList.filter(f => data[f.key] && String(data[f.key]).trim()).length
-  const actualTotal = fieldList.length || totalSteps
-  const progress = actualTotal > 0 ? Math.min(100, Math.round((filledCount / actualTotal) * 100)) : 0
+  const prog = progress || {}
+  const requiredTotal = prog.total ?? totalSteps ?? fieldList.filter(f => !f.optional).length
+  const filledCount = prog.filled ?? fieldList.filter(f => !f.optional && data[f.key] && String(data[f.key]).trim()).length
+  const optionalTotal = prog.optionalTotal ?? fieldList.filter(f => f.optional).length
+  const optionalFilled = prog.optionalFilled ?? fieldList.filter(f => f.optional && data[f.key] && String(data[f.key]).trim()).length
+  const coreComplete = prog.coreComplete === true
+  const actualTotal = requiredTotal > 0 ? requiredTotal : fieldList.length
+  const progressPct = actualTotal > 0 ? Math.min(100, Math.round((filledCount / actualTotal) * 100)) : 0
 
   const [fieldHistoryMap, setFieldHistoryMap] = useState({})
   const [historyLoading, setHistoryLoading] = useState({})
@@ -174,6 +202,7 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
 
   const grouped = {}
   for (const f of fieldList) {
+    if (f.key === 'wechat_orders') continue
     if (!grouped[f.group]) grouped[f.group] = []
     grouped[f.group].push(f)
   }
@@ -216,7 +245,11 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
             </div>
             <div>
               <h2 className="text-[13px] font-semibold text-gray-900 leading-tight">客户信息</h2>
-              <p className="text-[10px] text-gray-400 leading-tight mt-0.5">已收集 {filledCount} / {actualTotal} 项 · 点击可编辑</p>
+              <p className="text-[10px] text-gray-400 leading-tight mt-0.5">
+                必收 {filledCount}/{actualTotal} 项
+                {optionalTotal > 0 && ` · 选填 ${optionalFilled}/${optionalTotal}`}
+                {' · 点击可编辑'}
+              </p>
             </div>
           </div>
           {onClose && (
@@ -228,16 +261,50 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
         {/* 进度 */}
         <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full transition-all duration-700 ease-out"
-            style={{ width: `${progress}%` }} />
+            style={{ width: `${progressPct}%` }} />
         </div>
-        {progress === 100 && (
+        {coreComplete && (
           <div className="mt-2.5 flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 rounded-lg">
             <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
             </div>
-            <span className="text-[11px] text-green-700 font-medium">信息收集完成</span>
+            <span className="text-[11px] text-green-700 font-medium">
+              {prog.scenario === 'due_diligence' ? '尽调核心信息已齐，可打开「尽调填写」复制提交' : '核心信息已收集完成'}
+            </span>
           </div>
         )}
+        {!coreComplete && prog.missingRequired?.length > 0 && (
+          <div className="mt-2 px-2.5 py-1.5 bg-amber-50/80 rounded-lg border border-amber-100">
+            <p className="text-[10px] text-amber-800 font-medium mb-0.5">还需补充（可点击填写或对话告知）：</p>
+            <p className="text-[10px] text-amber-700 leading-relaxed">{prog.missingRequired.slice(0, 4).join('、')}{prog.missingRequired.length > 4 ? '…' : ''}</p>
+          </div>
+        )}
+        {(() => {
+          const pt = data.problem_type || ''
+          const vr = data.violation_reason || ''
+          const isDD = data.scenario_type === 'due_diligence' || /尽职调查|尽调/.test(pt) || /尽职调查|尽调/.test(vr)
+          const rows = [
+            pt && { label: '场景', value: pt },
+            vr && pt !== vr && { label: '原因', value: vr },
+            data.merchant_id && { label: '商户号', value: data.merchant_id },
+            (data.company_name || data.merchant_name) && { label: '主体', value: data.company_name || data.merchant_name },
+            isDD && data.dd_deadline && { label: '截止时间', value: data.dd_deadline, warn: true },
+          ].filter(Boolean)
+          if (rows.length === 0) return null
+          return (
+            <div className={`mt-2.5 rounded-xl border px-3 py-2.5 ${isDD ? 'bg-amber-50/80 border-amber-100' : 'bg-blue-50/60 border-blue-100'}`}>
+              <div className="text-[10px] font-semibold text-gray-500 mb-1.5">{isDD ? '📋 尽调通知摘要' : '📌 关键信息'}</div>
+              <div className="space-y-1">
+                {rows.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                    <span className="text-gray-400 shrink-0">{r.label}</span>
+                    <span className={`font-medium break-all ${r.warn ? 'text-amber-700' : 'text-gray-800'}`}>{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
@@ -267,6 +334,7 @@ export default function InfoPanel({ collectedData, fields, step, totalSteps, onC
                     fieldKey={f.key}
                     label={f.label}
                     value={data[f.key]}
+                    optional={f.optional}
                     onSave={handleFieldSave}
                     onShowHistory={fetchFieldHistory}
                     historyLogs={fieldHistoryMap[f.key]}
