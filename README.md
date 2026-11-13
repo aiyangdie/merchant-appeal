@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/covers/01-merchant-appeal.jpg" alt="merchant-appeal 项目封面" width="100%"></p>
+
 # Merchant Appeal — 商户申诉智能助手
 
 面向微信/支付违规申诉场景的多轮对话收集、AI 诊断、材料清单与智能商城；管理后台集成 **AI 进化**、**AI 中枢**、**AI 管理助手**。
