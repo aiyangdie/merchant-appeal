@@ -1,77 +1,61 @@
-<p align="center"><img src="assets/covers/01-merchant-appeal.jpg" alt="merchant-appeal 项目封面" width="100%"></p>
+<p align="center"><img src="assets/covers/01-merchant-appeal.jpg" alt="商户申诉助手 项目封面" width="100%"></p>
 
-# Merchant Appeal — 商户申诉智能助手
+<h1 align="center">商户申诉助手 · Merchant Appeal</h1>
 
-面向微信/支付违规申诉场景的多轮对话收集、AI 诊断、材料清单与智能商城；管理后台集成 **AI 进化**、**AI 中枢**、**AI 管理助手**。
+<p align="center">微信支付 / 商户号违规申诉的多轮对话收集、AI 诊断与材料生成平台</p>
 
-## 功能概览
+## 简介
 
-| 模块 | 说明 |
-|------|------|
-| 用户对话 | `ChatPage` — 流式对话、信息收集、申诉文案 |
-| AI 进化 | 对话分析 → 规则库 → 注入 System Prompt（见 [docs/AI_EVOLUTION.md](docs/AI_EVOLUTION.md)） |
-| 管理端 AI 助手 | 右下角 FAB：计划预览、确认执行、设置/充值/用户等工具 |
-| AI 模型 / 中枢 | 模型健康、Key 导入、自然语言运维指令 |
-| 闲鱼管家 | 订单发货、改价（需配置 API Key） |
+面向被限制、被投诉的微信支付商户：把散落在聊天里的申诉信息收拢成结构化材料，用 AI 先做一轮自查，再输出可提交的申诉文案与材料清单。后台额外集成了 AI 进化、AI 中枢与管理端助手，日常运维不必写代码。
+
+## 功能
+
+- **用户对话**：流式对话收集申诉背景、违规类型、交易凭证，边聊边补全材料
+- **AI 诊断**：按申诉场景给出问题归因与补充建议，输出申诉文案草稿
+- **AI 进化**：把真实对话沉淀为规则库，再注入 System Prompt，越用越贴合业务
+- **管理端 AI 助手**：右下角悬浮入口，支持计划预览、确认执行、设置 / 充值 / 用户等操作
+- **模型与中枢**：多厂商 OpenAI 兼容 API，健康检查、Key 导入、自然语言运维指令
+- **闲鱼管家**：订单发货与改价（需自备 API Key）
 
 ## 技术栈
 
-- **前端**：React 18 + Vite + Tailwind  
-- **后端**：Node.js + Express + MySQL  
-- **AI**：多厂商 OpenAI 兼容 API，自动 fallback  
+React 18 · Vite · Tailwind ｜ Node.js · Express · MySQL ｜ OpenAI 兼容多模型自动回退
 
 ## 快速开始
 
 ```bash
-cp .env.example .env
-# 配置 MySQL、JWT_SECRET、DEEPSEEK_API_KEY 等
-
+cp .env.example .env      # 填 MySQL、JWT_SECRET、DEEPSEEK_API_KEY 等
 npm install
 npm run dev
 ```
 
-- 用户端：Vite 开发服务器（默认代理 `/api` → `localhost:3001`）  
-- 管理端：`/admin`  
+- 用户端：Vite 开发服务器（默认把 `/api` 代理到 `localhost:3001`）
+- 管理端：`/admin`
 
-## 验证
+自检脚本：
 
 ```bash
-npm run test:unit
-npm run verify:all
+npm run test:unit     # 单元测试
+npm run verify:all    # 全链路校验
 ```
 
-| 脚本 | 作用 |
-|------|------|
-| `verify:evolution` | AI 进化链路（Key、批量分析、Prompt 注入） |
-| `verify:agent` | 管理端 Agent 冒烟（plan/execute/token） |
-
-## 开发规范
-
-本项目强制 **Cursor Superpowers** 全流程，详见：
-
-- [AGENTS.md](AGENTS.md)
-- [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md)
-
-## 目录结构（摘要）
+## 项目结构
 
 ```
-server/
-  index.js          # 入口，启动 evolution 定时器
-  createApp.js      # Express 应用工厂
-  app/registerRoutes.js
-  evolution.js      # AI 自进化引擎
-  ai.js             # 用户对话 AI + Prompt
-  ai/adminAgent.js  # 管理端 Agent
-src/
+server/                 # Express 后端
+  index.js              # 入口，启动进化定时器
+  evolution.js          # AI 自进化引擎
+  ai.js                 # 用户对话 Prompt
+  ai/adminAgent.js      # 管理端 Agent
+src/                    # React 前端
   pages/ChatPage.jsx
   pages/AdminPage.jsx
-  components/admin/AdminAIFab.jsx
   components/EvolutionPanel.jsx
-docs/
-  AI_EVOLUTION.md
-  superpowers/      # 设计与实施计划
+docs/                   # AI_EVOLUTION.md、superpowers 设计与实施计划
 ```
 
-## License
+开发流程与协作约定见 [AGENTS.md](AGENTS.md)、[docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md)。
 
-Private — 部署与开源策略以仓库所有者为准。
+## 许可证
+
+私有项目，授权与部署范围以仓库所有者约定为准。
